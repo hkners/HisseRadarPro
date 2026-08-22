@@ -89,7 +89,7 @@ export default function BrokerageDetail() {
                   const isExpanded = expandedRow === i;
                   const tickerDisplay = r.ticker || r.hisse;
                   const linkTarget = r.ticker ? `/hisse/${r.ticker}` : '#';
-                  const isUnknown = (val) => !val || val === 'Bilinmiyor';
+                  const isUnknown = (val) => !val || val === 'Bilinmiyor' || val === 'N/A' || val === 'None' || val === 'null' || val === 0 || val === '0' || val === '0.0';
                   const reportPrice = isUnknown(r.mevcutFiyat) ? null : parseFloat(String(r.mevcutFiyat).replace(',','.'));
                   const targetPrice = isUnknown(r.hedefFiyat) ? null : parseFloat(String(r.hedefFiyat).replace(',','.'));
                   // Calculate live potential if we have both live_price and target
@@ -166,7 +166,7 @@ export default function BrokerageDetail() {
                               <div style={{ color: 'var(--text-highlight)', marginBottom: '10px', fontWeight: 'bold' }}>
                                 RAPOR TAM METN\u0130 ({r.tarih}):
                               </div>
-                              {r.full_text ? r.full_text : "Metin bulunamad\u0131."}
+                              {r.full_text || r.metin || "Metin bulunamad\u0131."}
                               <div style={{ marginTop: '15px' }}>
                                 <a href={r.link} target="_blank" rel="noreferrer" className="ticker-link text-neutral">
                                   [OR\u0130J\u0130NAL KAYNA\u011eA G\u0130T]

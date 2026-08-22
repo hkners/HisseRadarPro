@@ -157,7 +157,7 @@ export default function Screener() {
                         </span>
                       )}
                     </td>
-                    <td style={{ color: '#fff', fontWeight: 'bold' }}>{row.avg_target ? row.avg_target.toFixed(2) : 'N/A'}</td>
+                    <td style={{ color: '#fff', fontWeight: 'bold' }}>{typeof row.avg_target === 'number' ? row.avg_target.toFixed(2) : 'N/A'}</td>
                     <td style={{ color: 'var(--color-warning)', fontWeight: 'bold' }}>{row.count}</td>
                     <td style={{ textAlign: 'center' }}>
                       {row.ratings && (
@@ -168,10 +168,10 @@ export default function Screener() {
                         </div>
                       )}
                     </td>
-                    <td className={getPotentialColor(row.upside_potential)} style={{ fontWeight: 'bold', color: row.upside_potential > 0 ? 'var(--color-up)' : 'var(--color-down)', textAlign: 'right', paddingRight: '20px' }}>
+                    <td className={getPotentialColor(typeof row.upside_potential === 'number' ? row.upside_potential : 0)} style={{ fontWeight: 'bold', color: (typeof row.upside_potential === 'number' && row.upside_potential > 0) ? 'var(--color-up)' : 'var(--color-down)', textAlign: 'right', paddingRight: '20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-                        <span>{row.upside_potential > 0 ? '+' : ''}{row.upside_potential ? row.upside_potential.toFixed(2) : '0.00'}%</span>
-                        {row.upside_potential > 0 && (
+                        <span>{(typeof row.upside_potential === 'number' && row.upside_potential > 0) ? '+' : ''}{typeof row.upside_potential === 'number' ? row.upside_potential.toFixed(2) + '%' : 'N/A'}</span>
+                        {typeof row.upside_potential === 'number' && row.upside_potential > 0 && (
                           <div style={{ width: '60px', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                             <div style={{ width: `${Math.min(row.upside_potential, 100)}%`, height: '100%', background: 'var(--color-up)' }}></div>
                           </div>

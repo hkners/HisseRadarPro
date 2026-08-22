@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { slugifyBroker } from '../utils/slugify';
 import ImageWithFallback from '../components/ImageWithFallback';
 import ReportDetail from '../components/ReportDetail';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 export default function StockDetail() {
   const { ticker } = useParams();
@@ -10,6 +11,7 @@ export default function StockDetail() {
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState(null);
+  const [priceHistory, setPriceHistory] = useState([]);
 
   useEffect(() => {
     // Fetch live price
@@ -38,6 +40,12 @@ export default function StockDetail() {
         setRecs(validRecs);
         setLoading(false);
       });
+
+    // Fetch price history for chart
+    fetch(`${import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://127.0.0.1:8015'}/api/stocks/${ticker}/history`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setPriceHistory(data || []))
+      .catch(() => setPriceHistory([]));
   }, [ticker]);
 
   // Calc live potential
@@ -91,6 +99,56 @@ export default function StockDetail() {
         <Link to="/" className="ticker-link text-neutral">&lt; BACK TO INDEX</Link>
       </div>
 
+      {/* Full-width Price Chart */}
+      {priceHistory.length > 0 && (
+        <div className="panel" style={{ marginBottom: '15px' }}>
+          <div className="panel-header" style={{ color: 'var(--color-cyan)' }}>
+            📈 {ticker} — 1 YILLIK FİYAT GRAFİĞİ
+          </div>
+          <div className="panel-content" style={{ padding: '15px 10px' }}>
+            <div style={{ width: '100%', height: '280px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={priceHistory} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
+                  <defs>
+                    <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00e5ff" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#00e5ff" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fill: '#888', fontSize: 10 }} 
+                    tickFormatter={(d) => d ? d.substring(5) : ''}
+                    interval={Math.floor(priceHistory.length / 8)}
+                  />
+                  <YAxis 
+                    domain={['auto', 'auto']} 
+                    tick={{ fill: '#888', fontSize: 10 }}
+                    tickFormatter={(v) => v.toFixed(0)}
+                    width={50}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+                    itemStyle={{ color: '#00e5ff' }}
+                    labelStyle={{ color: '#aaa' }}
+                    formatter={(value) => [`${parseFloat(value).toFixed(2)} ₺`, 'Kapanış']}
+                  />
+                  {consensus.avgTarget && (
+                    <ReferenceLine 
+                      y={consensus.avgTarget} 
+                      stroke="var(--color-warning)" 
+                      strokeDasharray="5 5" 
+                      label={{ value: `Hedef: ${consensus.avgTarget.toFixed(0)}`, fill: 'var(--color-warning)', fontSize: 10, position: 'right' }}
+                    />
+                  )}
+                  <Area type="monotone" dataKey="close" stroke="#00e5ff" fill="url(#priceGradient)" strokeWidth={2} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-row">
         {/* Left Panel: Live Data */}
         <div className="panel" style={{ width: '300px' }}>
@@ -125,12 +183,12 @@ export default function StockDetail() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span className="text-muted">Avg Target Price:</span>
-                        <span style={{ fontWeight: 'bold', color: '#fff' }}>{consensus.avgTarget ? consensus.avgTarget.toFixed(2) : 'N/A'}</span>
+                        <span style={{ fontWeight: 'bold', color: '#fff' }}>{typeof consensus.avgTarget === 'number' ? consensus.avgTarget.toFixed(2) : 'N/A'}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span className="text-muted">Avg Upside:</span>
-                        <span style={{ fontWeight: 'bold', color: consensus.avgPotential !== null ? (consensus.avgPotential > 0 ? 'var(--color-up)' : 'var(--color-down)') : 'var(--text-muted)' }}>
-                            {consensus.avgPotential !== null ? `${consensus.avgPotential > 0 ? '+' : ''}${consensus.avgPotential.toFixed(2)}%` : 'N/A'}
+                        <span style={{ fontWeight: 'bold', color: typeof consensus.avgPotential === 'number' ? (consensus.avgPotential > 0 ? 'var(--color-up)' : 'var(--color-down)') : 'var(--text-muted)' }}>
+                            {typeof consensus.avgPotential === 'number' ? `${consensus.avgPotential > 0 ? '+' : ''}${consensus.avgPotential.toFixed(2)}%` : 'N/A'}
                         </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
@@ -224,7 +282,7 @@ export default function StockDetail() {
                                 <div style={{ color: 'var(--text-highlight)', marginBottom: '10px', fontWeight: 'bold' }}>
                                   RAPOR TAM METNİ ({r.tarih}):
                                 </div>
-                                {r.full_text ? r.full_text : "Metin bulunamadı veya eski formatta kaydedilmiş."}
+                                {r.full_text || r.metin || "Metin bulunamadı veya eski formatta kaydedilmiş."}
                                 <div style={{ marginTop: '15px' }}>
                                   <a href={r.link} target="_blank" rel="noreferrer" className="ticker-link text-neutral">
                                     [ORİJİNAL KAYNAĞA GİT]

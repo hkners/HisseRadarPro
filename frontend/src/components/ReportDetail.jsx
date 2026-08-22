@@ -35,7 +35,7 @@ export default function ReportDetail({ r }) {
       <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
         
         {/* Only show the report summary section if we have report_title or summary (i.e. not in StockDetail page) */}
-        {(r.report_title || r.summary || r.catalysts || r.full_text) && (
+        {(r.report_title || r.summary || r.catalysts || r.full_text || r.metin) && (
           <div style={{ flex: '1 1 300px' }}>
             <div style={{ fontWeight: 'bold', color: 'var(--text-highlight)', marginBottom: '8px' }}>
               📌 {r.report_title || `${r.ticker || r.category} - Şirket Raporu`}
@@ -48,10 +48,10 @@ export default function ReportDetail({ r }) {
                 <strong style={{ color: 'var(--color-up)' }}>Katalizörler:</strong> {r.catalysts}
               </div>
             )}
-            {r.full_text && (
+            {(r.full_text || r.metin) && (
               <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', borderTop: '1px dashed #333', paddingTop: '8px' }}>
                 <strong>Metin Çıktısı:</strong>
-                <p style={{ marginTop: '4px' }}>{r.full_text}</p>
+                <p style={{ marginTop: '4px' }}>{r.full_text || r.metin}</p>
               </div>
             )}
           </div>

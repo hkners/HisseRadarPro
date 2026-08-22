@@ -4,11 +4,16 @@ import os
 from typing import List, Dict, Optional
 import PyPDF2
 
-from garanti_scraper import GarantiScraper
+logger = logging.getLogger(__name__)
+
+try:
+    from garanti_scraper import GarantiScraper
+except ImportError:
+    GarantiScraper = None
+    logger.warning("garanti_scraper module not found. Garanti scraper will be unavailable.")
+
 from deniz_scraper import DenizScraper
 from llm_parser import LLMParser
-
-logger = logging.getLogger(__name__)
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:

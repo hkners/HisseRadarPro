@@ -245,3 +245,149 @@ body {
   line-height: 1.6;
   border-left: 2px solid var(--color-neutral);
 }
+
+/* Fade-in animation used by page transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Action buttons (filter tabs, pagination) */
+.action-button {
+  background: transparent;
+  color: var(--text-highlight);
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.action-button:hover {
+  border-color: var(--text-highlight);
+  background: rgba(255, 204, 0, 0.1);
+}
+.action-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Sync button & modal */
+.sync-btn {
+  background: transparent;
+  color: var(--color-cyan);
+  border: 1px solid var(--color-cyan);
+  padding: 2px 8px;
+  margin-right: 15px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  transition: all 0.15s ease;
+}
+.sync-btn:hover {
+  background: rgba(0, 229, 255, 0.1);
+}
+.sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sync-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.sync-modal {
+  width: 80%;
+  max-width: 800px;
+  height: 60vh;
+  background: #000;
+  border: 1px solid var(--color-cyan);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sync-log {
+  flex: 1;
+  overflow-y: auto;
+  background: #111;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #0f0;
+  white-space: pre-wrap;
+}
+
+/* Rating badges */
+.rating-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  display: inline-block;
+}
+.rating-badge--al {
+  background: var(--color-up);
+  color: #000;
+}
+.rating-badge--tut {
+  background: var(--color-warning);
+  color: #000;
+}
+.rating-badge--sat {
+  background: var(--color-down);
+  color: #fff;
+}
+
+/* Portfolio-specific */
+.portfolio-summary-card .panel-content {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* Neon-blue alias (used in some components) */
+:root {
+  --neon-blue: var(--color-cyan);
+  --neon-green: var(--color-up);
+  --bg-highlight: var(--text-highlight);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .flex-row {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 2px solid var(--border-color);
+    display: flex;
+    overflow-x: auto;
+    padding-right: 0;
+    margin-right: 0;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+  .sidebar-link {
+    white-space: nowrap;
+    padding: 4px 10px;
+  }
+  .app-container {
+    flex-direction: column;
+    height: auto;
+  }
+  .terminal-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}

@@ -10,6 +10,7 @@ import Portfolio from "./pages/Portfolio";
 import Models from "./pages/Models";
 import ResearchReports from "./pages/ResearchReports";
 import Sidebar from "./components/Sidebar";
+import ErrorBoundary from "./components/ErrorBoundary";
 import './index.css';
 
 function SyncButton() {
@@ -97,33 +98,37 @@ function SyncButton() {
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="terminal-container">
-        <header className="terminal-header">
-          <div className="terminal-logo">HISSERADAR PRO v2.0 // TERMINAL</div>
-          <div className="terminal-status" style={{ display: 'flex', alignItems: 'center' }}>
-            <SyncButton />
-            <span className="blink">●</span> BIST LIVE CONNECTED
-          </div>
-        </header>
-        
-        <div className="app-container">
-          <Sidebar />
+      <ErrorBoundary>
+        <div className="terminal-container">
+          <header className="terminal-header">
+            <div className="terminal-logo">HISSERADAR PRO v2.0 // TERMINAL</div>
+            <div className="terminal-status" style={{ display: 'flex', alignItems: 'center' }}>
+              <SyncButton />
+              <span className="blink">●</span> BIST LIVE CONNECTED
+            </div>
+          </header>
           
-          <main className="main-content">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/stocks" element={<Stocks />} />
-              <Route path="/screener" element={<Screener />} />
-              <Route path="/reports" element={<ResearchReports />} />
-              <Route path="/brokerages" element={<Brokerages />} />
-              <Route path="/models" element={<Models />} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/hisse/:ticker" element={<StockDetail />} />
-              <Route path="/kurum/:kurumName" element={<BrokerageDetail />} />
-            </Routes>
-          </main>
+          <div className="app-container">
+            <Sidebar />
+            
+            <main className="main-content">
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/stocks" element={<Stocks />} />
+                  <Route path="/screener" element={<Screener />} />
+                  <Route path="/reports" element={<ResearchReports />} />
+                  <Route path="/brokerages" element={<Brokerages />} />
+                  <Route path="/models" element={<Models />} />
+                  <Route path="/portfolio" element={<Portfolio />} />
+                  <Route path="/hisse/:ticker" element={<StockDetail />} />
+                  <Route path="/kurum/:kurumName" element={<BrokerageDetail />} />
+                </Routes>
+              </ErrorBoundary>
+            </main>
+          </div>
         </div>
-      </div>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

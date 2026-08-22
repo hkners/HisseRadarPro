@@ -48,10 +48,10 @@ export function ReportDetail({ r }) {
               <strong style={{ color: 'var(--color-up)' }}>Katalizörler:</strong> {r.catalysts}
             </div>
           )}
-          {r.full_text && (
+          {(r.full_text || r.metin) && (
             <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', borderTop: '1px dashed #333', paddingTop: '8px' }}>
               <strong>Metin Çıktısı:</strong>
-              <p style={{ marginTop: '4px' }}>{r.full_text}</p>
+              <p style={{ marginTop: '4px' }}>{r.full_text || r.metin}</p>
             </div>
           )}
         </div>

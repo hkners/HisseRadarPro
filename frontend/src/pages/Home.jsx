@@ -202,8 +202,8 @@ export default function Home() {
                         />
                         <Link to={`/hisse/${stock.ticker}`} className="ticker-link text-up">{stock.ticker}</Link>
                       </td>
-                      <td className={stock.upside_potential > 0 ? "text-up" : stock.upside_potential < 0 ? "text-down" : "text-neutral"} style={{ fontWeight: 'bold' }}>
-                        {stock.upside_potential > 0 ? '+' : ''}{stock.upside_potential.toFixed(2)}%
+                      <td className={(typeof stock.upside_potential === 'number' && stock.upside_potential > 0) ? "text-up" : (typeof stock.upside_potential === 'number' && stock.upside_potential < 0) ? "text-down" : "text-neutral"} style={{ fontWeight: 'bold' }}>
+                        {(typeof stock.upside_potential === 'number' && stock.upside_potential > 0) ? '+' : ''}{typeof stock.upside_potential === 'number' ? stock.upside_potential.toFixed(2) + '%' : 'N/A'}
                       </td>
                       <td className="text-neutral">{stock.count}</td>
                     </tr>
