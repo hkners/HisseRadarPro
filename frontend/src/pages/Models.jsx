@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import ImageWithFallback from '../components/ImageWithFallback';
+import slugifyBroker from '../utils/slugify';
 
 export default function Models() {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedModel, setSelectedModel] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/models`)
@@ -21,100 +24,113 @@ export default function Models() {
   return (
     <div className="panel flex-1">
       <div className="panel-header" style={{ color: 'var(--color-warning)' }}>
-        MODEL PORTFÖYLER VE AYLIK/HAFTALIK RAPORLAR
+        CANLI MODEL PORTFÖYLER (FINTABLES)
       </div>
       <div className="panel-content">
         <p className="text-muted" style={{ marginBottom: '20px' }}>
-          &gt; Tıklandığında raporun tablo veya infografik görseli açılır. (Sadece güncel 2026 raporları)
+          &gt; Fintables veritabanı kullanılarak kurumların aktif model portföylerindeki hisseler canlı olarak derlenmektedir.
         </p>
 
         {loading ? (
           <div style={{ color: 'var(--text-highlight)' }}>YÜKLENİYOR...</div>
         ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-            gap: '15px' 
-          }}>
-            {models.map(m => (
-              <div 
-                key={m.id} 
-                className="row-hoverable" 
-                style={{ 
-                  border: '1px solid var(--border-color)', 
-                  padding: '15px', 
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  background: 'rgba(0,0,0,0.4)'
-                }}
-                onClick={() => setSelectedModel(m)}
-              >
-                <div>
-                  <div style={{ color: 'var(--color-warning)', fontSize: '0.85rem', marginBottom: '5px' }}>
-                    [{m.kurum}] - {m.tarih}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
+            {models.length === 0 && (
+              <div style={{
+                border: '1px dashed #333',
+                padding: '40px',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-neutral)' }}>
+                  // NO MODEL PORTFOLIO DATA
+                </div>
+                <div style={{ fontSize: '12px' }}>
+                  Guncel model portfoy verisi bulunamadi.
+                </div>
+              </div>
+            )}
+            
+            {models.filter(m => m.stocks && m.stocks.length > 0).map(m => (
+              <div key={m.id} style={{ border: '1px solid var(--border-color)', background: 'var(--panel-bg)' }}>
+                {/* Header for Broker */}
+                <div 
+                  onClick={() => navigate(`/kurum/${m.kurum.replace(/\s+/g, '-').toLowerCase()}`)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    padding: '12px 15px', 
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'rgba(0,0,0,0.2)',
+                    cursor: 'pointer'
+                  }}
+                  className="row-hoverable"
+                >
+                  <div style={{ marginRight: '15px' }}>
+                    <ImageWithFallback 
+                      src={`${import.meta.env.VITE_API_URL.replace(/\/api$/, '')}/logos/brokers/${slugifyBroker(m.kurum)}.png`} 
+                      alt={m.kurum} 
+                      style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '4px' }} 
+                      name={m.kurum}
+                    />
                   </div>
-                  <div style={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'var(--text-highlight)' }}>
-                    {m.title}
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--color-warning)' }}>{m.kurum}</h3>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{m.title} - {m.tarih}</div>
                   </div>
                 </div>
-                <div style={{ marginTop: '15px', fontSize: '0.8rem', color: 'var(--color-neutral)', textAlign: 'right' }}>
-                  [+] GÖRÜNTÜLE
-                </div>
+
+                {/* Table of Stocks */}
+                {m.stocks && m.stocks.length > 0 ? (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table" style={{ width: '100%', textAlign: 'left', border: 'none' }}>
+                      <thead>
+                          <tr>
+                              <th style={{ paddingLeft: '10px' }}>HİSSE</th>
+                              <th style={{ textAlign: 'right' }}>HEDEF</th>
+                              <th style={{ textAlign: 'right', paddingRight: '10px' }}>POTANSİYEL</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {m.stocks.map((s, idx) => {
+                              const isPositive = s.potansiyel && !s.potansiyel.toString().startsWith('-');
+                              return (
+                                  <tr 
+                                    key={idx} 
+                                    className="row-hoverable" 
+                                    style={{ borderBottom: idx === m.stocks.length - 1 ? 'none' : '1px solid #1a1a1a', cursor: 'pointer' }}
+                                    onClick={() => navigate(`/hisse/${s.hisse}`)}
+                                  >
+                                      <td style={{ paddingLeft: '10px', fontWeight: 'bold', color: 'var(--text-highlight)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <ImageWithFallback 
+                                            src={`${import.meta.env.VITE_API_URL.replace(/\/api$/, '')}/logos/${s.hisse}.png`} 
+                                            alt={s.hisse} 
+                                            style={{ width: '16px', height: '16px', objectFit: 'contain', borderRadius: '2px' }} 
+                                            name={s.hisse}
+                                          />
+                                          <span style={{ fontSize: '0.9rem' }}>{s.hisse}</span>
+                                        </div>
+                                      </td>
+
+                                      <td style={{ textAlign: 'right', color: 'var(--text-highlight)', fontSize: '0.9rem' }}>
+                                        {s.hedefFiyat && s.hedefFiyat !== 'N/A' ? `${s.hedefFiyat} ₺` : '--'}
+                                      </td>
+                                      <td style={{ textAlign: 'right', paddingRight: '10px', fontWeight: 'bold', color: isPositive ? 'var(--color-up)' : 'var(--color-down)', fontSize: '0.9rem' }}>
+                                        {s.potansiyel && s.potansiyel !== 'N/A' ? `${isPositive ? '+' : ''}${s.potansiyel}%` : '--'}
+                                      </td>
+                                  </tr>
+                              );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {selectedModel && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          display: 'flex', justifyContent: 'center', alignItems: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }} onClick={() => setSelectedModel(null)}>
-          <div style={{
-            background: 'var(--panel-bg)',
-            border: '1px solid var(--color-warning)',
-            padding: '20px',
-            maxWidth: '90vw',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            display: 'flex',
-            flexDirection: 'column'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', borderBottom: '1px dashed var(--border-color)', paddingBottom: '10px' }}>
-              <strong style={{ color: 'var(--color-warning)', fontSize: '1.2rem' }}>{selectedModel.title}</strong>
-              <button 
-                onClick={() => setSelectedModel(null)}
-                style={{ background: 'transparent', border: '1px solid var(--color-red)', color: 'var(--color-red)', cursor: 'pointer', padding: '0 10px' }}
-              >
-                [X]
-              </button>
-            </div>
-            
-            <div style={{ textAlign: 'center', flex: 1, minHeight: '300px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              {selectedModel.image_url ? (
-                <img 
-                  src={selectedModel.image_url} 
-                  alt={selectedModel.title} 
-                  style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} 
-                />
-              ) : (
-                <div style={{ color: 'var(--color-neutral)' }}>
-                  BU RAPOR İÇİN GÖRSEL BULUNAMADI.<br/><br/>
-                  <a href={selectedModel.link} target="_blank" rel="noreferrer" style={{ color: 'var(--text-highlight)' }}>
-                    ORİJİNAL KAYNAĞA GİT
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

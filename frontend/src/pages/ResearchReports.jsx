@@ -284,12 +284,12 @@ export default function ResearchReports() {
   };
 
   return (
-    <div className="research-reports-page">
-      {/* Terminal Title Header */}
-      <div className="panel" style={{ marginBottom: '15px' }}>
+    <div className="research-reports-page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Title Header */}
+      <div className="panel" style={{ marginBottom: '15px', flexShrink: 0 }}>
         <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>// ARAŞTIRMA RAPORLARI (RESEARCH REPORTS TERMINAL)</span>
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>DATA SOURCE: LLM SCRAPER NETWORK</span>
+          <span>Araştırma Raporları</span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Güncel Aracı Kurum Raporları</span>
         </div>
       </div>
 
@@ -315,17 +315,19 @@ export default function ResearchReports() {
         onReset={handleResetFilters}
       />
 
-      {/* Terminal Data Table & Pagination */}
-      <ReportTable
-        reports={sortedReports}
-        paginatedReports={paginatedReports}
-        loading={loading}
-        expandedId={expandedId}
-        onToggleAccordion={toggleAccordion}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-      />
+      {/* Data Table & Pagination */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <ReportTable
+          reports={sortedReports}
+          paginatedReports={paginatedReports}
+          loading={loading}
+          expandedId={expandedId}
+          onToggleAccordion={toggleAccordion}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      </div>
     </div>
   );
 }

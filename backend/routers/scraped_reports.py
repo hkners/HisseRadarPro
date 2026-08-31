@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/scraped-reports", tags=["scraped-reports"])
 
 def _get_deps():
     from globals import report_repo, base_dir
-    from main import load_static_json_cache
+    from main import load_static_json_cache, get_cached_recommendations
     return report_repo, base_dir, load_static_json_cache
 
 
@@ -96,36 +96,32 @@ def stream_scrape():
 @router.post("/trigger-scrape")
 def trigger_scrape(
     background_tasks: BackgroundTasks,
-    limit_per_broker: int = Query(5, description="Limit reports fetched per broker"),
     run_sync: bool = Query(False, description="Run synchronously if True"),
 ):
-    """Triggers background scraping run via run_scraper_network()."""
-    report_repo, base_dir, load_static_json_cache, run_scraper_network = _get_deps()
+    """Triggers the run_all_scrapers.py pipeline in the background and reloads the cache."""
+    report_repo, base_dir, load_static_json_cache = _get_deps()
 
-    def _run_scrape_task(lim: int = 5):
+    def _run_scrape_task():
         try:
-            crawler_path = os.path.join(base_dir, "crawler_2026.py")
-            if os.path.exists(crawler_path):
-                subprocess.run([sys.executable, crawler_path], check=False)
-                load_static_json_cache()
-
-            run_scraper_network(limit_per_broker=lim)
+            script_path = os.path.join(base_dir, "run_all_scrapers.py")
+            subprocess.run([sys.executable, "-u", script_path], check=False, cwd=base_dir)
+            load_static_json_cache()
             report_repo.reload()
         except Exception as e:
-            print(f"Error in background scrape task: {e}")
+            logger.error(f"Error in background scrape task: {e}")
 
     if run_sync:
-        _run_scrape_task(limit_per_broker=limit_per_broker)
+        _run_scrape_task()
         return {
             "status": "success",
-            "message": f"Scrape network executed synchronously with limit={limit_per_broker}.",
+            "message": "Scrape pipeline executed synchronously.",
             "report_count": len(report_repo.get_reports()),
         }
     else:
-        background_tasks.add_task(_run_scrape_task, limit_per_broker)
+        background_tasks.add_task(_run_scrape_task)
         return {
             "status": "success",
-            "message": f"Scrape network task scheduled in background with limit={limit_per_broker}.",
+            "message": "Scrape pipeline task scheduled in background.",
         }
 
 
@@ -148,6 +144,20 @@ def get_scraped_report_pdf(id: str):
         raise HTTPException(status_code=404, detail=f"Scraped report with ID '{id}' not found.")
 
     pdf_path = report.get("pdf_path")
+    
+    # Try looking in the new scraper_service downloads folder
+    if not pdf_path or not os.path.exists(pdf_path):
+        scraper_service_dir = os.path.join(os.path.dirname(base_dir), "scraper_service")
+        engine_downloads = os.path.join(scraper_service_dir, "engine", "downloads")
+        
+        pdf_url = report.get("pdf_url", "")
+        if pdf_url:
+            filename = pdf_url.split("/")[-1]
+            possible_path = os.path.join(engine_downloads, filename)
+            if os.path.exists(possible_path):
+                pdf_path = possible_path
+
+    # Fallback to old scrapers/downloads directory if not found
     if not pdf_path or not os.path.exists(pdf_path):
         downloads_dir = os.path.join(base_dir, "scrapers", "downloads")
         file_hash = report.get("file_hash", "")

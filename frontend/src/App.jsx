@@ -1,17 +1,29 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
-import Stocks from "./pages/Stocks";
-import StockDetail from "./pages/StockDetail";
-import BrokerageDetail from "./pages/BrokerageDetail";
-import Screener from "./pages/Screener";
-import Brokerages from "./pages/Brokerages";
-import Portfolio from "./pages/Portfolio";
-import Models from "./pages/Models";
-import ResearchReports from "./pages/ResearchReports";
 import Sidebar from "./components/Sidebar";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ScraperStatus from "./components/ScraperStatus";
 import './index.css';
+
+// Lazy-loaded pages for code splitting — only loaded when navigated to
+const Home = React.lazy(() => import("./pages/Home"));
+const Stocks = React.lazy(() => import("./pages/Stocks"));
+const StockDetail = React.lazy(() => import("./pages/StockDetail"));
+const BrokerageDetail = React.lazy(() => import("./pages/BrokerageDetail"));
+const Screener = React.lazy(() => import("./pages/Screener"));
+const TechnicalScreener = React.lazy(() => import("./pages/TechnicalScreener"));
+const Brokerages = React.lazy(() => import("./pages/Brokerages"));
+const Portfolio = React.lazy(() => import("./pages/Portfolio"));
+const Models = React.lazy(() => import("./pages/Models"));
+const ResearchReports = React.lazy(() => import("./pages/ResearchReports"));
+const Discovery = React.lazy(() => import("./pages/Discovery"));
+
+const PageLoader = () => (
+  <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px', fontSize: '14px' }}>
+    <div style={{ fontSize: '24px', marginBottom: '10px' }}>●</div>
+    Yükleniyor...
+  </div>
+);
 
 function SyncButton() {
   const [syncing, setSyncing] = React.useState(false);
@@ -52,15 +64,16 @@ function SyncButton() {
         disabled={syncing}
         style={{
           background: 'transparent',
-          color: 'var(--neon-blue)',
-          border: '1px solid var(--neon-blue)',
-          padding: '2px 8px',
+          color: 'var(--color-neutral)',
+          border: '1px solid var(--border-color)',
+          padding: '4px 10px',
           marginRight: '15px',
           cursor: 'pointer',
-          fontSize: '12px'
+          fontSize: '12px',
+          borderRadius: '4px'
         }}
       >
-        {syncing ? "SENKRONIZE EDILIYOR..." : "[ VERILERI SENKRONIZE ET ]"}
+        {syncing ? "Senkronize Ediliyor..." : "Verileri Senkronize Et"}
       </button>
 
       {syncing && (
@@ -71,11 +84,11 @@ function SyncButton() {
         }}>
           <div style={{
             width: '80%', maxWidth: '800px', height: '60vh',
-            background: '#000', border: '1px solid var(--neon-blue)',
+            background: 'var(--bg-panel)', border: '1px solid var(--border-color)',
             borderRadius: '8px', padding: '20px',
             display: 'flex', flexDirection: 'column'
           }}>
-            <h3 style={{ margin: '0 0 15px 0', color: 'var(--text-highlight)' }}>SENKRONIZASYON TERMINALI</h3>
+            <h3 style={{ margin: '0 0 15px 0', color: 'var(--text-highlight)' }}>Veri Senkronizasyonu</h3>
             <div style={{
               flex: 1, overflowY: 'auto', background: '#111', 
               padding: '10px', borderRadius: '4px', fontFamily: 'monospace',
@@ -101,10 +114,11 @@ export default function App() {
       <ErrorBoundary>
         <div className="terminal-container">
           <header className="terminal-header">
-            <div className="terminal-logo">HISSERADAR PRO v2.0 // TERMINAL</div>
+            <div className="terminal-logo">HisseRadar Pro</div>
             <div className="terminal-status" style={{ display: 'flex', alignItems: 'center' }}>
               <SyncButton />
-              <span className="blink">●</span> BIST LIVE CONNECTED
+              <ScraperStatus />
+              <span style={{ color: 'var(--color-up)', marginRight: '5px' }}>●</span> BIST Canlı
             </div>
           </header>
           
@@ -113,17 +127,21 @@ export default function App() {
             
             <main className="main-content">
               <ErrorBoundary>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/stocks" element={<Stocks />} />
-                  <Route path="/screener" element={<Screener />} />
-                  <Route path="/reports" element={<ResearchReports />} />
-                  <Route path="/brokerages" element={<Brokerages />} />
-                  <Route path="/models" element={<Models />} />
-                  <Route path="/portfolio" element={<Portfolio />} />
-                  <Route path="/hisse/:ticker" element={<StockDetail />} />
-                  <Route path="/kurum/:kurumName" element={<BrokerageDetail />} />
-                </Routes>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/discovery" element={<Discovery />} />
+                    <Route path="/stocks" element={<Stocks />} />
+                    <Route path="/screener" element={<Screener />} />
+                    <Route path="/technical-screener" element={<TechnicalScreener />} />
+                    <Route path="/reports" element={<ResearchReports />} />
+                    <Route path="/brokerages" element={<Brokerages />} />
+                    <Route path="/models" element={<Models />} />
+                    <Route path="/portfolio" element={<Portfolio />} />
+                    <Route path="/hisse/:ticker" element={<StockDetail />} />
+                    <Route path="/kurum/:kurumName" element={<BrokerageDetail />} />
+                  </Routes>
+                </Suspense>
               </ErrorBoundary>
             </main>
           </div>

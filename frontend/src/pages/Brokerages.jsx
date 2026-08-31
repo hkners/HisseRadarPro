@@ -98,12 +98,14 @@ export default function Brokerages() {
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--color-neutral)' }}>{k.count}</td>
                     <td style={{ textAlign: 'center' }}>
-                      {k.ratings && (
+                      {k.ratings && Object.keys(k.ratings).length > 0 ? (
                         <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>
                           {k.ratings.AL > 0 && <span style={{ background: 'var(--color-up)', color: '#000', padding: '2px 6px', borderRadius: '4px' }}>{k.ratings.AL} AL</span>}
                           {k.ratings.TUT > 0 && <span style={{ background: 'var(--color-warning)', color: '#000', padding: '2px 6px', borderRadius: '4px' }}>{k.ratings.TUT} TUT</span>}
                           {k.ratings.SAT > 0 && <span style={{ background: 'var(--color-down)', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>{k.ratings.SAT} SAT</span>}
                         </div>
+                      ) : (
+                        <span style={{ color: 'var(--border-color)' }}>--</span>
                       )}
                     </td>
                     <td style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>

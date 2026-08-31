@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { slugifyBroker } from '../utils/slugify';
+import { Link } from 'react-router-dom';
 import ImageWithFallback from '../components/ImageWithFallback';
+import { useFavorites } from '../hooks/useFavorites';
+import FavoriteStar from '../components/common/FavoriteStar';
 
 const BIST30 = ['AKBNK', 'ALARK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'CCOMP', 'CWENE', 'ENKAI', 'EREGL', 'FROTO', 'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KOZAA', 'KOZAL', 'KRDMD', 'MIATK', 'ODAS', 'PGSUS', 'PETKM', 'SAHOL', 'SASA', 'SISE', 'TCELL', 'THYAO', 'TOASO', 'TUPRS', 'YKBNK'];
 const BIST100 = [
@@ -38,22 +40,7 @@ export default function Stocks() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  const [favorites, setFavorites] = useState(() => {
-    try {
-      const saved = localStorage.getItem('hisseRadarFavorites');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const toggleFavorite = (ticker) => {
-    setFavorites(prev => {
-      const newFavs = prev.includes(ticker) ? prev.filter(t => t !== ticker) : [...prev, ticker];
-      localStorage.setItem('hisseRadarFavorites', JSON.stringify(newFavs));
-      return newFavs;
-    });
-  };
+  const { favorites } = useFavorites();
 
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/stocks`)
@@ -230,12 +217,7 @@ export default function Stocks() {
                   {paginatedData.map(s => (
                     <tr key={s.ticker} className="row-hoverable">
                       <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <span 
-                          onClick={() => toggleFavorite(s.ticker)}
-                          style={{ cursor: 'pointer', marginRight: '8px', color: favorites.includes(s.ticker) ? 'var(--color-warning)' : 'var(--text-muted)' }}
-                        >
-                          ★
-                        </span>
+                        <FavoriteStar ticker={s.ticker} />
                         <ImageWithFallback 
                           src={`${import.meta.env.VITE_API_URL.replace(/\/api$/, '')}/logos/${s.ticker}.png`} 
                           alt={s.ticker} 

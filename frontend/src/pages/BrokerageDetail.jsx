@@ -1,6 +1,7 @@
 import React, { useEffect, useState, Fragment } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { slugifyBroker } from '../utils/slugify';
+import { sortReportsByDateDesc } from '../utils/dateUtils';
 import ImageWithFallback from '../components/ImageWithFallback';
 
 export default function BrokerageDetail() {
@@ -13,7 +14,8 @@ export default function BrokerageDetail() {
     fetch(`${import.meta.env.VITE_API_URL}/kurum/${kurumName}`)
       .then(res => res.json())
       .then(data => {
-        setRecs(data);
+        const sorted = sortReportsByDateDesc(data);
+        setRecs(sorted);
         setLoading(false);
       });
   }, [kurumName]);
@@ -25,9 +27,10 @@ export default function BrokerageDetail() {
   const displayName = kurumName.replace(/-/g, ' ').toUpperCase();
   const brokerSlug = slugifyBroker(kurumName.replace(/-/g, ' '));
 
-  const getPotentialColor = (potStr) => {
-    if (!potStr) return 'var(--text-muted)';
-    const num = parseFloat(potStr.replace('%', '').replace(',', '.'));
+  const getPotentialColor = (pot) => {
+    if (pot === null || pot === undefined) return 'var(--text-muted)';
+    const str = String(pot);
+    const num = parseFloat(str.replace('%', '').replace(',', '.'));
     if (isNaN(num)) return 'var(--text-muted)';
     if (num > 50) return '#00ff00';
     if (num > 20) return '#55cc55';
@@ -90,13 +93,25 @@ export default function BrokerageDetail() {
                   const tickerDisplay = r.ticker || r.hisse;
                   const linkTarget = r.ticker ? `/hisse/${r.ticker}` : '#';
                   const isUnknown = (val) => !val || val === 'Bilinmiyor' || val === 'N/A' || val === 'None' || val === 'null' || val === 0 || val === '0' || val === '0.0';
-                  const reportPrice = isUnknown(r.mevcutFiyat) ? null : parseFloat(String(r.mevcutFiyat).replace(',','.'));
-                  const targetPrice = isUnknown(r.hedefFiyat) ? null : parseFloat(String(r.hedefFiyat).replace(',','.'));
+                  let reportPrice = (isUnknown(r.mevcutFiyat)) ? null : parseFloat(String(r.mevcutFiyat).replace(',','.'));
+                  let targetPrice = isUnknown(r.hedefFiyat) ? null : parseFloat(String(r.hedefFiyat).replace(',','.'));
+                  if (isNaN(reportPrice)) reportPrice = null;
+                  if (isNaN(targetPrice)) targetPrice = null;
+
+                  let originalPotStr = r.potansiyel;
+
                   // Calculate live potential if we have both live_price and target
                   let livePotential = null;
                   if (r.live_price && targetPrice) {
                     livePotential = ((targetPrice - r.live_price) / r.live_price * 100).toFixed(1);
                   }
+                  
+                  const formatPotential = (pot) => {
+                    if (pot === null || pot === undefined || pot === "N/A" || pot === "Bilinmiyor" || pot === "None") return "-";
+                    const val = parseFloat(pot);
+                    if (isNaN(val)) return "-";
+                    return val >= 0 ? `+${val.toFixed(2)}%` : `${val.toFixed(2)}%`;
+                  };
                   
                   return (
                     <Fragment key={i}>
@@ -145,17 +160,17 @@ export default function BrokerageDetail() {
                             <span style={{ color: getPotentialColor(livePotential + '%') }}>
                               %{livePotential > 0 ? '+' : ''}{livePotential}
                             </span>
-                          ) : !isUnknown(r.potansiyel) ? (
-                            <span style={{ color: getPotentialColor(r.potansiyel) }}>
-                              {r.potansiyel}
+                          ) : originalPotStr !== null && originalPotStr !== undefined && !isUnknown(originalPotStr) ? (
+                            <span style={{ color: getPotentialColor(originalPotStr) }}>
+                              {formatPotential(originalPotStr)}
                             </span>
                           ) : (
                             <span style={{ color: 'var(--text-muted)' }}>-</span>
                           )}
                         </td>
                         <td>
-                          <button className="btn-read">
-                            {isExpanded ? '[-] CLOSE' : '[+] READ'}
+                          <button className="btn-read" style={{ color: (!r.full_text && !r.pdf_url) ? 'var(--neon-blue)' : 'var(--neon-cyan)' }}>
+                            {isExpanded ? '[-] CLOSE' : ((!r.full_text || r.full_text === "Metin bulunamadı.") && !r.pdf_url) ? '[+] FINTABLES' : '[+] READ'}
                           </button>
                         </td>
                       </tr>
@@ -164,13 +179,22 @@ export default function BrokerageDetail() {
                           <td colSpan="9">
                             <div className="accordion-content">
                               <div style={{ color: 'var(--text-highlight)', marginBottom: '10px', fontWeight: 'bold' }}>
-                                RAPOR TAM METN\u0130 ({r.tarih}):
+                                RAPOR TAM METNİ ({r.tarih}):
                               </div>
-                              {r.full_text || r.metin || "Metin bulunamad\u0131."}
+                              {(!r.full_text || r.full_text === "Metin bulunamadı.") && (!r.metin || r.metin === "Metin bulunamadı.") ? 
+                                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Bu veri Fintables üzerinden aracı kurumun hedef fiyat ve model portföy tablolarından otomatik olarak entegre edilmiştir. Aracı kurumun detaylı PDF rapor metnine ulaşılamamaktadır.</span> : 
+                                (r.full_text || r.metin)
+                              }
                               <div style={{ marginTop: '15px' }}>
-                                <a href={r.link} target="_blank" rel="noreferrer" className="ticker-link text-neutral">
-                                  [OR\u0130J\u0130NAL KAYNA\u011eA G\u0130T]
-                                </a>
+                                {r.pdf_url ? (
+                                  <a href={r.pdf_url} target="_blank" rel="noreferrer" className="ticker-link text-neutral">
+                                    [ORİJİNAL KAYNAĞA GİT]
+                                  </a>
+                                ) : r.link ? (
+                                  <a href={r.link} target="_blank" rel="noreferrer" className="ticker-link text-neutral">
+                                    [ORİJİNAL KAYNAĞA GİT]
+                                  </a>
+                                ) : null}
                               </div>
                             </div>
                           </td>

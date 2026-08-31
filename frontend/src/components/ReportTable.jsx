@@ -13,7 +13,7 @@ export default function ReportTable({
   onPageChange
 }) {
   return (
-    <div className="panel">
+    <div className="panel flex-1">
       <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span>RAPOR LİSTESİ ({reports.length})</span>
         {loading && <span className="blink" style={{ color: 'var(--text-highlight)' }}>YÜKLENİYOR...</span>}

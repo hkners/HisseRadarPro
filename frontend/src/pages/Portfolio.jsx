@@ -1,20 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis } from 'recharts';
 import ImageWithFallback from '../components/ImageWithFallback';
 
-const COLORS = ['#00ff66', '#00e5ff', '#ffaa00', '#ff0055', '#ff00ff', '#ffcc00', '#00ff00', '#ff3333'];
+const COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 
 export default function Portfolio() {
-  const [holdings, setHoldings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('hisseRadarPortfolio');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
+  const [holdings, setHoldings] = useState([]);
   const [livePrices, setLivePrices] = useState({});
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -22,10 +14,25 @@ export default function Portfolio() {
   const [newQuantity, setNewQuantity] = useState('');
   const [newCost, setNewCost] = useState('');
 
-  // Save holdings to localStorage whenever they change
+  const fetchPortfolio = useCallback(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/portfolio`)
+      .then(res => res.json())
+      .then(data => {
+        // Map backend item to match the frontend expectations
+        const mapped = data.map(item => ({
+          ticker: item.ticker,
+          quantity: item.quantity,
+          avgCost: item.cost,
+          addedAt: item.addedAt || new Date().toISOString().split('T')[0]
+        }));
+        setHoldings(mapped);
+      })
+      .catch(console.error);
+  }, []);
+
   useEffect(() => {
-    localStorage.setItem('hisseRadarPortfolio', JSON.stringify(holdings));
-  }, [holdings]);
+    fetchPortfolio();
+  }, [fetchPortfolio]);
 
   // Fetch live prices
   useEffect(() => {
@@ -54,33 +61,29 @@ export default function Portfolio() {
     const cost = parseFloat(newCost);
     if (!ticker || isNaN(qty) || qty <= 0 || isNaN(cost) || cost <= 0) return;
 
-    // Check if already exists — merge
-    const existing = holdings.find(h => h.ticker === ticker);
-    if (existing) {
-      const totalQty = existing.quantity + qty;
-      const totalCost = (existing.quantity * existing.avgCost + qty * cost) / totalQty;
-      setHoldings(prev => prev.map(h =>
-        h.ticker === ticker
-          ? { ...h, quantity: totalQty, avgCost: parseFloat(totalCost.toFixed(2)) }
-          : h
-      ));
-    } else {
-      setHoldings(prev => [...prev, {
-        ticker,
-        quantity: qty,
-        avgCost: cost,
-        addedAt: new Date().toISOString().split('T')[0],
-      }]);
-    }
-
-    setNewTicker('');
-    setNewQuantity('');
-    setNewCost('');
-    setShowAddForm(false);
+    // First do optimistic UI update or just wait for backend
+    fetch(`${import.meta.env.VITE_API_URL}/portfolio`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, quantity: qty, cost })
+    })
+    .then(res => res.json())
+    .then(() => {
+      fetchPortfolio();
+      setNewTicker('');
+      setNewQuantity('');
+      setNewCost('');
+      setShowAddForm(false);
+    })
+    .catch(console.error);
   };
 
   const removeHolding = (ticker) => {
-    setHoldings(prev => prev.filter(h => h.ticker !== ticker));
+    fetch(`${import.meta.env.VITE_API_URL}/portfolio/${ticker}`, {
+      method: 'DELETE'
+    })
+    .then(() => fetchPortfolio())
+    .catch(console.error);
   };
 
   // Calculate portfolio metrics
@@ -320,50 +323,82 @@ export default function Portfolio() {
           </div>
         </div>
 
-        {/* Weight Distribution Chart */}
-        {pieData.length > 0 && (
-          <div className="panel">
-            <div className="panel-header" style={{ color: 'var(--color-warning)' }}>AĞIRLIK DAĞILIMI</div>
-            <div className="panel-content">
-              <div style={{ width: '100%', height: '250px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={90}
-                      innerRadius={45}
-                      dataKey="value"
-                      paddingAngle={2}
-                      label={({ name, value }) => `${name} ${value}%`}
-                      labelLine={false}
-                    >
-                      {pieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
-                      itemStyle={{ color: '#fff' }}
-                      formatter={(value) => [`${value}%`, 'Ağırlık']}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              {/* Legend */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px', fontSize: '11px' }}>
-                {pieData.map((item, index) => (
-                  <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: COLORS[index % COLORS.length] }}></div>
-                    <span className="text-muted">{item.name}</span>
-                    <span style={{ marginLeft: 'auto', fontWeight: 'bold' }}>{item.value}%</span>
-                  </div>
-                ))}
+        {/* Weight Distribution and Trend Charts */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          {pieData.length > 0 && (
+            <div className="panel">
+              <div className="panel-header" style={{ color: 'var(--color-warning)' }}>AĞIRLIK DAĞILIMI</div>
+              <div className="panel-content">
+                <div style={{ width: '100%', height: '220px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        innerRadius={40}
+                        dataKey="value"
+                        paddingAngle={2}
+                        label={({ name, value }) => `${name} ${value}%`}
+                        labelLine={false}
+                      >
+                        {pieData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+                        itemStyle={{ color: '#fff' }}
+                        formatter={(value) => [`${value}%`, 'Ağırlık']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                {/* Legend */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px', fontSize: '11px' }}>
+                  {pieData.map((item, index) => (
+                    <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: COLORS[index % COLORS.length] }}></div>
+                      <span className="text-muted">{item.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {portfolioData.totalMarketValue > 0 && (
+            <div className="panel">
+              <div className="panel-header" style={{ color: 'var(--color-cyan)' }}>PORTFOLIO TREND (30D SIMULATION)</div>
+              <div className="panel-content">
+                <div style={{ width: '100%', height: '200px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={[
+                      { day: '30D', value: portfolioData.totalCostBasis * 0.95 },
+                      { day: '20D', value: portfolioData.totalCostBasis * 0.98 },
+                      { day: '10D', value: portfolioData.totalCostBasis * 1.05 },
+                      { day: '5D', value: portfolioData.totalMarketValue * 0.97 },
+                      { day: 'NOW', value: portfolioData.totalMarketValue }
+                    ]}>
+                      <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} domain={['dataMin - 1000', 'dataMax + 1000']} tickFormatter={(val) => `${(val/1000).toFixed(1)}k`} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#111', border: '1px solid var(--border-color)', borderRadius: '4px' }}
+                        itemStyle={{ color: 'var(--color-cyan)', fontWeight: 'bold' }}
+                        formatter={(val) => [`${val.toLocaleString('tr-TR')} ₺`, 'Değer']}
+                      />
+                      <Line type="monotone" dataKey="value" stroke="var(--color-cyan)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-cyan)' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px' }}>
+                  * This is a simulated trend based on current holdings.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {loading && (

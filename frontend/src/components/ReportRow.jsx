@@ -122,8 +122,12 @@ export function ReportDetail({ r }) {
 }
 
 export default function ReportRow({ r, isExpanded, onToggle }) {
-  const upside = r.potansiyel !== undefined && r.potansiyel !== null ? r.potansiyel : 0;
-  const isPositive = upside >= 0;
+  const isFintables = !r.pdf_url;
+  const displayPotansiyel = (r.potansiyel !== undefined && r.potansiyel !== null ? r.potansiyel : null);
+  const displayCurrentPrice = r.current_price;
+  
+  const upside = displayPotansiyel;
+  const isPositive = upside !== null && upside >= 0;
 
   const getRatingStyle = (rating) => {
     const rStr = (rating || '').toUpperCase();
@@ -216,24 +220,28 @@ export default function ReportRow({ r, isExpanded, onToggle }) {
                 {r.rating || 'N/A'}
               </span>
             </td>
-            <td>{r.current_price ? r.current_price.toFixed(2) : 'N/A'} ₺</td>
+            <td>{displayCurrentPrice !== null ? displayCurrentPrice.toFixed(2) : '-'} {displayCurrentPrice !== null ? '₺' : ''}</td>
             <td style={{ fontWeight: 'bold', color: 'var(--text-highlight)' }}>
-              {r.target_price ? r.target_price.toFixed(2) : 'N/A'} ₺
+              {r.target_price !== null && r.target_price !== undefined ? r.target_price.toFixed(2) : 'N/A'} ₺
             </td>
-            <td className={isPositive ? 'text-up' : 'text-down'} style={{ fontWeight: 'bold' }}>
-              {isPositive ? '+' : ''}{upside.toFixed(2)}%
+            <td className={upside !== null ? (isPositive ? 'text-up' : 'text-down') : 'text-neutral'} style={{ fontWeight: 'bold' }}>
+              {upside !== null ? `${isPositive ? '+' : ''}${upside.toFixed(2)}%` : '-'}
             </td>
           </>
         )}
 
         <td className="text-muted">{r.report_date}</td>
-        <td style={{ textAlign: 'center' }}>
+        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
           <button
             className="btn-read"
-            style={{ marginRight: '5px' }}
+            style={{ 
+              marginRight: '5px', 
+              borderColor: (!r.full_text && !r.pdf_url) ? 'var(--color-up)' : 'var(--neon-cyan)',
+              color: (!r.full_text && !r.pdf_url) ? 'var(--color-up)' : 'var(--neon-cyan)'
+            }}
             onClick={onToggle}
           >
-            {isExpanded ? 'KAPAT' : 'DETAY'}
+            {isExpanded ? '[X] CLOSE' : ((!r.full_text || r.full_text === "Metin bulunamadı.") && !r.pdf_url) ? 'FINTABLES' : 'DETAY'}
           </button>
           {r.pdf_url && (
             <a
@@ -241,7 +249,7 @@ export default function ReportRow({ r, isExpanded, onToggle }) {
               target="_blank"
               rel="noopener noreferrer"
               className="btn-read"
-              style={{ textDecoration: 'none', display: 'inline-block' }}
+              style={{ textDecoration: 'none', display: 'inline-block', borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
             >
               PDF ↗
             </a>

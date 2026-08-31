@@ -3,15 +3,34 @@ import { Link, useLocation } from 'react-router-dom';
 
 export default function Sidebar() {
   const location = useLocation();
+  const isActive = (path) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
+
+  const links = [
+    { to: '/', label: 'DASHBOARD' },
+    { to: '/discovery', label: 'ALPHA FINDER' },
+    { to: '/stocks', label: 'HISSELER' },
+    { to: '/screener', label: 'SCREENER' },
+    { to: '/technical-screener', label: 'TEKNİK RADAR' },
+    { to: '/reports', label: 'RAPORLAR' },
+    { to: '/brokerages', label: 'BROKERAGES', matchAlso: '/kurum' },
+    { to: '/models', label: 'MODEL PORTFOLER' },
+    { to: '/portfolio', label: 'PORTFOLIO' },
+  ];
+
   return (
     <aside className="sidebar">
-      <Link to="/" className={`sidebar-link ${location.pathname === '/' ? 'active' : ''}`}>&gt; DASHBOARD</Link>
-      <Link to="/stocks" className={`sidebar-link ${location.pathname === '/stocks' ? 'active' : ''}`}>&gt; HİSSELER</Link>
-      <Link to="/screener" className={`sidebar-link ${location.pathname === '/screener' ? 'active' : ''}`}>&gt; SCREENER</Link>
-      <Link to="/reports" className={`sidebar-link ${location.pathname === '/reports' ? 'active' : ''}`}>&gt; RAPORLAR</Link>
-      <Link to="/brokerages" className={`sidebar-link ${location.pathname.startsWith('/kurum') || location.pathname === '/brokerages' ? 'active' : ''}`}>&gt; BROKERAGES</Link>
-      <Link to="/models" className={`sidebar-link ${location.pathname === '/models' ? 'active' : ''}`} style={{ color: 'var(--text-highlight)' }}>&gt; MODEL PORTFÖYLER</Link>
-      <Link to="/portfolio" className={`sidebar-link ${location.pathname === '/portfolio' ? 'active' : ''}`}>&gt; PORTFOLIO</Link>
+      {links.map(link => (
+        <Link
+          key={link.to}
+          to={link.to}
+          className={`sidebar-link ${isActive(link.to) || (link.matchAlso && location.pathname.startsWith(link.matchAlso)) ? 'active' : ''}`}
+        >
+          &gt; {link.label}
+        </Link>
+      ))}
     </aside>
   );
 }

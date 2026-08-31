@@ -9,7 +9,7 @@ ALL_BIST_FILE = os.path.join(base_dir, "all_bist.txt")
 
 report_repo = ReportRepository()
 BIST_TICKERS = load_bist_tickers(ALL_BIST_FILE)
-price_service = PriceService(BIST_TICKERS, refresh_interval=900)
+price_service = PriceService(BIST_TICKERS, refresh_interval=900, report_repo=report_repo)
 
 _static_json_cache = {
     "recommendations": [],

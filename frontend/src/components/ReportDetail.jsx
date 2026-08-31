@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 export default function ReportDetail({ r }) {
   const [history, setHistory] = useState([]);
@@ -41,32 +41,58 @@ export default function ReportDetail({ r }) {
               📌 {r.report_title || `${r.ticker || r.category} - Şirket Raporu`}
             </div>
             <div style={{ marginBottom: '8px' }}>
-              <strong style={{ color: '#00e5ff' }}>Özet:</strong> {r.summary || 'Özet bulunmuyor.'}
+              <strong style={{ color: '#00e5ff' }}>Özet:</strong> {r.summary || ((!r.full_text || r.full_text === "Metin bulunamadı.") && !r.pdf_url ? 'Bu veri Fintables hedef fiyat & model portföy tablolarından entegre edilmiştir. Rapor özeti bulunmamaktadır.' : 'Özet bulunmuyor.')}
             </div>
             {r.catalysts && (
               <div style={{ marginBottom: '8px' }}>
                 <strong style={{ color: 'var(--color-up)' }}>Katalizörler:</strong> {r.catalysts}
               </div>
             )}
-            {(r.full_text || r.metin) && (
+            {((r.full_text || r.metin) && r.full_text !== "Metin bulunamadı.") ? (
               <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', borderTop: '1px dashed #333', paddingTop: '8px' }}>
                 <strong>Metin Çıktısı:</strong>
                 <p style={{ marginTop: '4px' }}>{r.full_text || r.metin}</p>
               </div>
-            )}
+            ) : (!r.pdf_url && (!r.full_text || r.full_text === "Metin bulunamadı.")) ? (
+              <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', borderTop: '1px dashed #333', paddingTop: '8px', fontStyle: 'italic' }}>
+                <strong>Bilgi:</strong>
+                <p style={{ marginTop: '4px' }}>Bu veri Fintables üzerinden aracı kurumun hedef fiyat ve model portföy tablolarından otomatik olarak entegre edilmiştir. Aracı kurumun detaylı PDF rapor metnine ulaşılamamaktadır.</p>
+              </div>
+            ) : null}
           </div>
         )}
         
-        {r.ticker && (
-          <div style={{ flex: '1 1 300px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--neon-green)', marginBottom: '10px' }}>
-              📊 GEÇMİŞ 1 YIL FİYAT & BİLANÇO
-            </div>
+        {r.ticker && !r.hideChart && !r.hideFundamentals && (
+          <div style={{ flex: '1 1 100%', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            {!r.hideFundamentals && (
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-neutral)', marginBottom: '10px' }}>
+                📊 GEÇMİŞ 1 YIL FİYAT & BİLANÇO
+              </div>
+            )}
             {loading ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Veriler Yükleniyor...</div>
             ) : (
               <>
-                {history.length > 0 ? (
+                {fundamentals && fundamentals.quarterly_financials && fundamentals.quarterly_financials.dates ? (
+                  <div style={{ width: '100%', height: '150px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={fundamentals.quarterly_financials.dates.map((d, i) => ({
+                        date: d,
+                        netIncome: fundamentals.quarterly_financials.net_income[i],
+                        revenue: fundamentals.quarterly_financials.revenue[i]
+                      }))}>
+                        <XAxis dataKey="date" tick={{ fill: '#888', fontSize: 10 }} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontSize: '11px' }}
+                          formatter={(val) => [(val / 1e6).toFixed(0) + 'M ₺']}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '10px' }} />
+                        <Bar dataKey="revenue" fill="#3b82f6" name="Gelir" />
+                        <Bar dataKey="netIncome" fill="#10b981" name="Net Kar" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : history.length > 0 && !r.hideChart ? (
                   <div style={{ width: '100%', height: '150px' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={history}>
@@ -82,34 +108,34 @@ export default function ReportDetail({ r }) {
                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Grafik verisi bulunamadı.</div>
+                  !r.hideChart && <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Grafik verisi bulunamadı.</div>
                 )}
                 
-                {fundamentals && (
-                  <div style={{ marginTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', fontSize: '11px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>Sektör:</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.sector || 'N/A'}</span>
+                {!r.hideFundamentals && fundamentals && (
+                  <div style={{ marginTop: '15px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '11px' }}>
+                    <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>SEKTÖR</div>
+                      <div style={{ color: '#fff', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={fundamentals.sector || 'N/A'}>{fundamentals.sector || 'N/A'}</div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>F/K (P/E):</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.trailingPE ? fundamentals.trailingPE.toFixed(2) : 'N/A'}</span>
+                    <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>F/K</div>
+                      <div style={{ color: 'var(--text-highlight)', fontWeight: 'bold' }}>{fundamentals.trailingPE ? fundamentals.trailingPE.toFixed(2) : 'N/A'}</div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>PD/DD (P/B):</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.priceToBook ? fundamentals.priceToBook.toFixed(2) : 'N/A'}</span>
+                    <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>PD/DD</div>
+                      <div style={{ color: 'var(--text-highlight)', fontWeight: 'bold' }}>{fundamentals.priceToBook ? fundamentals.priceToBook.toFixed(2) : 'N/A'}</div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>Temettü:</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.dividendYield ? (fundamentals.dividendYield * 100).toFixed(2) + '%' : 'N/A'}</span>
+                    <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>TEMETTÜ</div>
+                      <div style={{ color: 'var(--color-up)', fontWeight: 'bold' }}>{fundamentals.dividendYield ? (fundamentals.dividendYield * 100).toFixed(2) + '%' : 'N/A'}</div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>Piyasa Değeri:</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.marketCap ? (fundamentals.marketCap / 1e9).toFixed(2) + ' Mlyr ₺' : 'N/A'}</span>
+                    <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>PİYASA DEĞERİ</div>
+                      <div style={{ color: '#fff', fontWeight: 'bold' }}>{fundamentals.marketCap ? (fundamentals.marketCap / 1e9).toFixed(2) + 'B ₺' : 'N/A'}</div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>Özsermaye K.:</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.returnOnEquity ? (fundamentals.returnOnEquity * 100).toFixed(2) + '%' : 'N/A'}</span>
+                    <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>ÖZSERMAYE KARL.</div>
+                      <div style={{ color: '#fff', fontWeight: 'bold' }}>{fundamentals.returnOnEquity ? (fundamentals.returnOnEquity * 100).toFixed(2) + '%' : 'N/A'}</div>
                     </div>
                   </div>
                 )}

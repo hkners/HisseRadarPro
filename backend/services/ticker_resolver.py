@@ -8,7 +8,7 @@ import re
 
 TICKER_MAP = {
     # A
-    "1000 Yatırımlar Holding": "YATAS",
+    "1000 Yatırımlar Holding": "BINHO",
     "Agesa": "AGESA", "Agesa Hayat Emeklilik": "AGESA",
     "Akbank": "AKBNK",
     "Akçansa": "AKCNS",
@@ -20,7 +20,7 @@ TICKER_MAP = {
     "Arçelik": "ARCLK",
     "ASELSAN": "ASELS", "Aselsan": "ASELS",
     "Astor Enerji": "ASTOR",
-    "Avrupakent GYO": "AVGYO",
+    "Avrupakent GYO": "AVPGY",
     "Aygaz": "AYGAZ",
     # B
     "Besler Gıda": "BSRGZ",
@@ -49,14 +49,14 @@ TICKER_MAP = {
     "Garanti BBVA": "GARAN", "Garanti Bankası": "GARAN", "Türkiye Garanti Bankası": "GARAN",
     "Gediz Ambalaj": "GEDZA",
     "Gelecek Varlık Yönetimi": "GLCVY",
-    "Girişim Elektrik": "GEREL",
+    "Girişim Elektrik": "GESAN",
     "Grainturk": "GRTRK", "Graintürk": "GRTRK",
     "Gülermak": "GLRMK", "Gülermak Ağır Sanayi": "GLRMK",
     # H
     "Halkbank": "HALKB",
     "Hareket Proje Taşımacılık": "HRKET", "Hareket Proje Taşımacılığı": "HRKET",
     # I - İ
-    "IC Enterra": "ICUGS",
+    "IC Enterra": "ENTRA",
     "İş Bankası": "ISCTR", "İ Bankası": "ISCTR", "Türkiye İş Bankası": "ISCTR",
     "Türkiye İ Bankası": "ISCTR", "Türkiye İ Bankası (C)": "ISCTR",
     "İş GYO": "ISGYO", "İ GYO": "ISGYO",
@@ -70,7 +70,7 @@ TICKER_MAP = {
     "Koton": "KOTON", "Koton Mağazacılık": "KOTON",
     "Koç Holding": "KCHOL",
     "Koza Altın": "KOZAL", "Koza Anadolu": "KOZAA", "Koza Altın İşletmeleri": "KOZAL",
-    "Kuzey Boru": "KZBGY",
+    "Kuzey Boru": "KBORU",
     # L
     "Lila Kağıt": "LILAK",
     "Logo Yazılım": "LOGO",
@@ -86,7 +86,7 @@ TICKER_MAP = {
     # P
     "Pegasus": "PGSUS", "Pegasus Hava Taşımacılığı": "PGSUS", "Pegasus Hava Taşımacılık": "PGSUS",
     # R
-    "Rönesans Gayrimenkul": "RYGYO", "Rönesans Gayrimenkul Yatırım": "RYGYO",
+    "Rönesans Gayrimenkul": "RGYAS", "Rönesans Gayrimenkul Yatırım": "RGYAS",
     # S
     "Sabancı Holding": "SAHOL",
     "Selçuk Ecza Deposu": "SELEC",
@@ -97,7 +97,7 @@ TICKER_MAP = {
     # T
     "TAB Gıda": "TABGD", "Tab Gıda": "TABGD",
     "TAV Holding": "TAVHL", "TAV Havalimanları": "TAVHL", "TAV Havalimanları Holding": "TAVHL", "Tav Havalimanları": "TAVHL",
-    "Tapdi Oksijen": "TDGYO",
+    "Tapdi Oksijen": "TNZTP",
     "Teknosa": "TKNSA",
     "Telekomunikasyon Sektörü": "TCELL",
     "Tofaş": "TOASO", "TOFAŞ": "TOASO",
@@ -118,7 +118,7 @@ TICKER_MAP = {
     # Y
     "YEO Teknoloji": "YEOTK",
     "Yapı Kredi Bankası": "YKBNK", "Yapı ve Kredi Bankası": "YKBNK",
-    "Yayla Agro Gıda": "YAYLA",
+    "Yayla Agro Gıda": "YYLGD",
 }
 
 
@@ -137,34 +137,52 @@ def load_bist_tickers(all_bist_file: str) -> list:
     return tickers
 
 
+# Pre-computed O(1) lookup dict: lowercase company name -> ticker
+_TICKER_LOOKUP = {k.lower(): v for k, v in TICKER_MAP.items()}
+# Pre-computed set of all known ticker symbols (uppercase) for fast membership test
+_TICKER_SET = None
+
+
+def _get_ticker_set(bist_tickers: list) -> set:
+    """Lazily build a set of all known tickers for O(1) membership checks."""
+    global _TICKER_SET
+    if _TICKER_SET is None:
+        _TICKER_SET = set(bist_tickers)
+    return _TICKER_SET
+
+
 def match_ticker(name: str, bist_tickers: list) -> str | None:
-    """Match a company name or ticker string to a canonical BIST ticker."""
+    """Match a company name or ticker string to a canonical BIST ticker.
+    Uses O(1) dict lookup instead of O(n) iteration over TICKER_MAP.
+    """
     if not name:
         return None
     name_strip = name.strip()
 
-    # Exact match in TICKER_MAP
-    for k, v in TICKER_MAP.items():
-        if k.lower() == name_strip.lower():
-            return v
+    # 1. O(1) exact match in pre-computed lowercase lookup
+    result = _TICKER_LOOKUP.get(name_strip.lower())
+    if result:
+        return result
 
-    # Substring match in TICKER_MAP
-    for k, v in TICKER_MAP.items():
-        if k.lower() in name_strip.lower():
-            return v
-
-    # Direct ticker match
+    # 2. Direct ticker match via set (O(1))
     upper_name = name_strip.upper()
-    if upper_name in bist_tickers:
+    ticker_set = _get_ticker_set(bist_tickers)
+    if upper_name in ticker_set:
         return upper_name
 
-    # Short ticker heuristic
-    if len(upper_name) <= 5 and upper_name.isupper() and upper_name.isalpha():
-        if upper_name == "BİM" or upper_name == "BIM":
+    # 3. Short ticker heuristic (rare fallback)
+    if len(upper_name) <= 5 and upper_name.isalpha():
+        if upper_name in ("BİM", "BIM"):
             return "BIMAS"
-        if upper_name == "TOFAŞ" or upper_name == "TOFAS":
+        if upper_name in ("TOFAŞ", "TOFAS"):
             return "TOASO"
         return upper_name
+
+    # 4. Substring match (slow path, only for fuzzy names — rare)
+    name_lower = name_strip.lower()
+    for k, v in TICKER_MAP.items():
+        if k.lower() in name_lower:
+            return v
 
     return None
 
