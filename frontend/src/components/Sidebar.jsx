@@ -10,14 +10,16 @@ export default function Sidebar() {
 
   const links = [
     { to: '/', label: 'DASHBOARD' },
-    { to: '/discovery', label: 'ALPHA FINDER' },
-    { to: '/stocks', label: 'HISSELER' },
-    { to: '/screener', label: 'SCREENER' },
+    { to: '/discovery', label: 'HİSSE KEŞİF' },
+    { to: '/alpha', label: 'ALPHA INSIGHTS' },
+    { to: '/stocks', label: 'HİSSELER' },
+    { to: '/screener', label: 'TARAYICI' },
     { to: '/technical-screener', label: 'TEKNİK RADAR' },
     { to: '/reports', label: 'RAPORLAR' },
-    { to: '/brokerages', label: 'BROKERAGES', matchAlso: '/kurum' },
-    { to: '/models', label: 'MODEL PORTFOLER' },
-    { to: '/portfolio', label: 'PORTFOLIO' },
+    { to: '/brokerages', label: 'KURUMLAR', matchAlso: '/kurum' },
+    { to: '/models', label: 'MODEL PORTFÖY' },
+    { to: '/portfolio', label: 'PORTFÖYÜM' },
+    { to: '/viop', label: 'VİOP' },
   ];
 
   return (

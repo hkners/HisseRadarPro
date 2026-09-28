@@ -86,9 +86,11 @@ def get_model_portfolios():
 @router.get("/kurum-stats")
 def get_kurum_stats():
     get_cached_recommendations, _, price_service, BIST_TICKERS, match_ticker = _get_deps()
+    from globals import report_repo
     stats = {}
     data = get_cached_recommendations()
     all_prices = price_service.prices  # Single snapshot — one lock acquire
+    all_company_info = report_repo.get_all_company_info()
 
     latest_reports = {}
     for r in data:
@@ -108,13 +110,38 @@ def get_kurum_stats():
 
     for r in unique_reports:
         k = r.get("kurum_normalized", "Bilinmiyor")
+        ticker = match_ticker(r.get("hisse", ""), BIST_TICKERS)
+        
+        # Determine if falling knife
+        is_falling_knife = False
+        if ticker:
+            info = all_company_info.get(ticker, {})
+            ta = info.get("technical_analysis", {})
+            ta_summary = ta.get("summary", {}) if ta else {}
+            ta_rec = ta_summary.get("RECOMMENDATION", "NEUTRAL")
+            
+            p_data = all_prices.get(ticker, {})
+            live_price = p_data.get("price") if isinstance(p_data, dict) else 0.0
+            
+            target = r.get("hedefFiyat")
+            upside = 0.0
+            try:
+                target_val = float(str(target).replace(",", "."))
+                if target_val > 0 and live_price and live_price > 0:
+                    upside = ((target_val - live_price) / live_price) * 100
+            except (ValueError, TypeError):
+                pass
+                
+            if ta_rec in ("SELL", "STRONG_SELL") and upside >= 40:
+                is_falling_knife = True
+
+        # Note: is_stale_due_to_split is already filtered by get_reports query (is_stale_due_to_split = 0)
+        
         if k not in stats:
             stats[k] = {
                 "count": 0,
                 "pot_count": 0,
                 "sum_potential": 0.0,
-                "sum_realized": 0.0,
-                "realized_count": 0,
                 "ratings": {"AL": 0, "TUT": 0, "SAT": 0, "OTHER": 0},
             }
         stats[k]["count"] += 1
@@ -122,7 +149,7 @@ def get_kurum_stats():
         pot_val = r.get("potansiyel", 0)
         try:
             pot_num = float(pot_val)
-            if pot_num != 0.0 and pot_num <= 500:
+            if pot_num != 0.0 and pot_num <= 500 and not is_falling_knife and not r.get("is_stale_due_to_split"):
                 stats[k]["sum_potential"] += pot_num
                 stats[k]["pot_count"] += 1
         except (ValueError, TypeError):
@@ -131,60 +158,87 @@ def get_kurum_stats():
         rating = parse_rating(str(r.get("tavsiye", "Bilinmiyor")))
         stats[k]["ratings"][rating] += 1
 
-        ticker = match_ticker(r.get("hisse", ""), BIST_TICKERS)
-        mevcut = r.get("mevcutFiyat", "0")
-        hedef = r.get("hedefFiyat", "0")
-        if ticker and mevcut and mevcut != "Bilinmiyor" and hedef and hedef != "Bilinmiyor":
-            p_data = all_prices.get(ticker, {})
-            live_price = p_data.get("price", 0.0) if isinstance(p_data, dict) else 0.0
-            try:
-                mevcut_num = float(str(mevcut).replace(",", "."))
-                hedef_num = float(str(hedef).replace(",", "."))
-                if live_price > 0 and mevcut_num > 0:
-                    realized = ((live_price - mevcut_num) / mevcut_num) * 100
-                    if -100 <= realized <= 500:
-                        stats[k]["sum_realized"] += realized
-                        stats[k]["realized_count"] += 1
-            except (ValueError, TypeError):
-                pass
+
 
     kurum_stats = []
     for k, v in stats.items():
         avg = v["sum_potential"] / v["count"] if v["count"] > 0 else 0
-        avg_realized = v["sum_realized"] / v["realized_count"] if v["realized_count"] > 0 else None
         
         kurum_stats.append({
             "kurum": k,
             "count": v["count"],
             "avg_potential": avg,
-            "avg_realized": avg_realized,
             "ratings": v["ratings"],
         })
 
     return sorted(kurum_stats, key=lambda x: x["count"], reverse=True)
 
 
+def _normalize_broker_slug(s: str) -> str:
+    if not s:
+        return ""
+    import unicodedata
+    s = s.strip().lower()
+    # Normalize unicode accents/combining chars
+    s = unicodedata.normalize('NFKD', s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    tr_map = str.maketrans("çğıöşüiı", "cgiosuii")
+    s = s.translate(tr_map)
+    return re.sub(r'[^a-z0-9]+', '-', s).strip('-')
+
+
 @router.get("/kurum/{kurumName}")
 def get_kurum_detail(kurumName: str):
     get_cached_recommendations, _, price_service, BIST_TICKERS, match_ticker = _get_deps()
+    from globals import report_repo
     matched = []
     data = get_cached_recommendations()
     all_prices = price_service.prices  # Single snapshot
+    all_company_info = report_repo.get_all_company_info()
+    target_slug = _normalize_broker_slug(kurumName)
+
     for r in data:
         k = r.get("kurum", "")
         k_normalized = re.sub(r'\s+', '-', k.strip()).lower()
-        if k_normalized == kurumName.lower():
+        k_slug = _normalize_broker_slug(k)
+        
+        if k_normalized == kurumName.lower() or k_slug == target_slug or k.strip().lower() == kurumName.strip().lower():
             ticker = match_ticker(r.get("hisse", ""), BIST_TICKERS)
             r["ticker"] = ticker
             if ticker:
                 p_data = all_prices.get(ticker, {})
-                r["live_price"] = p_data.get("price") if isinstance(p_data, dict) else None
+                live_price = p_data.get("price") if isinstance(p_data, dict) else None
+                r["live_price"] = live_price
                 r["live_change_pct"] = p_data.get("change_pct") if isinstance(p_data, dict) else None
+                
+                # Exclude falling knife from potential calculation implicitly if client calculates it,
+                # but let's pass a flag so the frontend knows it's a falling knife
+                info = all_company_info.get(ticker, {})
+                ta = info.get("technical_analysis", {})
+                ta_summary = ta.get("summary", {}) if ta else {}
+                ta_rec = ta_summary.get("RECOMMENDATION", "NEUTRAL")
+                
+                target = r.get("hedefFiyat")
+                upside = 0.0
+                try:
+                    target_val = float(str(target).replace(",", "."))
+                    if target_val > 0 and live_price and live_price > 0:
+                        upside = ((target_val - live_price) / live_price) * 100
+                except (ValueError, TypeError):
+                    pass
+                    
+                is_falling_knife = ta_rec in ("SELL", "STRONG_SELL") and upside >= 40
+                r["is_falling_knife"] = is_falling_knife
+                
+                if is_falling_knife or r.get("is_stale_due_to_split"):
+                    r["potansiyel_excluded"] = True
             else:
                 r["live_price"] = None
                 r["live_change_pct"] = None
+                r["is_falling_knife"] = False
             matched.append(r)
     return matched
+
 
 
 @router.get("/screener")

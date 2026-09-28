@@ -3,6 +3,7 @@ Stocks Router
 Handles /api/stocks, /api/stocks/{ticker}, /api/stocks/{ticker}/fundamentals, /api/stocks/{ticker}/history
 """
 from fastapi import APIRouter, HTTPException
+import time
 
 router = APIRouter(prefix="/api", tags=["stocks"])
 
@@ -14,9 +15,15 @@ def _get_deps():
     from services.ticker_resolver import match_ticker
     return get_cached_recommendations, price_service, BIST_TICKERS, match_ticker, report_repo
 
+_stocks_cache = {"timestamp": 0, "data": None}
 
 @router.get("/stocks")
 def get_all_stocks():
+    global _stocks_cache
+    now = time.time()
+    if _stocks_cache["data"] and (now - _stocks_cache["timestamp"] < 30):
+        return _stocks_cache["data"]
+
     get_cached_recommendations, price_service, BIST_TICKERS, match_ticker, report_repo = _get_deps()
 
     recs_data = get_cached_recommendations()
@@ -74,46 +81,40 @@ def get_all_stocks():
                 "avg_potential": upside,
                 "brokerages": list(rec_data["brokers"]),
             })
-    return {
+    res = {
         "status": price_service.status,
         "last_updated": price_service.last_updated,
         "stocks": stocks,
     }
+    _stocks_cache = {"timestamp": now, "data": res}
+    return res
+
+
+@router.get("/stocks/prices")
+def get_stock_prices():
+    """Returns price service snapshot with all live prices."""
+    _, price_service, _, _, _ = _get_deps()
+    return price_service.get_snapshot()
 
 
 @router.get("/stocks/{ticker}")
 def get_stock_detail(ticker: str):
+    global _stocks_cache
     _, price_service, _, _, _ = _get_deps()
     ticker = ticker.replace(".IS", "").upper()
-    p_data = price_service.get_price(ticker)
     
-    # On-demand live price fetch for the detail page (bypasses background sync delay)
-    live_price = None
-    if isinstance(p_data, dict):
-        live_price = p_data.get("price")
-        try:
-            import yfinance as yf
-            info = yf.Ticker(f"{ticker}.IS").fast_info
-            if hasattr(info, 'last_price') and info.last_price is not None:
-                live_price = float(info.last_price)
-                
-                # Also update change_pct if we have previous close from price_service
-                # In our price_service, if it's preloaded, the 'price' was actually the previous close!
-                # Wait, if p_data['price'] was preloaded (18.53), it acts as previous close for today!
-                # If background sync already updated, p_data['change_pct'] is accurate.
-                # Let's just calculate a new change_pct against the preloaded price as a fallback
-                if price_service.status == "INITIALIZING" or "Preloaded" in str(price_service.last_updated):
-                    prev_close = p_data.get("price")
-                    if prev_close and prev_close > 0:
-                        new_chg = ((live_price - prev_close) / prev_close) * 100
-                        p_data["change_pct"] = new_chg
-        except Exception as e:
-            print(f"On-demand live price fetch failed for {ticker}: {e}")
+    # On-demand authoritative fast_info update (ensures live/closing-auction accuracy)
+    p_data = price_service.update_ticker_from_fast_info(ticker)
+    
+    # Invalidate stocks list cache so /stocks immediately matches this exact price
+    _stocks_cache = {"timestamp": 0, "data": None}
 
+    live_price = p_data.get("price")
     return {
         "ticker": ticker,
         "price": live_price,
-        "change_pct": p_data.get("change_pct") if isinstance(p_data, dict) else None,
+        "change_pct": p_data.get("change_pct"),
+        "volume": p_data.get("volume"),
         "currency": "TRY",
         "last_updated": "Live" if live_price else price_service.last_updated,
     }
@@ -137,3 +138,281 @@ def get_stock_history(ticker: str):
     if not history:
         raise HTTPException(status_code=404, detail=f"Historical prices for {ticker} not found in cache. Run yf_cacher.")
     return history
+
+
+@router.get("/stocks/{ticker}/technical-analysis")
+def get_technical_analysis(ticker: str):
+    """Fetches exact, live TradingView technical indicators and recommendation for a ticker."""
+    get_cached_recommendations, price_service, BIST_TICKERS, match_ticker, report_repo = _get_deps()
+    clean_ticker = ticker.replace(".IS", "").upper()
+
+    # 1. First try live TradingView scanner fetch (with memory cache)
+    try:
+        from services.ta_sync import fetch_live_ta
+        live_data = fetch_live_ta(clean_ticker)
+        if live_data:
+            return live_data
+    except Exception as e:
+        logger.warning(f"Live TradingView fetch failed for {clean_ticker}: {e}")
+
+    # 2. Fallback to cached company_info in local database
+    try:
+        info = report_repo.get_company_info(clean_ticker)
+        if info and info.get("technical_analysis"):
+            return info["technical_analysis"]
+    except Exception as e:
+        logger.warning(f"DB TA fallback failed for {clean_ticker}: {e}")
+
+    # 3. Final fallback: local ta_engine
+    history = report_repo.get_historical_prices(clean_ticker)
+    if not history:
+        raise HTTPException(status_code=404, detail=f"No technical data found for {ticker}.")
+
+    from services.ta_engine import calculate_technical_indicators
+    ta_data = calculate_technical_indicators(history)
+    if "error" in ta_data:
+        raise HTTPException(status_code=400, detail=ta_data["error"])
+    return ta_data
+
+@router.get("/stocks/{ticker}/ai-analysis")
+def get_ai_analysis(ticker: str):
+    """Returns AI generated financial analysis for a ticker."""
+    from services.ai_service import get_ai_financial_analysis
+    
+    ticker = ticker.replace(".IS", "").upper()
+    analysis = get_ai_financial_analysis(ticker)
+    
+    if "error" in analysis:
+        # If API key is missing or data is missing, return 400 but don't crash
+        raise HTTPException(status_code=400, detail=analysis["message"])
+        
+    return analysis
+
+
+@router.get("/stocks/{ticker}/score-breakdown")
+def get_stock_score_breakdown(ticker: str):
+    """
+    Returns granular pillar breakdown of the Conviction Engine score (institutional, valuation,
+    technicals, mechanics, momentum) alongside score_history snapshot and Alpha Engine comparison.
+    """
+    clean_ticker = ticker.replace(".IS", "").upper().strip()
+
+    # 1. Fetch live conviction setup
+    from services.conviction_engine import conviction_engine
+    setup = conviction_engine.get_stock_setup(clean_ticker)
+
+    # If not in cache, fallback to evaluate on-demand
+    if not setup:
+        try:
+            from globals import report_repo, price_service
+            import datetime
+            spot = price_service.get_price(clean_ticker)
+            p = spot.get("price", 0.0) if isinstance(spot, dict) else 0.0
+            if p > 0:
+                recs = report_repo.get_reports(ticker=clean_ticker) or []
+                info = report_repo.get_company_info(clean_ticker) or {}
+                fund = info.get("fundamentals", {})
+                ta = info.get("technical_analysis", {})
+                hist = report_repo.get_historical_prices(clean_ticker, limit=60) or []
+                setup = conviction_engine._evaluate_stock(
+                    ticker=clean_ticker,
+                    live_price=p,
+                    change_pct=spot.get("change_pct", 0.0),
+                    volume=spot.get("volume", 0),
+                    recs=recs,
+                    fundamentals=fund,
+                    ta_data=ta,
+                    history=hist,
+                    today=datetime.date.today()
+                )
+        except Exception:
+            pass
+
+    # 2. Fetch latest record from score_history for comparison/fallback
+    from globals import report_repo
+    history_row = None
+    try:
+        with report_repo._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT snapshot_date, conviction_score, alpha_score, 
+                       technical_component, fundamental_component, sentiment_component, 
+                       consensus_component, revision_momentum, price_momentum_percentile
+                FROM score_history 
+                WHERE UPPER(TRIM(ticker)) = ? 
+                ORDER BY snapshot_date DESC, id DESC LIMIT 1
+            """, (clean_ticker,))
+            r = cursor.fetchone()
+            if r:
+                history_row = {
+                    "snapshot_date": r[0],
+                    "conviction_score": r[1],
+                    "alpha_score": r[2],
+                    "technical_component": r[3],
+                    "fundamental_component": r[4],
+                    "sentiment_component": r[5],
+                    "consensus_component": r[6],
+                    "revision_momentum": r[7],
+                    "price_momentum_percentile": r[8]
+                }
+    except Exception:
+        pass
+
+    # 3. Fetch Alpha Engine score & signal for comparison
+    alpha_info = None
+    try:
+        from services.alpha_engine import alpha_engine
+        screener = alpha_engine.get_alpha_screener()
+        matched = next((s for s in screener if s.get("ticker") == clean_ticker), None)
+        if matched:
+            alpha_info = {
+                "alpha_score": round(float(matched.get("alpha_score", 0.0)), 1),
+                "signal": matched.get("signal"),
+                "ta_score": round(float(matched.get("ta_score", 0.0)), 1),
+                "fa_score": round(float(matched.get("fa_score", 0.0)), 1),
+                "sentiment_score": round(float(matched.get("sentiment_score", 0.0)), 1)
+            }
+    except Exception:
+        pass
+
+    # If setup is still None, create default fallback
+    if not setup:
+        conv_score = history_row.get("conviction_score", 50) if history_row else 50
+        setup = {
+            "score": int(conv_score),
+            "raw_score": float(conv_score),
+            "decision": "BEKLE / İZLE",
+            "decision_badge": "HOLD",
+            "color": "#ffab00",
+            "institutional_pillar": history_row.get("consensus_component", 0.0) if history_row else 0.0,
+            "valuation_pillar": history_row.get("fundamental_component", 0.0) if history_row else 0.0,
+            "technical_pillar": history_row.get("technical_component", 0.0) if history_row else 0.0,
+            "mechanics_pillar": 0.0,
+            "momentum_pillar": 0.0,
+            "revision_momentum": history_row.get("revision_momentum", 0.0) if history_row else 0.0,
+            "price_momentum_percentile": history_row.get("price_momentum_percentile", 50.0) if history_row else 50.0,
+            "drivers": ["Veri yetersizliğinden dolayı temkinli yaklaşım."],
+            "risk_statement": "Yeterli konsensüs bulunmuyor."
+        }
+
+    # Extract pillars
+    inst_val = float(setup.get("institutional_pillar") or 0.0)
+    val_val = float(setup.get("valuation_pillar") or 0.0)
+    tech_val = float(setup.get("technical_pillar") or 0.0)
+    mech_val = float(setup.get("mechanics_pillar") or 0.0)
+    mom_val = float(setup.get("momentum_pillar") or 0.0)
+
+    # Calculate normalized 0-100 percentage for UI progress bars (matching Alpha Insights style)
+    # Institutional: 0 to 26 pt -> (val / 26) * 100
+    inst_pct = max(0.0, min(100.0, (inst_val / 26.0) * 100.0))
+    # Valuation: -20 to 32 pt (span 52) -> (val - (-20)) / 52 * 100
+    val_pct = max(0.0, min(100.0, ((val_val + 20.0) / 52.0) * 100.0))
+    # Technical: -30 to 20 pt (span 50) -> (val - (-30)) / 50 * 100
+    tech_pct = max(0.0, min(100.0, ((tech_val + 30.0) / 50.0) * 100.0))
+    # Mechanics: -5 to 12 pt (span 17) -> (val - (-5)) / 17 * 100
+    mech_pct = max(0.0, min(100.0, ((mech_val + 5.0) / 17.0) * 100.0))
+    # Momentum: -2.5 to 8.0 pt (span 10.5) -> (val - (-2.5)) / 10.5 * 100
+    mom_pct = max(0.0, min(100.0, ((mom_val + 2.5) / 10.5) * 100.0))
+
+    components = [
+        {
+            "key": "institutional",
+            "name": "Kurumsal Konsensüs & Kapsam",
+            "points": round(inst_val, 1),
+            "max_points": 26.0,
+            "min_points": 0.0,
+            "percentage": round(inst_pct, 1),
+            "details": f"{setup.get('broker_count', 0)} aracı kurum takibi, {setup.get('model_count', 0)} model portföy girişi"
+        },
+        {
+            "key": "valuation",
+            "name": "Değerleme & Reel Getiri Potansiyeli",
+            "points": round(val_val, 1),
+            "max_points": 32.0,
+            "min_points": -20.0,
+            "percentage": round(val_pct, 1),
+            "details": f"Enflasyon üzeri potansiyel (%{setup.get('upside_pct', 0):.1f}) ve göreceli çarpanlar"
+        },
+        {
+            "key": "technical",
+            "name": "Teknik Trend & İndikatörler (TV)",
+            "points": round(tech_val, 1),
+            "max_points": 20.0,
+            "min_points": -30.0,
+            "percentage": round(tech_pct, 1),
+            "details": f"TradingView skoru ({setup.get('ta_rec')}), SMA20/50 ve RSI ({setup.get('rsi')})"
+        },
+        {
+            "key": "mechanics",
+            "name": "İşlem Mekaniği & Rapor Tazeliği",
+            "points": round(mech_val, 1),
+            "max_points": 12.0,
+            "min_points": -5.0,
+            "percentage": round(mech_pct, 1),
+            "details": f"Risk/Ödül 1:{setup.get('risk_reward', 1.0):.1f} ve son 100 gündeki {setup.get('recent_reports_count', 0)} güncel rapor"
+        },
+        {
+            "key": "momentum",
+            "name": "Fiyat Momentumu & Hedef Revizyonu",
+            "points": round(mom_val, 1),
+            "max_points": 8.0,
+            "min_points": -2.5,
+            "percentage": round(mom_pct, 1),
+            "details": f"BIST kesitsel momentum (%{setup.get('price_momentum_percentile', 0):.1f}) ve kurum revizyonu (%{int(setup.get('revision_momentum', 0) * 100)})"
+        }
+    ]
+
+    # Evaluate disagreement between Conviction and Alpha engines
+    c_dec = (setup.get("decision") or "").upper()
+    c_cat = "AL" if ("AL" in c_dec and "SAT" not in c_dec) else ("SAT" if ("SAT" in c_dec or "RİSKLİ" in c_dec or "RISKLI" in c_dec) else "NOTR")
+
+    a_sig = ((alpha_info.get("signal") if alpha_info else None) or "").upper()
+    a_cat = "AL" if ("AL" in a_sig and "SAT" not in a_sig) else ("SAT" if "SAT" in a_sig else "NOTR")
+
+    is_disagreeing = False
+    disagreement_level = "NONE"
+    disagreement_badge = None
+    disagreement_reason = None
+
+    if (c_cat == "AL" and a_cat in ("NOTR", "SAT")) or (a_cat == "AL" and c_cat in ("NOTR", "SAT")):
+        is_disagreeing = True
+        alpha_scr = alpha_info.get("alpha_score", "-") if alpha_info else "-"
+        alpha_sgn = alpha_info.get("signal", "-") if alpha_info else "-"
+        if (c_cat == "AL" and a_cat == "SAT") or (c_cat == "SAT" and a_cat == "AL"):
+            disagreement_level = "STRONG"
+            disagreement_badge = "⚠ İki motor zıt görüşte"
+            disagreement_reason = f"Karar Motoru: {setup.get('score')}p ({setup.get('decision')}) vs Alpha Motoru: {alpha_scr}p ({alpha_sgn})"
+        else:
+            disagreement_level = "MILD"
+            disagreement_badge = "⚠ İki motor farklı görüşte"
+            disagreement_reason = f"Karar Motoru: {setup.get('score')}p ({setup.get('decision')}) vs Alpha Motoru: {alpha_scr}p ({alpha_sgn})"
+
+    return {
+        "ticker": clean_ticker,
+        "score": setup.get("score"),
+        "raw_score": setup.get("raw_score"),
+        "decision": setup.get("decision"),
+        "decision_badge": setup.get("decision_badge"),
+        "decision_color": setup.get("color"),
+        "base_points": 2.0,
+        "components": components,
+        "drivers": setup.get("drivers", []),
+        "risk_statement": setup.get("risk_statement"),
+        "entry_zone": setup.get("entry_zone"),
+        "stop_loss": setup.get("stop_loss"),
+        "stop_loss_pct": setup.get("stop_loss_pct"),
+        "risk_reward": setup.get("risk_reward"),
+        "consensus_target": setup.get("consensus_target"),
+        "upside_pct": setup.get("upside_pct"),
+        "history_snapshot": history_row,
+        "alpha_engine": alpha_info,
+        "disagreement": {
+            "is_disagreeing": is_disagreeing,
+            "level": disagreement_level,
+            "badge": disagreement_badge,
+            "reason": disagreement_reason,
+            "conviction_category": c_cat,
+            "alpha_category": a_cat
+        }
+    }
+

@@ -122,10 +122,22 @@ async def lifespan(app):
     """Modern FastAPI lifespan handler."""
     load_static_json_cache()
     price_service.start_background_worker()
+    # Start TradingView TA background sync worker (refreshes every 15 min)
+    try:
+        from services.ta_sync import start_ta_sync_worker
+        start_ta_sync_worker()
+    except Exception as e:
+        logger.warning(f"Could not start TA sync worker: {e}")
     # Pre-warm the recommendations cache
     get_cached_recommendations()
     # Pre-warm company info cache
     report_repo.get_all_company_info()
+    # Pre-warm conviction engine
+    try:
+        from services.conviction_engine import conviction_engine
+        threading.Thread(target=conviction_engine.recompute, daemon=True).start()
+    except Exception as e:
+        logger.warning(f"Could not pre-warm conviction engine: {e}")
     yield
 
 
@@ -162,6 +174,8 @@ from routers.ingest import router as ingest_router
 from routers.portfolio import router as portfolio_router
 from routers.admin import router as admin_router
 from routers.technical_screener import router as technical_screener_router
+from routers.viop import router as viop_router
+from routers.alpha import router as alpha_router
 
 app.include_router(stocks_router)
 app.include_router(recommendations_router)
@@ -170,6 +184,12 @@ app.include_router(ingest_router)
 app.include_router(portfolio_router)
 app.include_router(admin_router)
 app.include_router(technical_screener_router)
+app.include_router(viop_router)
+app.include_router(alpha_router)
+from routers.conviction import router as conviction_router
+app.include_router(conviction_router)
+from routers.backtest import router as backtest_router
+app.include_router(backtest_router)
 
 
 # --- Health check (stays in main) ---
@@ -184,11 +204,18 @@ def get_health():
 
 
 # --- Unified Dashboard Endpoint (single request for all dashboard data) ---
+_dashboard_cache = {"timestamp": 0, "data": None}
+
 @app.get("/api/dashboard")
 def get_dashboard():
     """Returns all data needed by the Home dashboard in a single response.
     Eliminates 5 separate API calls and their redundant DB queries.
     """
+    global _dashboard_cache
+    now = time.time()
+    if _dashboard_cache["data"] and (now - _dashboard_cache["timestamp"] < 30):
+        return _dashboard_cache["data"]
+
     all_recs = get_cached_recommendations()
     all_prices = price_service.prices
     
@@ -214,7 +241,6 @@ def get_dashboard():
         if k not in stats_map:
             stats_map[k] = {
                 "count": 0, "pot_count": 0, "sum_potential": 0.0,
-                "sum_realized": 0.0, "realized_count": 0,
                 "ratings": {"AL": 0, "TUT": 0, "SAT": 0, "OTHER": 0},
             }
         stats_map[k]["count"] += 1
@@ -231,30 +257,14 @@ def get_dashboard():
         rating = parse_rating(str(r.get("tavsiye", "Bilinmiyor")))
         stats_map[k]["ratings"][rating] += 1
         
-        ticker = r.get("_ticker")
-        mevcut = r.get("mevcutFiyat", "0")
-        hedef = r.get("hedefFiyat", "0")
-        if ticker and mevcut and mevcut != "Bilinmiyor" and hedef and hedef != "Bilinmiyor":
-            p_data = all_prices.get(ticker, {})
-            live_price = p_data.get("price", 0.0) if isinstance(p_data, dict) else 0.0
-            try:
-                mevcut_num = float(str(mevcut).replace(",", "."))
-                hedef_num = float(str(hedef).replace(",", "."))
-                if live_price > 0 and mevcut_num > 0:
-                    realized = ((live_price - mevcut_num) / mevcut_num) * 100
-                    if -100 <= realized <= 500:
-                        stats_map[k]["sum_realized"] += realized
-                        stats_map[k]["realized_count"] += 1
-            except (ValueError, TypeError):
-                pass
+
     
     kurum_stats = []
     for k, v in stats_map.items():
         avg = v["sum_potential"] / v["count"] if v["count"] > 0 else 0
-        avg_realized = v["sum_realized"] / v["realized_count"] if v["realized_count"] > 0 else None
         kurum_stats.append({
             "kurum": k, "count": v["count"],
-            "avg_potential": avg, "avg_realized": avg_realized,
+            "avg_potential": avg,
             "ratings": v["ratings"],
         })
     kurum_stats.sort(key=lambda x: x["count"], reverse=True)
@@ -374,20 +384,51 @@ def get_dashboard():
                 "brokerages": list(rec_data["brokers"]),
             })
     
-    return {
+    try:
+        from services.conviction_engine import conviction_engine
+        from services.ai_service import get_ai_market_pulse_summary
+        conv_summary = conviction_engine.get_dashboard_summary()
+        conv_summary["ai_market_pulse"] = get_ai_market_pulse_summary().get("summary", "")
+    except Exception as e:
+        conv_summary = {"error": str(e), "top_buys": []}
+
+    market_regime_data = {}
+    try:
+        from services.market_regime_service import market_regime_service
+        market_regime_data = market_regime_service.get_current_regime(all_prices=all_prices)
+    except Exception as e:
+        market_regime_data = {"regime": "NEUTRAL", "exposure_multiplier": 1.0, "color": "#ffab00"}
+
+    result = {
         "kurum_stats": kurum_stats,
         "top_stocks": top_stocks[:5],
         "models": models[:3],
         "latest_recommendations": latest,
         "market_pulse": {"up": up, "down": down, "flat": flat, "total": len(all_prices)},
+        "market_regime": market_regime_data,
+        "conviction": conv_summary,
         "stocks": {
             "status": price_service.status,
             "last_updated": price_service.last_updated,
             "stocks": stocks_list,
         }
     }
+    _dashboard_cache = {"timestamp": now, "data": result}
+    return result
+
+
+@app.get("/api/market-regime")
+def api_get_market_regime():
+    try:
+        from services.market_regime_service import market_regime_service
+        all_prices = price_service.prices if price_service else {}
+        return market_regime_service.get_current_regime(all_prices=all_prices)
+    except Exception as e:
+        return {"error": str(e), "regime": "NEUTRAL", "exposure_multiplier": 1.0, "color": "#ffab00"}
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8015)
+
+

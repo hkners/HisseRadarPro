@@ -22,12 +22,24 @@ yarn-error.log*
 # Databases and large media
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 backend/scrapers/scraped_reports.db
 backend/scrapers/downloads/*.pdf
+scraper_service/engine/downloads/*.pdf
 
-# Project specific caches
+# Project specific caches & browser data
 backend/scrapers/cache/
 backend/scrapers/logs/
+backend/scrapers/.browser_data/
+backend/scrapers/.chrome_debug/
+backend/scrapers/.chrome_profile/
+*.html
+
+# Scratch & test dumps
+scratch_*
+verify_all*.py
+backend/test_res.json
 
 # IDEs
 .idea/
@@ -38,3 +50,4 @@ backend/scrapers/logs/
 # OS files
 .DS_Store
 Thumbs.db
+

@@ -65,77 +65,93 @@ def parse_fintables_number(num_str):
     except ValueError:
         return 0.0
 
+# ---------------------------------------------------------------------------
+# undetected_chromedriver Implementation
+# ---------------------------------------------------------------------------
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+
 class FintablesScraper:
     def __init__(self):
-        self.playwright = sync_playwright().start()
-        
-        # Use stealth to bypass Cloudflare
-        self.browser = self.playwright.chromium.launch(headless=True)
-        self.context = self.browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        )
-        self.page = self.context.new_page()
-        # Apply Stealth to the sync page directly using the older version approach or the new Stealth().use_sync context
-        # Since we initialized the browser manually, we can just apply stealth to the context or page if supported.
-        # However, earlier we found Stealth().use_sync() works better for wrapping. 
-        pass
+        options = uc.ChromeOptions()
+        # Keep window offscreen to not disturb the user
+        options.add_argument('--window-position=-32000,-32000')
+        # Version 153 to match the user's local Chrome
+        self.driver = uc.Chrome(options=options, version_main=153)
+        self.driver.set_page_load_timeout(30)
 
     def close(self):
-        self.browser.close()
-        self.playwright.stop()
+        try:
+            self.driver.quit()
+        except Exception:
+            pass
+
 
 def scrape_fintables_tickers(tickers):
     """
-    Scrapes a list of tickers using a single browser instance with stealth.
-    Introduces jitter (random delays) to avoid rate limits.
+    Scrapes a list of tickers sequentially using undetected_chromedriver.
+    Bypasses Cloudflare easily and uses minimal RAM (single tab).
     """
     reports = []
     
-    with Stealth().use_sync(sync_playwright()) as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            viewport={'width': 1920, 'height': 1080}
-        )
-        page = context.new_page()
-        
+    scraper = FintablesScraper()
+    driver = scraper.driver
+    
+    try:
+        # 1) WARMUP: Bypass Cloudflare on THYAO
+        print("[FintablesScraper] Warming up session with THYAO to solve Cloudflare...")
+        driver.get("https://fintables.com/sirketler/THYAO/analist-tavsiyeleri")
+        cf_solved = False
+        for _ in range(12):
+            title = driver.title.lower()
+            if "moment" not in title and "dakika" not in title and len(title) > 5:
+                cf_solved = True
+                print("  Cloudflare bypassed!")
+                break
+            time.sleep(5)
+            
+        if not cf_solved:
+            print("[FintablesScraper] ERROR: Could not bypass Cloudflare. Aborting.")
+            return reports
+
+        # 2) SCRAPE TICKERS
         for index, ticker in enumerate(tickers):
             url = f"https://fintables.com/sirketler/{ticker}/analist-tavsiyeleri"
             print(f"[{index+1}/{len(tickers)}] Scraping Fintables for {ticker}...")
             
             try:
-                page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                # Wait for potential cloudflare challenge or table load
-                try:
-                    page.wait_for_selector('table', timeout=8000)
-                except Exception:
-                    pass
-                page.wait_for_timeout(random.randint(1000, 2000))
+                driver.get(url)
                 
-                html = page.content()
+                # Polling to wait for React to populate the data (bypass skeleton)
+                table_found = False
+                for _ in range(10): # max 5 seconds
+                    html = driver.page_source
+                    if "</td>" in html and html.count("</td>") > 5:
+                        table_found = True
+                        break
+                    time.sleep(0.5)
+
+                if not table_found:
+                    print(f"  [{ticker}] 0 reports found.")
+                    continue
+                
+                time.sleep(0.5)
+                html = driver.page_source
                 soup = BeautifulSoup(html, 'html.parser')
                 
                 table = soup.find('table')
                 if not table:
-                    print(f"No table found for {ticker}")
+                    print(f"  [{ticker}] 0 reports found.")
                     continue
                     
                 tbody = table.find('tbody')
                 if not tbody:
                     continue
                     
+                added_count = 0
                 for tr in tbody.find_all('tr'):
                     tds = tr.find_all('td')
                     if len(tds) >= 8:
-                        # 0: #
-                        # 1: Kurum
-                        # 2: Öneri
-                        # 3: Güncellenme Tarihi
-                        # 4: Hedef Fiyat
-                        # 5: Son Fiyat
-                        # 6: Potansiyel
-                        # 7: Model Portföy
-                        
                         kurum = tds[1].text.strip()
                         oneri = tds[2].text.strip()
                         tarih_str = tds[3].text.strip()
@@ -144,12 +160,15 @@ def scrape_fintables_tickers(tickers):
                         pot_str = tds[6].text.strip()
                         is_model = bool(tds[7].find('svg')) or "evet" in tds[7].text.lower() or "var" in tds[7].text.lower()
                         
-                        # Sometimes rows might be placeholders or empty
                         if not kurum or not tarih_str:
                             continue
                             
-                        # Parse values
                         report_date = parse_turkish_date(tarih_str)
+                        
+                        # Sadece 2026 ve sonrası raporları al
+                        if report_date and report_date < "2026-01-01":
+                            continue
+                            
                         target_price = parse_fintables_number(hedef_str)
                         if report_date and target_price > 0:
                             hist_price = get_historical_close(ticker, report_date)
@@ -175,16 +194,18 @@ def scrape_fintables_tickers(tickers):
                             "source": "Fintables"
                         }
                         reports.append(report)
+                        added_count += 1
+                        
+                print(f"  [{ticker}] Scraped {added_count} reports.")
                         
             except Exception as e:
-                print(f"Error scraping {ticker}: {e}")
+                print(f"  [{ticker}] Error scraping: {e}")
                 
-            # Jitter: wait randomly between 2 and 5 seconds before next request
-            # to avoid IP block.
+            # Jitter: wait randomly between 1 and 3 seconds before next request
             if index < len(tickers) - 1:
-                delay = random.uniform(2.0, 5.0)
-                time.sleep(delay)
+                time.sleep(random.uniform(1.0, 3.0))
                 
-        browser.close()
+    finally:
+        scraper.close()
         
     return reports

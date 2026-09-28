@@ -54,7 +54,6 @@ const TIMEFRAMES = [
     { key: '6M', label: '6 Ay', days: 180 },
     { key: '1Y', label: '1 Yıl', days: 365 },
     { key: '5Y', label: '5 Yıl', days: 1825 },
-    { key: 'MAX', label: 'Maks.', days: 99999 },
 ];
 
 const INTERVALS = [
@@ -113,13 +112,13 @@ function aggregateToMonthly(dailyData) {
 }
 
 // ────────────────────────────── CHART COMPONENT ──────────────────────────────
-export default function TradingViewChart({ data, reports, ticker, currentPrice }) {
+export default function TradingViewChart({ data, reports, ticker, currentPrice, fillContainer = false }) {
     const containerRef = useRef();
     const chartContainerRef = useRef();
     const chartRef = useRef(null);
     const mainSeriesRef = useRef(null);
     const volumeSeriesRef = useRef(null);
-    
+
     const sma20Ref = useRef(null);
     const sma50Ref = useRef(null);
     const sma200Ref = useRef(null);
@@ -138,6 +137,11 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
     const [activeTimeframe, setActiveTimeframe] = useState('1Y');
     const [activeInterval, setActiveInterval] = useState('D');
     const [activeSignal, setActiveSignal] = useState('');
+    const [reportMarkerMode, setReportMarkerMode] = useState('pin'); // 'pin' | 'full' | 'none'
+    const [chartHeightMode, setChartHeightMode] = useState(() => {
+        try { return localStorage.getItem('chart_height_mode') || 'standard'; } catch { return 'standard'; }
+    });
+    const heightValue = chartHeightMode === 'compact' ? 340 : chartHeightMode === 'large' ? 580 : 440;
 
     // Measure Tool State
     const [isMeasureMode, setIsMeasureMode] = useState(false);
@@ -215,7 +219,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
     // Calculate SMAs and TA on the current interval data
     const { sma20Data, sma50Data, sma200Data, macdLineData, macdSignalData, macdHistData, rsiData } = useMemo(() => {
         if (formattedData.length === 0) return { sma20Data: [], sma50Data: [], sma200Data: [], macdLineData: [], macdSignalData: [], macdHistData: [], rsiData: [] };
-        
+
         const sma20 = calculateSMA(formattedData, 20).map((val, i) => ({ time: formattedData[i].time, value: val })).filter(d => d.value !== null);
         const sma50 = calculateSMA(formattedData, 50).map((val, i) => ({ time: formattedData[i].time, value: val })).filter(d => d.value !== null);
         const sma200 = calculateSMA(formattedData, 200).map((val, i) => ({ time: formattedData[i].time, value: val })).filter(d => d.value !== null);
@@ -260,21 +264,21 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
     const applyTimeframe = useCallback((tf, chartInstance, dataArray) => {
         if (!chartInstance || !dataArray || dataArray.length === 0) return;
         if (tf === 'MAX') { chartInstance.timeScale().fitContent(); return; }
-        
+
         const lastDate = new Date(dataArray[dataArray.length - 1].time);
         const tfConfig = TIMEFRAMES.find(t => t.key === tf);
         if (!tfConfig) { chartInstance.timeScale().fitContent(); return; }
-        
+
         const fromDate = new Date(lastDate);
         fromDate.setDate(fromDate.getDate() - tfConfig.days);
-        
+
         const fromStr = fromDate.toISOString().split('T')[0];
         const toStr = lastDate.toISOString().split('T')[0];
-        
+
         // Find actual data boundaries
         const firstDataDate = dataArray[0].time;
         const actualFrom = fromStr < firstDataDate ? firstDataDate : fromStr;
-        
+
         chartInstance.timeScale().setVisibleRange({ from: actualFrom, to: toStr });
     }, []);
 
@@ -289,14 +293,8 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
         // Use live price if available and valid, otherwise fallback to last chart data close
         const lastPrice = currentPrice || dailyData[dailyData.length - 1].close;
         const now = new Date(); // Use actual current calendar date, just like Investing.com
-        
-        return TIMEFRAMES.map(tf => {
-            if (tf.key === 'MAX') {
-                const startPrice = dailyData[0].close;
-                const priceDate = dailyData[0].time;
-                return { ...tf, change: startPrice ? ((lastPrice - startPrice) / startPrice) * 100 : null, startPrice, priceDate };
-            }
 
+        return TIMEFRAMES.map(tf => {
             // For 1D (1 Gün), compare current price to the previous trading day's close.
             // If the last entry in dailyData is today's live price, then yesterday's price is at length - 2.
             // If not, it's at length - 1. We check if the last entry's date is today's date.
@@ -328,7 +326,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
 
             // Convert to local YYYY-MM-DD
             const targetStr = new Date(targetDate.getTime() - (targetDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-            
+
             // Find the closest past trading day BEFORE or ON targetStr
             let startPrice = null;
             let priceDate = null;
@@ -358,7 +356,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
 
         const handleResize = () => {
             if (chartRef.current && chartContainerRef.current) {
-                chartRef.current.applyOptions({ 
+                chartRef.current.applyOptions({
                     width: chartContainerRef.current.clientWidth,
                     height: chartContainerRef.current.clientHeight
                 });
@@ -384,11 +382,11 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                 upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350',
             });
         } else {
-            mainSeries = chart.addSeries(AreaSeries, { 
-                lineColor: '#2962ff', 
+            mainSeries = chart.addSeries(AreaSeries, {
+                lineColor: '#2962ff',
                 topColor: 'rgba(41, 98, 255, 0.28)',
                 bottomColor: 'rgba(41, 98, 255, 0.0)',
-                lineWidth: 2 
+                lineWidth: 2
             });
         }
         mainSeries.setData(formattedData);
@@ -417,9 +415,9 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
         const macdLineSeries = chart.addSeries(LineSeries, { color: '#2962FF', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
         const macdSignalSeries = chart.addSeries(LineSeries, { color: '#FF6D00', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
         const macdHistSeries = chart.addSeries(HistogramSeries, { priceScaleId: 'ta', visible: false });
-        
+
         const rsiLineSeries = chart.addSeries(LineSeries, { color: '#9C27B0', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
-        
+
         chart.priceScale('ta').applyOptions({
             scaleMargins: { top: 0.8, bottom: 0 },
         });
@@ -443,14 +441,14 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                 const x = chart.timeScale().timeToCoordinate(measureStartRef.current.time);
                 const y = mainSeriesRef.current.priceToCoordinate(measureStartRef.current.price);
                 if (x !== null && y !== null) {
-                    setMeasureStart(prev => ({...prev, x, y}));
+                    setMeasureStart(prev => ({ ...prev, x, y }));
                 }
             }
             if (measureEndRef.current && mainSeriesRef.current) {
                 const x = chart.timeScale().timeToCoordinate(measureEndRef.current.time);
                 const y = mainSeriesRef.current.priceToCoordinate(measureEndRef.current.price);
                 if (x !== null && y !== null) {
-                    setMeasureEnd(prev => ({...prev, x, y}));
+                    setMeasureEnd(prev => ({ ...prev, x, y }));
                 }
             }
         };
@@ -463,7 +461,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
             const entry = dataMap.get(param.time);
             const dataPoint = entry ? entry.data : null;
             const dataIndex = entry ? entry.index : -1;
-            
+
             const price = dataPoint ? dataPoint.close : mainSeriesRef.current.coordinateToPrice(param.point.y);
             const exactX = chart.timeScale().timeToCoordinate(param.time) || param.point.x;
             const exactY = mainSeriesRef.current.priceToCoordinate(price) || param.point.y;
@@ -493,7 +491,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
             const { groupedReports, groupedSignals, dataMap } = tooltipDataRef.current;
             const exactX = chart.timeScale().timeToCoordinate(param.time) || (param.point ? param.point.x : 0);
             const exactY = param.point ? param.point.y : 50;
-            
+
             const entry = dataMap.get(param.time);
             const dataPoint = entry ? entry.data : null;
             const dataIndex = entry ? entry.index : -1;
@@ -523,8 +521,25 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
         applyTimeframe(activeTimeframe, chart, formattedData);
         window.addEventListener('resize', handleResize);
 
+        const resizeObserver = new ResizeObserver((entries) => {
+            if (!entries || entries.length === 0) return;
+            const entry = entries[0];
+            const width = Math.floor(entry.contentRect.width);
+            const height = Math.floor(entry.contentRect.height);
+            if (width > 0 && chartRef.current) {
+                chartRef.current.applyOptions({
+                    width,
+                    height: height > 0 ? height : undefined
+                });
+            }
+        });
+        if (chartContainerRef.current) {
+            resizeObserver.observe(chartContainerRef.current);
+        }
+
         return () => {
             window.removeEventListener('resize', handleResize);
+            resizeObserver.disconnect();
             chart.remove();
             chartRef.current = null;
             mainSeriesRef.current = null;
@@ -535,6 +550,15 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
     useEffect(() => { if (sma20Ref.current) sma20Ref.current.applyOptions({ visible: showSMA20 }); }, [showSMA20]);
     useEffect(() => { if (sma50Ref.current) sma50Ref.current.applyOptions({ visible: showSMA50 }); }, [showSMA50]);
     useEffect(() => { if (sma200Ref.current) sma200Ref.current.applyOptions({ visible: showSMA200 }); }, [showSMA200]);
+
+    // Dynamically adjust height when chartHeightMode or isFullscreen changes
+    useEffect(() => {
+        if (chartRef.current && chartContainerRef.current) {
+            chartRef.current.applyOptions({
+                height: isFullscreen ? (window.innerHeight - 80) : heightValue
+            });
+        }
+    }, [chartHeightMode, isFullscreen, heightValue]);
 
     // Toggle TA visibility based on activeSignal
     useEffect(() => {
@@ -550,7 +574,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
         chartRef.current.priceScale('right').applyOptions({
             scaleMargins: { top: 0.05, bottom: (isMacd || isRsi) ? 0.25 : 0.05 },
         });
-        
+
         // Hide volume when TA is visible to prevent overlap
         if (volumeSeriesRef.current) {
             volumeSeriesRef.current.applyOptions({ visible: !(isMacd || isRsi) });
@@ -560,16 +584,22 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
     // Handle TA and Markers
     useEffect(() => {
         if (!mainSeriesRef.current || formattedData.length === 0) return;
-        
+
         const markersMap = new Map();
 
         // Report Markers
-        if (reports && reports.length > 0) {
+        if (reports && reports.length > 0 && reportMarkerMode !== 'none') {
             Object.keys(groupedReports).forEach(date => {
                 const dayReports = groupedReports[date];
                 if (!dataMap.has(date)) return;
-                const text = dayReports.length === 1 ? dayReports[0].kurum : `${dayReports.length} Rapor`;
-                markersMap.set(date, { time: date, position: 'aboveBar', color: '#94a3b8', shape: 'arrowDown', text });
+                let text = '';
+                if (reportMarkerMode === 'full') {
+                    text = dayReports.length === 1 ? dayReports[0].kurum : `${dayReports.length} Rapor`;
+                } else {
+                    // In compact 'pin' mode, use clean pin without long company names blocking candlesticks
+                    text = dayReports.length > 1 ? `${dayReports.length}` : '';
+                }
+                markersMap.set(date, { time: date, position: 'aboveBar', color: '#38bdf8', shape: 'arrowDown', text, size: 1 });
             });
         }
 
@@ -581,7 +611,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                 const position = sig.signal === 'BUY' ? 'belowBar' : 'aboveBar';
                 const color = sig.signal === 'BUY' ? '#00e676' : '#ff5252';
                 const shape = sig.signal === 'BUY' ? 'arrowUp' : 'arrowDown';
-                
+
                 if (existing) {
                     existing.text = `${text} | ${existing.text}`;
                     existing.color = color;
@@ -599,7 +629,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
             if (a.time > b.time) return 1;
             return 0;
         });
-        
+
         try {
             if (!markersPluginRef.current) {
                 markersPluginRef.current = createSeriesMarkers(mainSeriesRef.current, currentMarkers);
@@ -610,21 +640,21 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
             console.error("Error setting markers:", e);
         }
 
-    }, [formattedData, reports, groupedReports, dataMap, chartType, historicalSignals]);
+    }, [formattedData, reports, groupedReports, dataMap, chartType, historicalSignals, reportMarkerMode]);
 
     // ────────────────────────────── TOOLTIP OVERLAY ──────────────────────────────
     const renderTooltipOverlay = () => {
         if (!activeTooltip) return null;
-        
+
         const { date, dataPoint, reports, signals } = activeTooltip;
         const chartWidth = chartContainerRef.current ? chartContainerRef.current.clientWidth : 800;
         const tooltipWidth = 160; // Approx max width
-        
+
         let leftPos = activeTooltip.x + 15;
         if (leftPos + tooltipWidth > chartWidth) {
             leftPos = activeTooltip.x - tooltipWidth - 15;
         }
-        
+
         return (
             <div style={{
                 position: 'absolute',
@@ -649,7 +679,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                         </span>
                     )}
                 </div>
-                
+
                 {dataPoint && (
                     <div style={{ fontSize: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: reports.length > 0 ? '8px' : '0' }}>
                         <div><span style={{ color: '#888' }}>Açılış:</span> {dataPoint.open.toFixed(2)}</div>
@@ -700,7 +730,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
         const top = Math.min(measureStart.y, measureEnd.y);
         const width = Math.abs(measureEnd.x - measureStart.x);
         const height = Math.abs(measureEnd.y - measureStart.y);
-        
+
         const priceDiff = measureEnd.price - measureStart.price;
         const pctDiff = (priceDiff / measureStart.price) * 100;
         const barDiff = Math.abs((measureEnd.index || 0) - (measureStart.index || 0));
@@ -735,9 +765,9 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
 
     // ────────────────────────────── RENDER ──────────────────────────────
     return (
-        <div ref={containerRef} style={{ 
+        <div ref={containerRef} style={{
             position: 'relative', background: isFullscreen ? '#0a0e17' : 'transparent', padding: isFullscreen ? '20px' : '0',
-            width: '100%', height: isFullscreen ? '100vh' : 'auto', display: 'flex', flexDirection: 'column'
+            width: '100%', height: isFullscreen ? '100vh' : (fillContainer ? '100%' : 'auto'), flex: fillContainer ? 1 : 'none', display: 'flex', flexDirection: 'column', minHeight: 0
         }}>
             {/* ─── TOP BAR: Interval | Chart Type | Measure | SMAs | Fullscreen ─── */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
@@ -759,23 +789,23 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                             background: chartType === 'candle' ? '#555' : 'transparent',
                             color: chartType === 'candle' ? '#fff' : '#aaa',
                             border: 'none', padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '4px'
+                            display: 'flex', alignItems: 'center', gap: '4px', fontWeight: chartType === 'candle' ? 'bold' : 'normal'
                         }}>
-                            <span style={{ fontSize: '14px' }}>🕯</span> Mum
+                            Mum
                         </button>
                         <button onClick={() => setChartType('line')} style={{
                             background: chartType === 'line' ? '#555' : 'transparent',
                             color: chartType === 'line' ? '#fff' : '#aaa',
                             border: 'none', padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '4px'
+                            display: 'flex', alignItems: 'center', gap: '4px', fontWeight: chartType === 'line' ? 'bold' : 'normal'
                         }}>
-                            <span style={{ fontSize: '14px' }}>📈</span> Çizgi
+                            Çizgi
                         </button>
                     </div>
 
                     {/* Technical Signals Dropdown */}
                     <div style={{ position: 'relative' }}>
-                        <select 
+                        <select
                             value={activeSignal}
                             onChange={(e) => setActiveSignal(e.target.value)}
                             style={{
@@ -794,9 +824,9 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                     </div>
 
                     {/* Measure */}
-                    <button 
+                    <button
                         onClick={() => {
-                            if (isMeasureMode) { clearMeasure(); } 
+                            if (isMeasureMode) { clearMeasure(); }
                             else { setIsMeasureMode(true); setMeasureStart(null); setMeasureEnd(null); measureStartRef.current = null; measureEndRef.current = null; }
                         }}
                         style={{
@@ -807,14 +837,56 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                             display: 'flex', alignItems: 'center', gap: '4px'
                         }}
                     >
-                        📏 Ölçüm
+                        Ölçüm
                     </button>
                     {measureStart && !isMeasureMode && (
                         <button onClick={clearMeasure} style={{ background: 'transparent', border: '1px solid #444', color: '#ff4444', cursor: 'pointer', fontSize: '11px', padding: '4px 8px', borderRadius: '4px' }}>✕</button>
                     )}
+
+                    {/* Report Marker Mode Toggle */}
+                    <button
+                        onClick={() => {
+                            setReportMarkerMode(prev => prev === 'pin' ? 'full' : prev === 'full' ? 'none' : 'pin');
+                        }}
+                        title="Grafik üzerindeki kurum rapor imlerini değiştir (Nokta / Etiket / Gizle)"
+                        style={{
+                            background: reportMarkerMode !== 'none' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0,0,0,0.4)',
+                            color: reportMarkerMode !== 'none' ? '#38bdf8' : '#777',
+                            border: `1px solid ${reportMarkerMode !== 'none' ? 'rgba(56, 189, 248, 0.4)' : '#333'}`,
+                            padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        Raporlar: {reportMarkerMode === 'pin' ? 'Nokta' : reportMarkerMode === 'full' ? 'Etiket' : 'Gizli'}
+                    </button>
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    {/* Chart Height Mode Toggle (only when not filling container) */}
+                    {!fillContainer && (
+                        <button
+                            onClick={() => {
+                                const next = chartHeightMode === 'standard' ? 'compact' : chartHeightMode === 'compact' ? 'large' : 'standard';
+                                setChartHeightMode(next);
+                                try { localStorage.setItem('chart_height_mode', next); } catch { }
+                            }}
+                            title="Grafik dikey yüksekliğini ayarla (Kompakt: 340px, Standart: 440px, Geniş: 580px)"
+                            style={{
+                                background: 'rgba(0,0,0,0.4)',
+                                color: '#fff',
+                                border: '1px solid #444',
+                                borderRadius: '6px',
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            Boyut: {chartHeightMode === 'compact' ? '340px' : chartHeightMode === 'large' ? '580px' : '440px'}
+                        </button>
+                    )}
+
                     <button onClick={() => setShowSMA20(!showSMA20)} style={getToggleStyle(showSMA20, '#ffc107')}>SMA 20</button>
                     <button onClick={() => setShowSMA50(!showSMA50)} style={getToggleStyle(showSMA50, '#00e5ff')}>SMA 50</button>
                     <button onClick={() => setShowSMA200(!showSMA200)} style={getToggleStyle(showSMA200, '#ef5350')}>SMA 200</button>
@@ -831,7 +903,13 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
             </div>
 
             {/* ─── CHART AREA ─── */}
-            <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: '400px' }}>
+            <div style={{
+                position: 'relative',
+                width: '100%',
+                height: isFullscreen ? 'calc(100vh - 120px)' : (fillContainer ? '100%' : `${heightValue}px`),
+                flex: fillContainer ? 1 : 'none',
+                minHeight: 0
+            }}>
                 <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
                 {renderMeasureOverlay()}
                 {renderTooltipOverlay()}
@@ -843,17 +921,20 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                 borderRadius: '6px',
                 border: '1px solid rgba(255,255,255,0.08)',
                 background: 'rgba(0,0,0,0.3)',
+                width: '100%',
+                minWidth: 0,
+                overflow: 'hidden'
             }}>
                 {performanceBadges.map((tf, idx) => {
                     const isActive = activeTimeframe === tf.key;
                     const isPositive = tf.change !== null && tf.change >= 0;
                     const changeColor = tf.change === null ? '#555' : isPositive ? '#22c55e' : '#ef4444';
-                    const changeStr = tf.change !== null ? `${isPositive ? '+' : ''}${tf.change.toFixed(2)}%` : '-';
-                    
+                    const changeStr = tf.change !== null ? `${isPositive ? '+' : ''}${tf.change.toFixed(1)}%` : '-';
+
                     return (
-                        <div key={tf.key} style={{ flex: 1, position: 'relative' }}
-                             onMouseEnter={() => setHoveredBadge(tf.key)}
-                             onMouseLeave={() => setHoveredBadge(null)}>
+                        <div key={tf.key} style={{ flex: 1, minWidth: 0, position: 'relative' }}
+                            onMouseEnter={() => setHoveredBadge(tf.key)}
+                            onMouseLeave={() => setHoveredBadge(null)}>
                             {hoveredBadge === tf.key && tf.priceDate && (
                                 <div style={{
                                     position: 'absolute',
@@ -873,8 +954,8 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                                     pointerEvents: 'none'
                                 }}>
                                     <div style={{ color: '#888', marginBottom: '2px' }}>Başlangıç Değeri</div>
-                                    <div><span style={{color: '#888'}}>Tarih:</span> {tf.priceDate}</div>
-                                    <div><span style={{color: '#888'}}>Fiyat:</span> <span style={{color: '#fff'}}>{tf.startPrice?.toFixed(2)} TRY</span></div>
+                                    <div><span style={{ color: '#888' }}>Tarih:</span> {tf.priceDate}</div>
+                                    <div><span style={{ color: '#888' }}>Fiyat:</span> <span style={{ color: '#fff' }}>{tf.startPrice?.toFixed(2)} TRY</span></div>
                                     {/* Little triangle arrow */}
                                     <div style={{
                                         position: 'absolute',
@@ -892,7 +973,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                                 style={{
                                     width: '100%',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                    padding: '8px 4px',
+                                    padding: '5px 2px',
                                     background: isActive ? 'rgba(41, 98, 255, 0.15)' : 'transparent',
                                     border: 'none',
                                     borderRight: idx < performanceBadges.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
@@ -907,8 +988,8 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice }
                                 onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
                                 onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                             >
-                                <span style={{ fontSize: '11px', fontWeight: 'bold', color: isActive ? '#fff' : '#888', marginBottom: '2px' }}>{tf.label}</span>
-                                <span style={{ fontSize: '11px', fontWeight: 'bold', color: changeColor, fontFamily: 'var(--font-mono)' }}>{changeStr}</span>
+                                <span style={{ fontSize: '10px', fontWeight: 'bold', color: isActive ? '#fff' : '#888', marginBottom: '1px', whiteSpace: 'nowrap' }}>{tf.label}</span>
+                                <span style={{ fontSize: '10.5px', fontWeight: 'bold', color: changeColor, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{changeStr}</span>
                             </button>
                         </div>
                     );

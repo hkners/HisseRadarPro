@@ -38,7 +38,7 @@ export default function ReportDetail({ r }) {
         {(r.report_title || r.summary || r.catalysts || r.full_text || r.metin) && (
           <div style={{ flex: '1 1 300px' }}>
             <div style={{ fontWeight: 'bold', color: 'var(--text-highlight)', marginBottom: '8px' }}>
-              📌 {r.report_title || `${r.ticker || r.category} - Şirket Raporu`}
+              {r.report_title || `${r.ticker || r.category} - Şirket Raporu`}
             </div>
             <div style={{ marginBottom: '8px' }}>
               <strong style={{ color: '#00e5ff' }}>Özet:</strong> {r.summary || ((!r.full_text || r.full_text === "Metin bulunamadı.") && !r.pdf_url ? 'Bu veri Fintables hedef fiyat & model portföy tablolarından entegre edilmiştir. Rapor özeti bulunmamaktadır.' : 'Özet bulunmuyor.')}
@@ -66,7 +66,7 @@ export default function ReportDetail({ r }) {
           <div style={{ flex: '1 1 100%', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
             {!r.hideFundamentals && (
               <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-neutral)', marginBottom: '10px' }}>
-                📊 GEÇMİŞ 1 YIL FİYAT & BİLANÇO
+                GEÇMİŞ 1 YIL FİYAT & BİLANÇO
               </div>
             )}
             {loading ? (

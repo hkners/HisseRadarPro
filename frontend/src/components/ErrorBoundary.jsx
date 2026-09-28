@@ -20,10 +20,9 @@ export default class ErrorBoundary extends React.Component {
       return (
         <div className="panel" style={{ margin: '40px auto', maxWidth: '600px' }}>
           <div className="panel-header" style={{ color: 'var(--color-red)' }}>
-            ⚠ SYSTEM ERROR — UNHANDLED EXCEPTION
+            [SİSTEM HATASI]
           </div>
           <div className="panel-content" style={{ textAlign: 'center', padding: '30px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '20px' }}>💥</div>
             <h3 style={{ color: 'var(--text-highlight)', marginBottom: '15px' }}>
               BİR HATA OLUŞTU
             </h3>

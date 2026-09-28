@@ -30,14 +30,18 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
         "STRONG_SELL": 0
     };
 
-    const overallRec = summary.RECOMMENDATION || "NEUTRAL";
-    const gaugeScore = gaugeMap[overallRec];
-    const rotation = (gaugeScore / 100) * 180 - 90; // -90 to 90
+    // Needle angle mapping: 0deg is vertical (Neutral), negative is left (Sell), positive is right (Buy)
+    const angleMap = {
+        "STRONG_SELL": -72,
+        "SELL": -36,
+        "NEUTRAL": 0,
+        "BUY": 36,
+        "STRONG_BUY": 72
+    };
 
-    // Parse counts from oscillators and MA if we can, else just display 0
-    // TradingView scanner API returns Recommendation strings, not exact counts for BUY/SELL
-    // So we will just show the overall text.
-    
+    const overallRec = summary.RECOMMENDATION || "NEUTRAL";
+    const rotation = angleMap[overallRec] ?? 0;
+
     const renderActionBadge = (action) => {
         const bg = action === 'BUY' ? 'var(--color-up)' : action === 'SELL' ? 'var(--color-down)' : 'transparent';
         const color = action === 'NEUTRAL' || action === 'NÖTR' ? 'var(--text-muted)' : '#fff';
@@ -65,7 +69,6 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
 
     const maList = [5, 10, 20, 30, 50, 100, 200];
 
-    // Helper to determine MA action (Price vs MA)
     const getMaAction = (val) => {
         if (!val || !currentPrice) return "NEUTRAL";
         return currentPrice > val ? "BUY" : "SELL";
@@ -92,27 +95,128 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
         };
     };
 
+    // Summary counts across oscillators and moving averages
+    const counts = useMemo(() => {
+        let sell = 0, neutral = 0, buy = 0;
+        if (oscillators && oscillators.COMPUTE) {
+            Object.values(oscillators.COMPUTE).forEach(sig => {
+                if (sig === 'BUY') buy++;
+                else if (sig === 'SELL') sell++;
+                else neutral++;
+            });
+        }
+        if (indicators && currentPrice) {
+            maList.forEach(len => {
+                const sma = indicators[`SMA${len}`];
+                const ema = indicators[`EMA${len}`];
+                if (sma) { currentPrice > sma ? buy++ : sell++; }
+                if (ema) { currentPrice > ema ? buy++ : sell++; }
+            });
+        }
+        return { sell, neutral, buy };
+    }, [oscillators, indicators, currentPrice]);
+
     return (
         <div style={{ background: 'var(--bg-secondary)', borderRadius: '5px', padding: '12px 10px', border: '1px solid var(--border-color)', width: '100%', boxSizing: 'border-box' }}>
             <h2 style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '15px', color: 'var(--color-neutral)', display: 'flex', alignItems: 'center', gap: '5px', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                <span>🚀</span> OTO-ANALİZ (TRADINGVIEW - ÖZET)
+                OTO-ANALİZ (TRADINGVIEW - ÖZET)
             </h2>
             
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                <div style={{ position: 'relative', width: '160px', height: '80px', overflow: 'hidden', marginBottom: '10px' }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '160px', height: '160px', borderRadius: '50%', border: '14px solid rgba(255,255,255,0.1)', boxSizing: 'border-box' }}></div>
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '160px', height: '160px', borderRadius: '50%', border: '14px solid #ef4444', borderTopColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: 'transparent', transform: 'rotate(-45deg)', transformOrigin: 'center', opacity: 0.8, boxSizing: 'border-box' }}></div>
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '160px', height: '160px', borderRadius: '50%', border: '14px solid #22c55e', borderLeftColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: 'transparent', transform: 'rotate(45deg)', transformOrigin: 'center', opacity: 0.8, boxSizing: 'border-box' }}></div>
-                    
-                    <div style={{
-                        position: 'absolute', bottom: 0, left: '50%', width: '3px', height: '60px', background: '#fff', transformOrigin: 'bottom center', borderRadius: '3px 3px 0 0',
-                        transform: `translateX(-50%) rotate(${rotation}deg)`, transition: 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 10
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '4px 0' }}>
+                <svg viewBox="0 0 200 115" style={{ width: '180px', height: '105px', overflow: 'visible' }}>
+                    {/* Background track */}
+                    <path
+                        d="M 28 95 A 72 72 0 0 1 172 95"
+                        fill="none"
+                        stroke="rgba(255,255,255,0.06)"
+                        strokeWidth="11"
+                        strokeLinecap="round"
+                    />
+
+                    {/* Segment 1: GÜÇLÜ SAT (178° -> 146°) */}
+                    <path
+                        d="M 28.04 92.49 A 72 72 0 0 1 40.31 54.74"
+                        fill="none"
+                        stroke="#ef4444"
+                        strokeWidth={overallRec === "STRONG_SELL" ? 13 : 9}
+                        strokeLinecap="round"
+                        opacity={overallRec === "STRONG_SELL" ? 1.0 : 0.45}
+                        style={{ transition: 'stroke-width 0.3s, opacity 0.3s' }}
+                    />
+
+                    {/* Segment 2: SAT (142° -> 110°) */}
+                    <path
+                        d="M 43.26 50.67 A 72 72 0 0 1 75.37 27.34"
+                        fill="none"
+                        stroke="#f87171"
+                        strokeWidth={overallRec === "SELL" ? 13 : 9}
+                        strokeLinecap="round"
+                        opacity={overallRec === "SELL" ? 1.0 : 0.45}
+                        style={{ transition: 'stroke-width 0.3s, opacity 0.3s' }}
+                    />
+
+                    {/* Segment 3: NÖTR (106° -> 74°) */}
+                    <path
+                        d="M 80.15 25.79 A 72 72 0 0 1 119.85 25.79"
+                        fill="none"
+                        stroke="#64748b"
+                        strokeWidth={overallRec === "NEUTRAL" ? 13 : 9}
+                        strokeLinecap="round"
+                        opacity={overallRec === "NEUTRAL" ? 1.0 : 0.45}
+                        style={{ transition: 'stroke-width 0.3s, opacity 0.3s' }}
+                    />
+
+                    {/* Segment 4: AL (70° -> 38°) */}
+                    <path
+                        d="M 124.63 27.34 A 72 72 0 0 1 156.74 50.67"
+                        fill="none"
+                        stroke="#4ade80"
+                        strokeWidth={overallRec === "BUY" ? 13 : 9}
+                        strokeLinecap="round"
+                        opacity={overallRec === "BUY" ? 1.0 : 0.45}
+                        style={{ transition: 'stroke-width 0.3s, opacity 0.3s' }}
+                    />
+
+                    {/* Segment 5: GÜÇLÜ AL (34° -> 2°) */}
+                    <path
+                        d="M 159.69 54.74 A 72 72 0 0 1 171.96 92.49"
+                        fill="none"
+                        stroke="#22c55e"
+                        strokeWidth={overallRec === "STRONG_BUY" ? 13 : 9}
+                        strokeLinecap="round"
+                        opacity={overallRec === "STRONG_BUY" ? 1.0 : 0.45}
+                        style={{ transition: 'stroke-width 0.3s, opacity 0.3s' }}
+                    />
+
+                    {/* Labels around gauge */}
+                    <text x="18" y="108" fill={overallRec === "STRONG_SELL" ? "#ef4444" : "#64748b"} fontSize="8" fontWeight={overallRec === "STRONG_SELL" ? "bold" : "normal"} textAnchor="middle">Güçlü sat</text>
+                    <text x="48" y="34" fill={overallRec === "SELL" ? "#f87171" : "#64748b"} fontSize="8" fontWeight={overallRec === "SELL" ? "bold" : "normal"} textAnchor="middle">Sat</text>
+                    <text x="100" y="14" fill={overallRec === "NEUTRAL" ? "#94a3b8" : "#64748b"} fontSize="8" fontWeight={overallRec === "NEUTRAL" ? "bold" : "normal"} textAnchor="middle">Nötr</text>
+                    <text x="152" y="34" fill={overallRec === "BUY" ? "#4ade80" : "#64748b"} fontSize="8" fontWeight={overallRec === "BUY" ? "bold" : "normal"} textAnchor="middle">Al</text>
+                    <text x="182" y="108" fill={overallRec === "STRONG_BUY" ? "#22c55e" : "#64748b"} fontSize="8" fontWeight={overallRec === "STRONG_BUY" ? "bold" : "normal"} textAnchor="middle">Güçlü al</text>
+
+                    {/* Needle with pivot */}
+                    <g style={{
+                        transform: `rotate(${rotation}deg)`,
+                        transformOrigin: '100px 95px',
+                        transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
                     }}>
-                        <div style={{ position: 'absolute', bottom: '-3px', left: '50%', width: '10px', height: '10px', background: '#fff', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}></div>
-                    </div>
+                        <polygon points="98.5,95 99.5,35 100.5,35 101.5,95" fill="#ffffff" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))" />
+                        <circle cx="100" cy="95" r="5" fill="#ffffff" stroke="#14171c" strokeWidth="2" />
+                        <circle cx="100" cy="95" r="2" fill="#14171c" />
+                    </g>
+                </svg>
+
+                {/* Rating title */}
+                <div style={{ fontSize: '16px', fontWeight: '900', color: colorMap[overallRec], marginTop: '2px', letterSpacing: '0.4px' }}>
+                    {textMap[overallRec]}
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: colorMap[overallRec], marginBottom: '6px' }}>{textMap[overallRec]}</div>
+
+                {/* Signal count badges */}
+                <div style={{ display: 'flex', gap: '14px', fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>
+                    <span style={{ color: '#ef4444' }}>Sat: {counts.sell}</span>
+                    <span style={{ color: '#9da7b3' }}>Nötr: {counts.neutral}</span>
+                    <span style={{ color: '#22c55e' }}>Al: {counts.buy}</span>
                 </div>
             </div>
 
@@ -187,6 +291,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
             </div>
 
             {/* Pivot Points Table */}
+            {indicators['Pivot.M.Classic.Pivot'] !== undefined && (
             <div style={{ marginTop: '25px' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-highlight)', fontWeight: 'bold', borderBottom: '1px solid var(--border-color)', paddingBottom: '5px', marginBottom: '8px' }}>
                     Pivot Noktaları
@@ -225,6 +330,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                     </table>
                 </div>
             </div>
+            )}
         </div>
     );
 };

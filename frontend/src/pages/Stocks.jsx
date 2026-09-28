@@ -4,23 +4,24 @@ import { Link } from 'react-router-dom';
 import ImageWithFallback from '../components/ImageWithFallback';
 import { useFavorites } from '../hooks/useFavorites';
 import FavoriteStar from '../components/common/FavoriteStar';
+import { getCachedData, setCachedData } from '../utils/apiCache';
+import PageContainer from '../components/common/PageContainer';
+import ScoreBreakdownWidget from '../components/ScoreBreakdownWidget';
 
-const BIST30 = ['AKBNK', 'ALARK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'CCOMP', 'CWENE', 'ENKAI', 'EREGL', 'FROTO', 'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KOZAA', 'KOZAL', 'KRDMD', 'MIATK', 'ODAS', 'PGSUS', 'PETKM', 'SAHOL', 'SASA', 'SISE', 'TCELL', 'THYAO', 'TOASO', 'TUPRS', 'YKBNK'];
+const BIST30 = ['AKBNK', 'ALARK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'CCOMP', 'CWENE', 'ENKAI', 'EREGL', 'FROTO', 'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KRDMD', 'MIATK', 'ODAS', 'PGSUS', 'PETKM', 'SAHOL', 'SASA', 'SISE', 'TCELL', 'THYAO', 'TOASO', 'TRALT', 'TRMET', 'TUPRS', 'YKBNK'];
 const BIST100 = [
   'AGHOL', 'AKBNK', 'AKCNS', 'AKFGY', 'AKFYE', 'AKSA', 'AKSEN', 'ALARK', 'ALBRK', 'ALFAS',
   'ARCLK', 'ARDYZ', 'ASELS', 'ASTOR', 'ASUZU', 'BERA', 'BIENY', 'BIMAS', 'BIOEN', 'BOBET',
   'BRSAN', 'BRYAT', 'BUCIM', 'CANTE', 'CCOLA', 'CIMSA', 'CWENE', 'DOAS', 'DOHOL', 'ECILC',
   'ECZYT', 'EGEEN', 'EKGYO', 'ENJSA', 'ENKAI', 'EREGL', 'EUPWR', 'EUREN', 'FROTO', 'GARAN',
   'GENIL', 'GESAN', 'GLYHO', 'GUBRF', 'GWIND', 'HALKB', 'HEKTS', 'HKTM', 'ISCTR', 'ISGYO',
-  'ISMEN', 'IZENR', 'KCAER', 'KCHOL', 'KLSER', 'KMPUR', 'KONTR', 'KONYA', 'KOZAA', 'KOZAL',
+  'ISMEN', 'IZENR', 'KCAER', 'KCHOL', 'KLSER', 'KMPUR', 'KONTR', 'KONYA',
   'KRDMD', 'KZBGY', 'MAVI', 'MGROS', 'MIATK', 'ODAS', 'OTKAR', 'OYAKC', 'PENTA', 'PETKM',
   'PGSUS', 'PNLSN', 'QUAGR', 'SAHOL', 'SASA', 'SAYAS', 'SISE', 'SKBNK', 'SMRTG', 'SOKM',
-  'TABGD', 'TAVHL', 'TCELL', 'THYAO', 'TKFEN', 'TOASO', 'TSKB', 'TTKOM', 'TTRAK', 'TUKAS',
+  'TABGD', 'TAVHL', 'TCELL', 'THYAO', 'TKFEN', 'TOASO', 'TRALT', 'TRMET', 'TSKB', 'TTKOM', 'TTRAK', 'TUKAS',
   'TUPRS', 'TURSG', 'ULKER', 'VAKBN', 'VESBE', 'VESTL', 'YEOTK', 'YKBNK', 'YYLGD', 'ZOREN'
 ];
 const XBANK = ['AKBNK', 'GARAN', 'YKBNK', 'ISCTR', 'VAKBN', 'HALKB', 'TSKB', 'SKBNK', 'ALBRK', 'ICBCT', 'KLNMA', 'QNBFL'];
-
-
 
 const getPotentialColor = (pct) => {
   if (pct > 50) return '#00ff00';
@@ -32,28 +33,67 @@ const getPotentialColor = (pct) => {
 };
 
 export default function Stocks() {
-  const [data, setData] = useState({ status: 'INITIALIZING', last_updated: null, stocks: [] });
+  const apiBase = import.meta.env.VITE_API_URL || '/api';
+  const stocksUrl = `${apiBase}/stocks`;
+  const convictionUrl = `${apiBase}/conviction/all`;
+  const cachedStocks = getCachedData(stocksUrl);
+  const cachedConviction = getCachedData(convictionUrl);
+
+  const initialConvictionMap = useMemo(() => {
+    const cMap = {};
+    if (Array.isArray(cachedConviction)) {
+      cachedConviction.forEach(item => { cMap[item.ticker] = item; });
+    }
+    return cMap;
+  }, []);
+
+  const hasValidStocks = cachedStocks && Array.isArray(cachedStocks.stocks) && cachedStocks.stocks.length > 0;
+  const [data, setData] = useState(hasValidStocks ? cachedStocks : { status: 'INITIALIZING', last_updated: null, stocks: [] });
+  const [convictionMap, setConvictionMap] = useState(initialConvictionMap);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('ALL'); // 'ALL', 'BIST30'
-  const [sortConfig, setSortConfig] = useState({ key: 'ticker', direction: 'asc' });
+  const [loading, setLoading] = useState(!hasValidStocks);
+  const [filter, setFilter] = useState('ALL'); // 'ALL', 'STRONG_BUY', 'IN_ENTRY', 'BIST30', 'BIST100', 'XBANK', 'RECOMMENDED', 'FAVORITES'
+  const [sortConfig, setSortConfig] = useState({ key: 'score', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedRows, setExpandedRows] = useState({});
   const itemsPerPage = 50;
+
+  const toggleRowExpand = (ticker) => {
+    setExpandedRows(prev => ({ ...prev, [ticker]: !prev[ticker] }));
+  };
 
   const { favorites } = useFavorites();
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/stocks`)
-      .then(res => res.json())
-      .then(json => {
-        setData(json);
+    // 1. Fetch stocks
+    const fetchStocks = fetch(stocksUrl).then(r => r.ok ? r.json() : null).catch(() => null);
+    // 2. Fetch conviction engine scores
+    const fetchConviction = fetch(convictionUrl).then(r => r.ok ? r.json() : []).catch(() => []);
+
+    Promise.all([fetchStocks, fetchConviction])
+      .then(([stocksRes, convictionRes]) => {
+        if (stocksRes && Array.isArray(stocksRes.stocks)) {
+          setCachedData(stocksUrl, stocksRes);
+          setData(stocksRes);
+        }
+
+        if (convictionRes) {
+          setCachedData(convictionUrl, convictionRes);
+          const cMap = {};
+          if (Array.isArray(convictionRes)) {
+            convictionRes.forEach(item => {
+              cMap[item.ticker] = item;
+            });
+          }
+          setConvictionMap(cMap);
+        }
         setLoading(false);
       })
       .catch(err => {
-        console.error(err);
+        console.error("Stocks fetch error:", err);
         setLoading(false);
       });
-  }, []);
+  }, [stocksUrl, convictionUrl]);
 
   const handleSort = (key) => {
     let direction = 'desc';
@@ -66,14 +106,44 @@ export default function Stocks() {
   const processedData = useMemo(() => {
     if (!data.stocks) return [];
     
+    // Merge conviction data into stock rows
+    let merged = data.stocks.map(s => {
+      const conv = convictionMap[s.ticker] || {};
+      return {
+        ...s,
+        score: conv.score || 0,
+        decision: conv.decision || 'BEKLE',
+        decision_badge: conv.decision_badge || 'HOLD',
+        decision_color: conv.color || 'var(--color-warning)',
+        consensus_target: conv.consensus_target || null,
+        stop_loss: conv.stop_loss || null,
+        entry_zone: conv.entry_zone || null,
+        risk_reward: conv.risk_reward || 1.0,
+        is_excessive_rr: conv.is_excessive_rr || (conv.risk_reward > 10.0),
+        rr_warning: conv.rr_warning || null,
+        is_momentum: conv.is_momentum || false,
+        is_value: conv.is_value || false,
+        model_count: conv.model_count || 0,
+        is_disagreeing: conv.is_disagreeing || false,
+        disagreement_badge: conv.disagreement_badge || null,
+        disagreement_reason: conv.disagreement_reason || null,
+        alpha_score: conv.alpha_score !== undefined ? conv.alpha_score : null,
+        alpha_signal: conv.alpha_signal || null
+      };
+    });
+
     // 1. Filter by Search
-    let result = data.stocks.filter(s => 
+    let result = merged.filter(s => 
       s.ticker.toLowerCase().includes(search.toLowerCase()) || 
       s.name.toLowerCase().includes(search.toLowerCase())
     );
 
     // 2. Filter by Tab
-    if (filter === 'BIST30') {
+    if (filter === 'STRONG_BUY') {
+      result = result.filter(s => (s.decision === 'GÜÇLÜ AL' || s.decision === 'KADEMELİ AL') && !s.is_excessive_rr);
+    } else if (filter === 'IN_ENTRY') {
+      result = result.filter(s => s.entry_zone && s.price >= s.entry_zone.low && s.price <= s.entry_zone.high);
+    } else if (filter === 'BIST30') {
       result = result.filter(s => BIST30.includes(s.ticker));
     } else if (filter === 'BIST100') {
       result = result.filter(s => BIST100.includes(s.ticker));
@@ -103,13 +173,12 @@ export default function Stocks() {
     });
 
     return result;
-  }, [data.stocks, search, filter, sortConfig, favorites]);
+  }, [data.stocks, convictionMap, search, filter, sortConfig, favorites]);
 
   // Pagination logic
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
   const paginatedData = processedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [search, filter]);
@@ -130,224 +199,351 @@ export default function Stocks() {
   };
 
   return (
-    <div className="panel flex-1" style={{ display: 'flex', flexDirection: 'column' }}>
-      <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>BIST INDEX TRACKER // {processedData.length} SYMBOLS</span>
-        <span className="blink" style={{ color: data.status === 'FETCHING' ? 'var(--color-warning)' : 'var(--color-up)', fontSize: '0.9rem'}}>
-          {data.status === 'FETCHING' ? 'DOWNLOADING LIVE DATA...' : `SYNCED [${data.last_updated}]`}
-        </span>
-      </div>
-      
-      <div className="panel-content" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-        <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
-          <input 
-            type="text" 
-            className="search-box" 
-            placeholder="SEARCH TICKER OR COMPANY..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button 
-              onClick={() => { setFilter('ALL'); setCurrentPage(1); }} 
-              className="action-button"
-              style={{ background: filter === 'ALL' ? 'var(--bg-highlight)' : 'transparent', color: filter === 'ALL' ? 'var(--bg-panel)' : 'var(--text-highlight)' }}
-            >
-              [TÜMÜ]
-            </button>
-            <button 
-              onClick={() => { setFilter('RECOMMENDED'); setCurrentPage(1); }} 
-              className="action-button"
-              style={{ background: filter === 'RECOMMENDED' ? 'var(--bg-highlight)' : 'transparent', color: filter === 'RECOMMENDED' ? 'var(--bg-panel)' : 'var(--text-highlight)' }}
-            >
-              [ÖNERİLENLER]
-            </button>
-            <button 
-              onClick={() => { setFilter('FAVORITES'); setCurrentPage(1); }} 
-              className="action-button"
-              style={{ background: filter === 'FAVORITES' ? 'var(--bg-highlight)' : 'transparent', color: filter === 'FAVORITES' ? 'var(--bg-panel)' : 'var(--text-highlight)' }}
-            >
-              [FAVORİLER]
-            </button>
-            <button 
-              onClick={() => { setFilter('BIST30'); setCurrentPage(1); }} 
-              className="action-button"
-              style={{ background: filter === 'BIST30' ? 'var(--bg-highlight)' : 'transparent', color: filter === 'BIST30' ? 'var(--bg-panel)' : 'var(--text-highlight)' }}
-            >
-              [BIST 30]
-            </button>
-            <button 
-              onClick={() => { setFilter('BIST100'); setCurrentPage(1); }} 
-              className="action-button"
-              style={{ background: filter === 'BIST100' ? 'var(--bg-highlight)' : 'transparent', color: filter === 'BIST100' ? 'var(--bg-panel)' : 'var(--text-highlight)' }}
-            >
-              [BIST 100]
-            </button>
-            <button 
-              onClick={() => { setFilter('XBANK'); setCurrentPage(1); }} 
-              className="action-button"
-              style={{ background: filter === 'XBANK' ? 'var(--bg-highlight)' : 'transparent', color: filter === 'XBANK' ? 'var(--bg-panel)' : 'var(--text-highlight)' }}
-            >
-              [XBANK]
-            </button>
-          </div>
+    <PageContainer
+      title="BIST HİSSE RADARI"
+      badge={{
+        label: `${processedData.length} SEMBOL`,
+        background: 'rgba(88, 166, 255, 0.12)',
+        color: 'var(--color-neutral)',
+        borderColor: 'rgba(88, 166, 255, 0.3)'
+      }}
+      subtitle="Giriş/çıkış seviyeleri, dinamik stop-loss ve risk/ödül optimizasyonu ile kısa-orta vadeli işlem kararları"
+      statusDot={data.status === 'FETCHING' ? 'var(--color-warning)' : 'var(--color-up)'}
+      headerRight={
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px' }}>
+          <span style={{ 
+            color: data.status === 'FETCHING' ? 'var(--color-warning)' : 'var(--color-up)',
+            border: `1px solid ${data.status === 'FETCHING' ? 'var(--color-warning)' : 'var(--color-up)'}`,
+            padding: '2px 6px',
+            borderRadius: '3px',
+            fontWeight: '600'
+          }}>
+            {data.status === 'FETCHING' ? 'VERİLER GÜNCELLENİYOR...' : `EŞİTLENDİ [${data.last_updated || 'LIVE'}]`}
+          </span>
         </div>
+      }
+    >
+      <div className="panel flex-1" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, marginBottom: 0 }}>
+        <div className="panel-content" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: '8px 10px' }}>
+          {/* Controls and Filters */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input 
+                type="text" 
+                placeholder="Hisse / Şirket Ara..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ 
+                  width: '220px',
+                  height: '28px',
+                  padding: '3px 10px', 
+                  background: 'var(--bg-secondary)', 
+                  border: '1px solid var(--border-color)', 
+                  color: '#fff',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  outline: 'none'
+                }}
+              />
+              <button 
+                onClick={() => setFilter('ALL')} 
+                className={`action-button ${filter === 'ALL' ? 'active' : ''}`}
+              >
+                [TÜMÜ]
+              </button>
+              <button 
+                onClick={() => setFilter('STRONG_BUY')} 
+                className={`action-button ${filter === 'STRONG_BUY' ? 'active-green' : ''}`}
+                style={filter === 'STRONG_BUY' ? {} : { color: 'var(--color-up)', borderColor: 'rgba(0, 230, 118, 0.3)' }}
+              >
+                [GÜÇLÜ AL]
+              </button>
+              <button 
+                onClick={() => setFilter('IN_ENTRY')} 
+                className={`action-button ${filter === 'IN_ENTRY' ? 'active-cyan' : ''}`}
+              >
+                [ALIM BÖLGESİ]
+              </button>
+              <button 
+                onClick={() => setFilter('BUY_RECOMMENDED')} 
+                className={`action-button ${filter === 'BUY_RECOMMENDED' ? 'active' : ''}`}
+              >
+                [ÖNERİLENLER]
+              </button>
+              <button 
+                onClick={() => setFilter('FAVORITES')} 
+                className={`action-button ${filter === 'FAVORITES' ? 'active-warning' : ''}`}
+                style={filter === 'FAVORITES' ? {} : { color: 'var(--color-warning)', borderColor: 'rgba(255, 170, 0, 0.3)' }}
+              >
+                [FAVORİLER]
+              </button>
+              <button 
+                onClick={() => setFilter('BIST30')} 
+                className={`action-button ${filter === 'BIST30' ? 'active' : ''}`}
+              >
+                [BIST 30]
+              </button>
+              <button 
+                onClick={() => setFilter('BIST100')} 
+                className={`action-button ${filter === 'BIST100' ? 'active' : ''}`}
+              >
+                [BIST 100]
+              </button>
+            </div>
+          </div>
 
-        {loading ? (
-          <div style={{ color: 'var(--text-highlight)', textAlign: 'center', padding: '40px' }}>INITIALIZING BIST CONNECTION...</div>
-        ) : (
-          <>
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              <table className="data-table">
-                <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-panel)', zIndex: 1, boxShadow: '0 2px 5px rgba(0,0,0,0.5)' }}>
-                  <tr>
-                    <th style={{ width: '50px' }}></th>
-                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('ticker')}>TICKER {sortConfig.key === 'ticker' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
-                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('name')}>COMPANY {sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
-                    <th style={{ cursor: 'pointer', textAlign: 'right' }} onClick={() => handleSort('price')}>PRICE (TRY) {sortConfig.key === 'price' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
-                    <th style={{ cursor: 'pointer', textAlign: 'right' }} onClick={() => handleSort('change_pct')}>CHANGE % {sortConfig.key === 'change_pct' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
-                    <th style={{ cursor: 'pointer', textAlign: 'right' }} onClick={() => handleSort('volume')}>VOLUME {sortConfig.key === 'volume' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
-                    <th style={{ cursor: 'pointer', textAlign: 'center' }} onClick={() => handleSort('avg_potential')}>POTENTIAL {sortConfig.key === 'avg_potential' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
-                    <th style={{ cursor: 'pointer', textAlign: 'left' }} onClick={() => handleSort('rec_count')}>BROKERS {sortConfig.key === 'rec_count' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
-                    <th style={{ textAlign: 'center' }}>ACTION</th>
+        <div className="table-responsive stable-scroll" style={{ flex: 1, borderBottom: '1px solid var(--border-color)' }}>
+          <table className="data-table data-table-fixed compact-terminal-table" style={{ width: '100%' }}>
+            <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-panel)', zIndex: 2, boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+              <tr>
+                <th style={{ width: '4%', textAlign: 'center' }}></th>
+                <th style={{ width: '16%', cursor: 'pointer', textAlign: 'left' }} onClick={() => handleSort('ticker')}>HİSSE {sortConfig.key === 'ticker' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
+                <th style={{ width: '9%', cursor: 'pointer', textAlign: 'right' }} onClick={() => handleSort('price')}>FİYAT (TL) {sortConfig.key === 'price' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
+                <th style={{ width: '7%', cursor: 'pointer', textAlign: 'right' }} onClick={() => handleSort('change_pct')}>FARK % {sortConfig.key === 'change_pct' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
+                <th style={{ width: '16%', cursor: 'pointer', textAlign: 'center' }} onClick={() => handleSort('score')}>KARAR SKORU {sortConfig.key === 'score' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
+                <th style={{ width: '13%', textAlign: 'center' }}>ALIM BÖLGESİ</th>
+                <th style={{ width: '10%', cursor: 'pointer', textAlign: 'center' }} onClick={() => handleSort('avg_potential')}>HEDEF POT. {sortConfig.key === 'avg_potential' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
+                <th style={{ width: '9%', textAlign: 'center' }}>STOP-LOSS</th>
+                <th style={{ width: '8%', cursor: 'pointer', textAlign: 'left' }} onClick={() => handleSort('rec_count')}>KURUMLAR {sortConfig.key === 'rec_count' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</th>
+                <th style={{ width: '8%', textAlign: 'center' }}>İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 14 }).map((_, i) => (
+                  <tr key={`skel-${i}`}>
+                    <td style={{ textAlign: 'center' }}>
+                      <div className="skeleton-bar" style={{ width: '26px', height: '26px', borderRadius: '50%', margin: '0 auto' }} />
+                    </td>
+                    <td style={{ textAlign: 'left' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="skeleton-bar" style={{ width: '15px', height: '15px', borderRadius: '50%' }} />
+                        <div className="skeleton-bar" style={{ width: '60px', height: '14px' }} />
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="skeleton-bar" style={{ width: '50px', height: '16px', marginLeft: 'auto' }} />
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="skeleton-bar" style={{ width: '45px', height: '16px', marginLeft: 'auto' }} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div className="skeleton-bar" style={{ width: '65px', height: '20px', margin: '0 auto' }} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div className="skeleton-bar" style={{ width: '80px', height: '16px', margin: '0 auto' }} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div className="skeleton-bar" style={{ width: '55px', height: '20px', margin: '0 auto' }} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div className="skeleton-bar" style={{ width: '60px', height: '16px', margin: '0 auto' }} />
+                    </td>
+                    <td style={{ textAlign: 'left' }}>
+                      <div className="skeleton-bar" style={{ width: '55px', height: '16px' }} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div className="skeleton-bar" style={{ width: '55px', height: '22px', margin: '0 auto' }} />
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {paginatedData.map(s => (
-                    <tr key={s.ticker} className="row-hoverable">
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <FavoriteStar ticker={s.ticker} />
-                        <ImageWithFallback 
-                          src={`${import.meta.env.VITE_API_URL.replace(/\/api$/, '')}/logos/${s.ticker}.png`} 
-                          alt={s.ticker} 
-                          fallbackName={s.ticker}
-                          size={32}
-                          style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff', objectFit: 'contain', verticalAlign: 'middle' }}
-                        />
-                      </td>
-                      <td style={{ fontWeight: 'bold' }}>
-                        <Link to={`/hisse/${s.ticker}`} className="ticker-link">
-                          {s.ticker}
-                        </Link>
-                      </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{s.name}</td>
-                      <td style={{ fontWeight: 'bold', textAlign: 'right', color: '#fff' }}>
-                        {s.price ? s.price.toFixed(2) : 'N/A'}
-                      </td>
-                      <td style={{ 
-                        fontWeight: 'bold', 
-                        textAlign: 'right', 
-                        color: s.change_pct > 0 ? 'var(--color-up)' : (s.change_pct < 0 ? 'var(--color-down)' : 'var(--text-muted)') 
-                      }}>
-                        {s.change_pct > 0 ? '▲ ' : (s.change_pct < 0 ? '▼ ' : '')}
-                        {s.change_pct !== null && s.change_pct !== undefined ? Math.abs(s.change_pct).toFixed(2) + '%' : 'N/A'}
-                      </td>
-                      <td style={{ 
-                        textAlign: 'right', 
-                        color: 'var(--color-neutral)',
-                        position: 'relative'
-                      }}>
-                        <div style={{
-                          position: 'absolute', top: '4px', bottom: '4px', right: 0,
-                          background: 'rgba(255, 255, 255, 0.05)', borderRadius: '2px',
-                          width: maxVolume > 0 && s.volume ? `${(s.volume / maxVolume) * 100}%` : '0%',
-                          zIndex: 0
-                        }}></div>
-                        <span style={{ position: 'relative', zIndex: 1 }}>{formatVolume(s.volume)}</span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {s.rec_count > 0 ? (
-                          <span style={{ 
-                            background: `${getPotentialColor(s.avg_potential)}20`, 
-                            color: getPotentialColor(s.avg_potential), 
-                            padding: '2px 6px', 
+                ))
+              ) : (
+                paginatedData.map(s => (
+                <React.Fragment key={s.ticker}>
+                  <tr className="row-hoverable">
+                    <td style={{ textAlign: 'center', width: '4.5%' }}>
+                      <ImageWithFallback 
+                        src={`${import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://127.0.0.1:8015'}/logos/${s.ticker}.png`} 
+                        alt={s.ticker} 
+                        fallbackName={s.ticker}
+                        size={26}
+                        style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#fff', objectFit: 'contain', margin: '0 auto', display: 'block' }}
+                      />
+                    </td>
+                    <td style={{ textAlign: 'left', width: '18%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FavoriteStar ticker={s.ticker} size={15} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Link to={`/hisse/${s.ticker}`} className="ticker-link" style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                            {s.ticker}
+                          </Link>
+                          {BIST30.includes(s.ticker) && <span className="badge badge-subtle" style={{ fontSize: '9px', padding: '1px 3px' }}>B30</span>}
+                          {s.model_count > 0 && (
+                            <span style={{ fontSize: '9px', color: '#ffab00', fontWeight: 'bold', background: 'rgba(255, 171, 0, 0.15)', padding: '1px 4px', borderRadius: '3px', flexShrink: 0 }}>MOD</span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Price */}
+                    <td style={{ fontWeight: 'bold', textAlign: 'right', color: '#fff', fontSize: '13px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                      {s.price ? s.price.toFixed(2) : 'N/A'}
+                    </td>
+
+                    {/* Change % */}
+                    <td style={{ 
+                      fontWeight: 'bold', 
+                      textAlign: 'right', 
+                      fontSize: '13px',
+                      fontVariantNumeric: 'tabular-nums',
+                      whiteSpace: 'nowrap',
+                      color: s.change_pct > 0 ? 'var(--color-up)' : (s.change_pct < 0 ? 'var(--color-down)' : 'var(--text-muted)') 
+                    }}>
+                      {s.change_pct > 0 ? '▲ +' : (s.change_pct < 0 ? '▼ ' : '')}
+                      {s.change_pct !== null && s.change_pct !== undefined ? Math.abs(s.change_pct).toFixed(2) + '%' : 'N/A'}
+                    </td>
+
+                    {/* Decision & Score */}
+                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '150px' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleRowExpand(s.ticker); }}
+                          title="Karar Skoru alt bileşen dökümünü aç/kapat"
+                          style={{
+                            width: '128px',
+                            background: s.decision_color || 'var(--color-warning)',
+                            color: ['#ff3366', '#ef4444', '#dc2626', '#f85149'].includes(s.decision_color) ? '#ffffff' : '#000000',
+                            fontSize: '9.5px',
+                            fontWeight: '900',
+                            padding: '3px 6px',
                             borderRadius: '4px',
-                            fontWeight: 'bold',
-                            border: `1px solid ${getPotentialColor(s.avg_potential)}50`
-                          }}>
-                            {s.avg_potential > 0 ? '+' : ''}{s.avg_potential.toFixed(1)}%
+                            letterSpacing: '0.2px',
+                            border: expandedRows[s.ticker] ? '1px solid var(--color-cyan)' : '1px solid transparent',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            whiteSpace: 'nowrap',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <span style={{ whiteSpace: 'nowrap', fontSize: '9px', fontWeight: '900' }}>
+                            {s.decision}
                           </span>
-                        ) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                          <span style={{ fontSize: '9px', opacity: 0.85, fontVariantNumeric: 'tabular-nums', flexShrink: 0, marginLeft: '4px', borderLeft: '1px solid rgba(0,0,0,0.2)', paddingLeft: '4px' }}>
+                            {s.score}p {expandedRows[s.ticker] ? '▲' : '▼'}
+                          </span>
+                        </button>
+                        {s.is_disagreeing && (
+                          <span 
+                            title={s.disagreement_reason || "İki motor farklı görüşte"}
+                            style={{
+                              position: 'absolute',
+                              right: '0px',
+                              color: '#ffab00',
+                              cursor: 'help',
+                              fontSize: '12px',
+                              lineHeight: 1
+                            }}
+                          >
+                            ⚠️
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Entry Zone */}
+                    <td style={{ textAlign: 'center', fontSize: '12px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                      {s.entry_zone ? (
+                        <span style={{ color: '#00e5ff', fontWeight: 'bold' }}>
+                          {s.entry_zone.low} - {s.entry_zone.high}
+                        </span>
+                      ) : '-'}
+                    </td>
+
+                    {/* Potential */}
+                    <td style={{ textAlign: 'center', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                      {s.rec_count > 0 ? (
+                        <span 
+                          style={{ 
+                            color: s.is_excessive_rr ? '#ffab00' : getPotentialColor(s.avg_potential),
+                            fontWeight: 'bold',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: s.is_excessive_rr ? 'rgba(255, 171, 0, 0.12)' : 'rgba(255,255,255,0.03)',
+                            border: s.is_excessive_rr ? '1px solid rgba(255, 171, 0, 0.3)' : 'none',
+                            fontVariantNumeric: 'tabular-nums'
+                          }}
+                          title={s.is_excessive_rr ? "Aşırı yüksek getiri/R:R - sermaye artırımı/bölünme sonrası hedef fiyat doğrulaması gerekebilir" : ""}
+                        >
+                          {s.is_excessive_rr && <span style={{ fontSize: '10px' }}>⚠️</span>}
+                          {s.avg_potential > 0 ? '+' : ''}{s.avg_potential.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--border-color)' }}>--</span>
+                      )}
+                    </td>
+
+                    {/* Stop Loss */}
+                    <td style={{ textAlign: 'center', fontSize: '13px', color: 'var(--color-red)', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                      {s.stop_loss ? `${s.stop_loss.toFixed(1)} TL` : '-'}
+                    </td>
+
+                    {/* Brokers */}
+                    <td style={{ textAlign: 'left', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontWeight: 'bold', color: 'var(--text-highlight)', fontSize: '13px' }}>{s.rec_count}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '3px' }}>Kurum</span>
+                    </td>
+
+                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <Link to={`/hisse/${s.ticker}`} className="action-button" style={{ padding: '3px 8px', fontSize: '10px' }}>
+                        [KOKPİT]
+                      </Link>
+                    </td>
+                  </tr>
+                  {expandedRows[s.ticker] && (
+                    <tr key={`${s.ticker}-breakdown`} style={{ background: 'rgba(10, 15, 25, 0.95)' }}>
+                      <td colSpan="10" style={{ padding: '8px 14px 12px 14px', borderBottom: '1px solid var(--border-color)' }}>
+                        <ScoreBreakdownWidget ticker={s.ticker} compact={true} />
                       </td>
-                      <td style={{ textAlign: 'left' }}>
-                        {s.rec_count > 0 ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ display: 'flex' }}>
-                              {s.brokerages.slice(0, 4).map((broker, idx) => (
-                                <ImageWithFallback
-                                  key={broker}
-                                  src={`${import.meta.env.VITE_API_URL.replace(/\/api$/, '')}/logos/brokers/${slugifyBroker(broker)}.png`}
-                                  alt={broker}
-                                  fallbackName={broker}
-                                  size={32}
-                                  title={broker}
-                                  style={{
-                                    width: '24px', height: '24px', borderRadius: '50%', 
-                                    background: '#fff', objectFit: 'contain', 
-                                    marginLeft: idx === 0 ? '0' : '-8px',
-                                    border: '1px solid var(--bg-panel)',
-                                    zIndex: 10 - idx
-                                  }}
-                                />
-                              ))}
-                              {s.rec_count > 4 && (
-                                <div style={{
-                                  width: '24px', height: '24px', borderRadius: '50%',
-                                  background: 'var(--bg-highlight)', color: 'var(--text-highlight)',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  fontSize: '0.6rem', fontWeight: 'bold',
-                                  marginLeft: '-8px', border: '1px solid var(--bg-panel)', zIndex: 1
-                                }}>
-                                  +{s.rec_count - 4}
-                                </div>
-                              )}
-                            </div>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--color-warning)' }}>[{s.rec_count}]</span>
-                          </div>
-                        ) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <Link to={`/hisse/${s.ticker}`} className="action-button" style={{ fontSize: '0.8rem', padding: '2px 8px', textDecoration: 'none' }}>
-                          ANALYZE
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                  {paginatedData.length === 0 && (
-                    <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>NO DATA MATCHES FILTERS.</td>
                     </tr>
                   )}
-                </tbody>
-              </table>
-            </div>
-            
+                </React.Fragment>
+                ))
+              )}
+              {!loading && paginatedData.length === 0 && (
+                <tr>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                    Kriterlere uygun hisse bulunamadı.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
             {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '15px', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-color)', fontSize: '11.5px', flexShrink: 0 }}>
+              <div style={{ color: 'var(--text-muted)' }}>
+                Gösterilen: {processedData.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, processedData.length)} / Toplam: {processedData.length}
+              </div>
+              <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                 <button 
-                  className="action-button" 
+                  onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} 
                   disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  style={{ opacity: currentPage === 1 ? 0.3 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                  className="action-button"
+                  style={{ opacity: currentPage === 1 ? 0.4 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
                 >
-                  &lt; PREV
+                  &lt; Önceki
                 </button>
-                <span style={{ color: 'var(--text-highlight)', fontWeight: 'bold', fontSize: '0.9rem' }}>PAGE {currentPage} / {totalPages}</span>
+                <span style={{ padding: '3px 8px', color: 'var(--text-highlight)', fontWeight: 'bold' }}>
+                  Sayfa {currentPage} / {totalPages || 1}
+                </span>
                 <button 
-                  className="action-button" 
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  style={{ opacity: currentPage === totalPages ? 0.3 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                  onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} 
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  className="action-button"
+                  style={{ opacity: (currentPage === totalPages || totalPages === 0) ? 0.4 : 1, cursor: (currentPage === totalPages || totalPages === 0) ? 'not-allowed' : 'pointer' }}
                 >
-                  NEXT &gt;
+                  Sonraki &gt;
                 </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+            </div>
+          </div>
+        </div>
+    </PageContainer>
   );
 }

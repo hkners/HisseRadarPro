@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import ImageWithFallback from './ImageWithFallback';
 import { slugifyBroker } from '../utils/slugify';
+import FavoriteStar from './common/FavoriteStar';
 
 export function ReportDetail({ r }) {
   const [history, setHistory] = useState([]);
@@ -38,7 +39,7 @@ export function ReportDetail({ r }) {
       <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 300px' }}>
           <div style={{ fontWeight: 'bold', color: 'var(--text-highlight)', marginBottom: '8px' }}>
-            📌 {r.report_title || `${r.ticker || r.category} - Şirket Raporu`}
+            {r.report_title || `${r.ticker || r.category} - Şirket Raporu`}
           </div>
           <div style={{ marginBottom: '8px' }}>
             <strong style={{ color: '#00e5ff' }}>Özet:</strong> {r.summary || 'Özet bulunmuyor.'}
@@ -59,7 +60,7 @@ export function ReportDetail({ r }) {
         {r.ticker && (
           <div style={{ flex: '1 1 300px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
             <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-up)', marginBottom: '10px' }}>
-              📊 GEÇMİŞ 1 YIL FİYAT & BİLANÇO
+              GEÇMİŞ 1 YIL FİYAT & BİLANÇO
             </div>
             {loading ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Veriler Yükleniyor...</div>
@@ -154,6 +155,7 @@ export default function ReportRow({ r, isExpanded, onToggle }) {
           <div style={{ marginBottom: '4px' }}>
             {r.ticker ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FavoriteStar ticker={r.ticker} style={{ marginRight: 0 }} />
                 <ImageWithFallback 
                   src={`${baseUrl}/logos/${r.ticker}.png`}
                   alt={r.ticker}
@@ -161,7 +163,7 @@ export default function ReportRow({ r, isExpanded, onToggle }) {
                   size={18}
                   style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff', objectFit: 'contain' }}
                 />
-                <span className="ticker-link" style={{ fontSize: '14px' }}>{r.ticker}</span>
+                <span className="ticker-link" style={{ fontSize: '13px' }}>{r.ticker}</span>
               </span>
             ) : (
               <span style={{ fontSize: '10px', background: 'var(--bg-panel)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)', color: 'var(--text-highlight)' }}>

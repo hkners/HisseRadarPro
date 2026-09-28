@@ -14,6 +14,8 @@ import os
 import subprocess
 import sys
 import time
+import json
+import datetime
 
 import schedule
 
@@ -55,7 +57,7 @@ def job_fintables_sync():
     """Scrape analyst recommendations from Fintables and persist to DB."""
     plugin_path = os.path.join(backend_dir, "plugins", "01_fintables_sync.py")
     _run_script(plugin_path, "FintablesSync")
-
+    _write_heartbeat("FintablesSync")
 
 def job_yf_sync():
     """Pull live prices + fundamentals from Yahoo Finance (incremental — only missing days)."""
@@ -67,12 +69,37 @@ def job_yf_sync():
         logger.error(f"Incremental YF sync failed, falling back to script: {e}")
         yf_script = os.path.join(backend_dir, "services", "yf_sync.py")
         _run_script(yf_script, "YFSync")
+    _write_heartbeat("YFSync")
 
 
 def job_ta_sync():
     """Fetch exact Technical Analysis indicators from TradingView."""
     ta_script = os.path.join(backend_dir, "services", "ta_sync.py")
     _run_script(ta_script, "TASync")
+    _write_heartbeat("TASync")
+
+def job_stale_splits():
+    """Check for splits and flag stale reports."""
+    splits_script = os.path.join(backend_dir, "flag_stale_split_reports.py")
+    _run_script(splits_script, "FlagSplits")
+    _write_heartbeat("FlagSplits")
+
+def _write_heartbeat(job_name: str):
+    """Write heartbeat to file for health monitoring."""
+    heartbeat_path = os.path.join(backend_dir, "scheduler_heartbeat.json")
+    try:
+        data = {}
+        if os.path.exists(heartbeat_path):
+            with open(heartbeat_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        
+        data["last_run_time"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        data["last_job"] = job_name
+        
+        with open(heartbeat_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.error(f"Failed to write heartbeat: {e}")
 
 
 def start_scheduler():
@@ -86,11 +113,19 @@ def start_scheduler():
     
     # TradingView TA sync: 18:45 (after YF sync)
     schedule.every().day.at("18:45").do(job_ta_sync)
+    
+    # Stale splits flag sync: 03:00 (Nightly cleanup)
+    schedule.every().day.at("03:00").do(job_stale_splits)
 
     logger.info("Scheduler started. Waiting for scheduled jobs...")
     logger.info("  Fintables sync: 08:30 and 12:30 daily")
     logger.info("  Yahoo Finance sync: 18:30 daily")
     logger.info("  TradingView TA sync: 18:45 daily")
+    logger.info("  Stale Split Check: 03:00 daily")
+
+    # Run stale splits once on boot
+    logger.info("Running stale splits check on boot...")
+    job_stale_splits()
 
     while True:
         schedule.run_pending()

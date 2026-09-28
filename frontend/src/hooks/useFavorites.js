@@ -1,49 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 // Shared event emitter to keep favorites synced across tabs and components
 const FAVORITES_KEY = 'hisseRadarFavorites';
 const FAVORITES_EVENT = 'favorites_updated';
 
-// We keep a simple singleton to trigger updates across components that use this hook
+const getSavedFavorites = () => {
+    try {
+        const saved = localStorage.getItem(FAVORITES_KEY);
+        return saved ? JSON.parse(saved) : [];
+    } catch {
+        return [];
+    }
+};
+
+let globalFavorites = getSavedFavorites();
+
 export function useFavorites() {
-    const [favorites, setFavorites] = useState(() => {
-        try {
-            const saved = localStorage.getItem(FAVORITES_KEY);
-            return saved ? JSON.parse(saved) : [];
-        } catch {
-            return [];
-        }
-    });
+    const [favorites, setFavorites] = useState(globalFavorites);
 
     useEffect(() => {
-        const handleStorageChange = (e) => {
-            if (e.key === FAVORITES_KEY || e.type === FAVORITES_EVENT) {
-                try {
-                    const saved = localStorage.getItem(FAVORITES_KEY);
-                    setFavorites(saved ? JSON.parse(saved) : []);
-                } catch {}
-            }
+        const handleUpdate = () => {
+            const current = getSavedFavorites();
+            globalFavorites = current;
+            setFavorites(current);
         };
 
-        // Listen for storage events (cross-tab)
-        window.addEventListener('storage', handleStorageChange);
-        // Listen for custom event (same-tab cross-component)
-        window.addEventListener(FAVORITES_EVENT, handleStorageChange);
+        window.addEventListener('storage', handleUpdate);
+        window.addEventListener(FAVORITES_EVENT, handleUpdate);
 
         return () => {
-            window.removeEventListener('storage', handleStorageChange);
-            window.removeEventListener(FAVORITES_EVENT, handleStorageChange);
+            window.removeEventListener('storage', handleUpdate);
+            window.removeEventListener(FAVORITES_EVENT, handleUpdate);
         };
     }, []);
 
-    const toggleFavorite = (ticker) => {
-        setFavorites((prev) => {
-            const newFavs = prev.includes(ticker) ? prev.filter(t => t !== ticker) : [...prev, ticker];
-            localStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavs));
-            window.dispatchEvent(new Event(FAVORITES_EVENT));
-            return newFavs;
-        });
-    };
+    const toggleFavorite = useCallback((ticker) => {
+        if (!ticker) return;
+        const current = getSavedFavorites();
+        const exists = current.includes(ticker);
+        const next = exists ? current.filter(t => t !== ticker) : [...current, ticker];
+        
+        try {
+            localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+        } catch (err) {
+            console.error('Error saving favorites:', err);
+        }
+        
+        globalFavorites = next;
+        setFavorites(next);
+        
+        // Notify other component instances cleanly
+        window.dispatchEvent(new CustomEvent(FAVORITES_EVENT, { detail: next }));
+    }, []);
 
     return { favorites, toggleFavorite };
 }
+

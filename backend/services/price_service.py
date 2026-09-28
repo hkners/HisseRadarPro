@@ -19,6 +19,7 @@ class PriceService:
         self._lock = threading.Lock()
         self.bist_tickers = bist_tickers
         self.refresh_interval = refresh_interval
+        self.report_repo = report_repo
         self._prices: dict = {}
         self._last_updated: Optional[str] = None
         self._status: str = "INITIALIZING"
@@ -60,6 +61,123 @@ class PriceService:
         with self._lock:
             return self._prices.get(ticker, {})
 
+    def set_price(self, ticker: str, price: Optional[float], change_pct: Optional[float] = None, volume: Optional[float] = None):
+        """Thread-safe update of an individual ticker price."""
+        clean = ticker.replace(".IS", "").upper()
+        with self._lock:
+            entry = self._prices.get(clean, {})
+            if price is not None:
+                entry["price"] = self._safe_float(price)
+            if change_pct is not None:
+                entry["change_pct"] = self._safe_float(change_pct)
+            if volume is not None:
+                entry["volume"] = self._safe_float(volume)
+            self._prices[clean] = entry
+
+    def get_priority_tickers(self) -> list:
+        """Returns high-priority tickers (BIST 30 + stocks with research reports)."""
+        bist_30 = [
+            'AKBNK', 'ALARK', 'ARCLK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'EKGYO',
+            'ENKAI', 'EREGL', 'FROTO', 'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL',
+            'KONTR', 'TRALT', 'KRDMD', 'OYAKC', 'PETKM', 'PGSUS', 'SAHOL', 'SASA',
+            'SISE', 'TCELL', 'THYAO', 'TOASO', 'TUPRS', 'YKBNK'
+        ]
+        priority = set(bist_30)
+        if self.report_repo:
+            try:
+                from services.ticker_resolver import match_ticker
+                reports = self.report_repo.load_json_reports(include_full_text=False)
+                for r in reports:
+                    m = match_ticker(r.get("ticker") or r.get("hisse") or "", self.bist_tickers)
+                    if m:
+                        priority.add(m)
+            except Exception as e:
+                print(f"Error resolving priority report tickers: {e}")
+        return [t for t in self.bist_tickers if t in priority]
+
+    def update_ticker_from_fast_info(self, ticker: str) -> dict:
+        """
+        Fetches the authoritative live/closing-auction price directly from fast_info.
+        Updates self._prices[clean_ticker] and returns the updated price dict.
+        """
+        clean_ticker = ticker.replace(".IS", "").upper()
+        try:
+            fi = yf.Ticker(f"{clean_ticker}.IS").fast_info
+            last_price = getattr(fi, 'last_price', None)
+            prev_close = getattr(fi, 'previous_close', None)
+            volume = getattr(fi, 'last_volume', None)
+            
+            if last_price is not None:
+                p_val = self._safe_float(last_price)
+                pc_val = self._safe_float(prev_close)
+                v_val = self._safe_float(volume)
+                
+                chg = None
+                if pc_val and pc_val > 0:
+                    chg = ((p_val - pc_val) / pc_val) * 100
+                else:
+                    with self._lock:
+                        chg = self._prices.get(clean_ticker, {}).get("change_pct")
+                
+                entry = {
+                    "price": p_val,
+                    "change_pct": self._safe_float(chg),
+                    "volume": v_val
+                }
+                with self._lock:
+                    self._prices[clean_ticker] = entry
+                return entry
+        except Exception as e:
+            print(f"Fast_info update failed for {clean_ticker}: {e}")
+            
+        with self._lock:
+            return self._prices.get(clean_ticker, {"price": None, "change_pct": None, "volume": None})
+
+    def fetch_priority_fast_info(self, priority_tickers: Optional[list] = None):
+        """
+        Concurrently fetches fast_info for priority tickers to capture the authoritative
+        closing-auction settlement price (e.g. AKBNK 70.70) across the entire platform.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+        tickers = priority_tickers or self.get_priority_tickers()
+        if not tickers:
+            return
+
+        def _fetch_one(t):
+            try:
+                fi = yf.Ticker(f"{t}.IS").fast_info
+                last_price = getattr(fi, 'last_price', None)
+                prev_close = getattr(fi, 'previous_close', None)
+                volume = getattr(fi, 'last_volume', None)
+                if last_price is not None:
+                    p = self._safe_float(last_price)
+                    pc = self._safe_float(prev_close)
+                    v = self._safe_float(volume)
+                    chg = ((p - pc) / pc * 100) if pc and pc > 0 else None
+                    return t, p, chg, v
+            except Exception:
+                pass
+            return t, None, None, None
+
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            results = list(executor.map(_fetch_one, tickers))
+
+        updated_count = 0
+        with self._lock:
+            for t, p, chg, v in results:
+                if p is not None:
+                    existing = self._prices.get(t, {})
+                    self._prices[t] = {
+                        "price": p,
+                        "change_pct": chg if chg is not None else existing.get("change_pct"),
+                        "volume": v if v is not None else existing.get("volume", 0)
+                    }
+                    updated_count += 1
+            if updated_count > 0:
+                self._last_updated = datetime.now().strftime("%H:%M:%S")
+                self._status = "READY"
+        print(f"Updated {updated_count} priority tickers via fast_info at {self._last_updated}")
+
     def get_snapshot(self) -> dict:
         """Return full cache snapshot for API responses."""
         with self._lock:
@@ -80,7 +198,10 @@ class PriceService:
             return None
 
     def start_background_worker(self):
-        """Start the background price update thread."""
+        """Start the background price update thread and immediate priority fast_info sync."""
+        t_priority = threading.Thread(target=self.fetch_priority_fast_info, daemon=True)
+        t_priority.start()
+
         t = threading.Thread(target=self._update_loop, daemon=True)
         t.start()
 
@@ -187,6 +308,12 @@ class PriceService:
                     self._last_updated = datetime.now().strftime("%H:%M:%S")
                     self._status = "READY"
                 print(f"Prices updated at {self._last_updated}")
+
+                # Enrich priority tickers with authoritative fast_info (closing auction)
+                try:
+                    self.fetch_priority_fast_info()
+                except Exception as e:
+                    print(f"Error enriching priority tickers: {e}")
 
             except Exception as e:
                 print(f"Background task error: {e}")

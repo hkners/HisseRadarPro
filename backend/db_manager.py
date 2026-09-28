@@ -35,6 +35,26 @@ def normalize_broker_name(name):
     return mapping.get(n, n)
 
 
+BANNED_BROKERS = {
+    "pusula", "pusula yatırım", 
+    "tera", "tera yatırım", 
+    "a1", "a1 capital", "a1 capital yatırım", 
+    "atlas", "atlas yatırım", 
+    "info", "i̇nfo", "info yatırım", "i̇nfo yatırım", 
+    "bulls", "bulls yatırım", 
+    "trive", "trive yatırım", 
+    "pardus", "pardus yatırım"
+}
+
+def is_broker_banned(name):
+    if not name: return False
+    norm = normalize_broker_name(name).lower()
+    if norm in BANNED_BROKERS: return True
+    for b in BANNED_BROKERS:
+        if b in norm: return True
+    return False
+
+
 class ReportDBManager:
     """
     Database Manager & Repository for Scraped Research Reports.
@@ -101,7 +121,8 @@ class ReportDBManager:
                         file_hash TEXT,
                         pdf_url TEXT,
                         report_title TEXT,
-                        is_model INTEGER DEFAULT 0
+                        is_model INTEGER DEFAULT 0,
+                        is_stale_due_to_split INTEGER DEFAULT 0
                     )
                 """)
                 # Create mandatory indexes for high-performance query execution
@@ -144,6 +165,106 @@ class ReportDBManager:
                         cost REAL
                     )
                 """)
+                
+                # Create table for portfolio transactions
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS portfolio_transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ticker TEXT,
+                        tx_type TEXT,
+                        quantity REAL,
+                        price REAL,
+                        tx_date TEXT
+                    )
+                """)
+
+                # Create table for ticker aliases (e.g. KOZAL -> TRALT, KOZAA -> TRMET, GRTRK -> GRTHO)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS ticker_aliases (
+                        alias TEXT PRIMARY KEY,
+                        canonical_ticker TEXT NOT NULL,
+                        notes TEXT,
+                        created_at TEXT
+                    )
+                """)
+                seed_aliases = [
+                    ("KOZAL", "TRALT", "Borsa İstanbul sembol değişikliği (Koza Altın -> Türk Altın)", "2026-09-23"),
+                    ("KOZAA", "TRMET", "Borsa İstanbul sembol değişikliği (Koza Anadolu Metal -> TR Anadolu Metal)", "2026-09-23"),
+                    ("GRTRK", "GRTHO", "Borsa İstanbul sembol değişikliği (Graintürk -> Graintürk Holding)", "2026-09-23"),
+                    ("BSRGZ", "BESLR", "Yazım hatası düzeltmesi (Besler Gıda -> BESLR)", "2026-09-23"),
+                ]
+                conn.executemany("""
+                    INSERT OR IGNORE INTO ticker_aliases (alias, canonical_ticker, notes, created_at)
+                    VALUES (?, ?, ?, ?)
+                """, seed_aliases)
+
+                # Create table for score history (snapshot per day)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS score_history (
+                        ticker TEXT NOT NULL,
+                        snapshot_date TEXT NOT NULL,
+                        conviction_score REAL,
+                        alpha_score REAL,
+                        technical_component REAL,
+                        fundamental_component REAL,
+                        sentiment_component REAL,
+                        consensus_component REAL,
+                        revision_momentum REAL,
+                        price_momentum_percentile REAL,
+                        created_at TEXT NOT NULL,
+                        PRIMARY KEY (ticker, snapshot_date)
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_ticker ON score_history(ticker)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_date ON score_history(snapshot_date)")
+
+                # Migration guard: check if new columns exist in score_history
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA table_info(score_history)")
+                existing_cols = {row["name"] for row in cursor.fetchall()}
+                if "revision_momentum" not in existing_cols:
+                    conn.execute("ALTER TABLE score_history ADD COLUMN revision_momentum REAL")
+                if "price_momentum_percentile" not in existing_cols:
+                    conn.execute("ALTER TABLE score_history ADD COLUMN price_momentum_percentile REAL")
+
+                # Migration guard: check if sector column exists in company_info
+                cursor.execute("PRAGMA table_info(company_info)")
+                company_info_cols = {row["name"] for row in cursor.fetchall()}
+                if "sector" not in company_info_cols:
+                    conn.execute("ALTER TABLE company_info ADD COLUMN sector TEXT")
+
+                # Auto-backfill missing sectors from fundamentals_json if any
+                cursor.execute("SELECT ticker, fundamentals_json FROM company_info WHERE sector IS NULL OR sector = ''")
+                missing_sector_rows = cursor.fetchall()
+                for row in missing_sector_rows:
+                    t_sym = row["ticker"]
+                    f_json = row["fundamentals_json"]
+                    sec = None
+                    if f_json:
+                        try:
+                            f_data = json.loads(f_json)
+                            sec = f_data.get("sector") or f_data.get("sectorKey") or f_data.get("category")
+                        except Exception:
+                            pass
+                    if sec:
+                        conn.execute("UPDATE company_info SET sector = ? WHERE ticker = ?", (sec, t_sym))
+
+                # Create table for target revision logs
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS target_revision_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ticker TEXT NOT NULL,
+                        broker TEXT NOT NULL,
+                        old_target REAL,
+                        new_target REAL,
+                        revision_pct REAL,
+                        report_date TEXT,
+                        created_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_revision_log_ticker ON target_revision_log(ticker)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_revision_log_date ON target_revision_log(report_date)")
+
                 conn.commit()
 
     def _sync_on_init(self) -> None:
@@ -217,8 +338,9 @@ class ReportDBManager:
                     INSERT INTO scraped_reports (
                         id, ticker, broker, rating, target_price, current_price,
                         potansiyel, report_date, summary, catalysts, full_text,
-                        cached, prompt_id, file_hash, pdf_url, report_title, is_model
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        cached, prompt_id, file_hash, pdf_url, report_title, is_model,
+                        is_stale_due_to_split
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         ticker=excluded.ticker,
                         broker=excluded.broker,
@@ -235,7 +357,8 @@ class ReportDBManager:
                         file_hash=excluded.file_hash,
                         pdf_url=excluded.pdf_url,
                         report_title=excluded.report_title,
-                        is_model=excluded.is_model
+                        is_model=excluded.is_model,
+                        is_stale_due_to_split=excluded.is_stale_due_to_split
                 """, (
                     report_id,
                     r.get("ticker", ""),
@@ -253,27 +376,33 @@ class ReportDBManager:
                     r.get("file_hash", ""),
                     r.get("pdf_url", ""),
                     r.get("report_title", ""),
-                    1 if r.get("is_model") else 0
+                    1 if r.get("is_model") else 0,
+                    1 if r.get("is_stale_due_to_split") else 0
                 ))
             conn.commit()
 
     def save_reports(self, reports: List[Dict[str, Any]]) -> int:
         """Saves reports to both SQLite DB and JSON file. Returns count saved."""
+        valid_reports = []
         for r in reports:
             r["broker"] = normalize_broker_name(r.get("broker"))
+            if not is_broker_banned(r["broker"]):
+                valid_reports.append(r)
 
         with self._lock:
-            self._upsert_reports_db(reports)
+            self._upsert_reports_db(valid_reports)
             all_reports = self._get_all_reports_db()
             self.save_json_reports(all_reports)
-
-        return len(reports)
+            
+        return len(valid_reports)
 
     def _row_to_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
         d = dict(row)
         d["cached"] = bool(d["cached"])
         if "is_model" in d:
             d["is_model"] = bool(d["is_model"])
+        if "is_stale_due_to_split" in d:
+            d["is_stale_due_to_split"] = bool(d["is_stale_due_to_split"])
         return d
 
     def _get_all_reports_db(self) -> List[Dict[str, Any]]:
@@ -323,12 +452,14 @@ class ReportDBManager:
         - min_upside (minimum potansiyel yield percentage using index)
         - limit & offset (SQL pagination)
         """
-        query = "SELECT * FROM scraped_reports WHERE 1=1"
+        query = "SELECT * FROM scraped_reports WHERE is_stale_due_to_split = 0"
         params = []
 
         if ticker and ticker.strip():
-            query += " AND UPPER(ticker) = UPPER(?)"
-            params.append(ticker.strip())
+            variants = self.get_all_ticker_variants(ticker.strip())
+            placeholders = ",".join("?" * len(variants))
+            query += f" AND UPPER(ticker) IN ({placeholders})"
+            params.extend([v.upper() for v in variants])
 
         if broker and broker.strip():
             query += " AND UPPER(broker) LIKE UPPER(?)"
@@ -364,9 +495,15 @@ class ReportDBManager:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             results = []
+            seen_reports = set()
             term = search.strip().lower() if (search and search.strip()) else None
             for r in rows:
                 d = self._row_to_dict(r)
+                if ticker:
+                    rep_key = (d.get("broker"), d.get("report_date"), d.get("target_price"))
+                    if rep_key in seen_reports:
+                        continue
+                    seen_reports.add(rep_key)
                 if not d.get("summary") and d.get("full_text"):
                     d["summary"] = d["full_text"]
                 elif term and d.get("full_text") and term in str(d["full_text"]).lower():
@@ -411,15 +548,60 @@ class ReportDBManager:
             "top_recommendations": top_recommendations
         }
 
+    # --- Ticker Alias Resolution Methods ---
+    def get_ticker_aliases(self) -> Dict[str, str]:
+        """Returns dict mapping alias -> canonical_ticker."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT alias, canonical_ticker FROM ticker_aliases")
+            return {row[0].upper(): row[1].upper() for row in cursor.fetchall()}
+
+    def resolve_ticker(self, ticker: str) -> str:
+        """Resolves any alias to its active canonical ticker symbol."""
+        if not ticker:
+            return ""
+        clean = ticker.upper().strip()
+        aliases = self.get_ticker_aliases()
+        return aliases.get(clean, clean)
+
+    def get_all_ticker_variants(self, ticker: str) -> List[str]:
+        """Returns list containing the canonical ticker and all known aliases."""
+        if not ticker:
+            return []
+        clean = ticker.upper().strip()
+        aliases = self.get_ticker_aliases()
+        canonical = aliases.get(clean, clean)
+        variants = {canonical, clean}
+        for alias, can in aliases.items():
+            if can == canonical:
+                variants.add(alias)
+        return list(variants)
+
     def get_company_info(self, ticker: str) -> Optional[Dict[str, Any]]:
         # Use batch cache if available (avoids per-ticker DB hit)
         import time as _time
+        clean = ticker.upper().strip() if ticker else ""
         if self._company_info_cache is not None and (_time.time() - self._company_info_cache_time) < 300:
-            return self._company_info_cache.get(ticker)
+            info = self._company_info_cache.get(clean)
+            if info and info.get("sector") and info.get("sector") != "Bilinmiyor":
+                return info
+            canonical = self.resolve_ticker(clean)
+            if canonical != clean:
+                can_info = self._company_info_cache.get(canonical)
+                if can_info:
+                    return can_info
+            return info
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM company_info WHERE ticker = ?", (ticker,))
+            cursor.execute("SELECT * FROM company_info WHERE ticker = ?", (clean,))
             row = cursor.fetchone()
+            if not row or (dict(row).get("sector") == "Bilinmiyor"):
+                canonical = self.resolve_ticker(clean)
+                if canonical != clean:
+                    cursor.execute("SELECT * FROM company_info WHERE ticker = ?", (canonical,))
+                    can_row = cursor.fetchone()
+                    if can_row:
+                        row = can_row
             if row:
                 d = dict(row)
                 if d.get("fundamentals_json"):
@@ -450,20 +632,44 @@ class ReportDBManager:
         self._company_info_cache_time = now
         return result
 
-    def get_historical_prices(self, ticker: str) -> List[Dict[str, Any]]:
+    def get_historical_prices(self, ticker: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM historical_prices WHERE ticker = ? ORDER BY date ASC", (ticker,))
+            if limit:
+                cursor.execute(
+                    "SELECT * FROM (SELECT * FROM historical_prices WHERE ticker = ? ORDER BY date DESC LIMIT ?) ORDER BY date ASC",
+                    (ticker, limit)
+                )
+            else:
+                cursor.execute("SELECT * FROM historical_prices WHERE ticker = ? ORDER BY date ASC", (ticker,))
             rows = cursor.fetchall()
+            if not rows:
+                canonical = self.resolve_ticker(ticker)
+                if canonical != ticker:
+                    if limit:
+                        cursor.execute(
+                            "SELECT * FROM (SELECT * FROM historical_prices WHERE ticker = ? ORDER BY date DESC LIMIT ?) ORDER BY date ASC",
+                            (canonical, limit)
+                        )
+                    else:
+                        cursor.execute("SELECT * FROM historical_prices WHERE ticker = ? ORDER BY date ASC", (canonical,))
+                    rows = cursor.fetchall()
             return [dict(r) for r in rows]
 
-    def get_latest_price_date(self, ticker: str) -> str:
+    def get_latest_price_date(self, ticker: str) -> Optional[str]:
         """Returns the latest date string for a ticker's historical prices, or None."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT MAX(date) FROM historical_prices WHERE ticker = ?", (ticker,))
             row = cursor.fetchone()
-            return row[0] if row and row[0] else None
+            if row and row[0]:
+                return row[0]
+            canonical = self.resolve_ticker(ticker)
+            if canonical != ticker:
+                cursor.execute("SELECT MAX(date) FROM historical_prices WHERE ticker = ?", (canonical,))
+                row = cursor.fetchone()
+                return row[0] if row and row[0] else None
+            return None
 
     # --- YFinance Data Sync Methods ---
     def upsert_company_info(self, ticker: str, sector: str, fundamentals_json: str, last_updated: str) -> None:
@@ -505,29 +711,226 @@ class ReportDBManager:
                 """, records)
                 conn.commit()
 
-    # --- User Portfolio Methods ---
-    def get_user_portfolio(self) -> List[Dict[str, Any]]:
+    # --- Score History Methods ---
+    def upsert_score_history(self, records: List[Dict[str, Any]]) -> int:
+        """
+        Upserts daily score snapshots into score_history.
+        Uses COALESCE so conviction_engine and alpha_engine can update
+        their respective metrics independently on the same date without overwriting each other.
+        """
+        if not records:
+            return 0
+        rows = []
+        for r in records:
+            ticker = str(r.get("ticker", "")).upper().strip()
+            snapshot_date = str(r.get("snapshot_date", ""))[:10]
+            if not ticker or not snapshot_date:
+                continue
+            rows.append((
+                ticker,
+                snapshot_date,
+                r.get("conviction_score"),
+                r.get("alpha_score"),
+                r.get("technical_component"),
+                r.get("fundamental_component"),
+                r.get("sentiment_component"),
+                r.get("consensus_component"),
+                r.get("revision_momentum"),
+                r.get("price_momentum_percentile"),
+                r.get("created_at") or r.get("snapshot_date")
+            ))
+        if not rows:
+            return 0
+        with self._lock:
+            with self._get_connection() as conn:
+                conn.executemany("""
+                    INSERT INTO score_history (
+                        ticker, snapshot_date, conviction_score, alpha_score,
+                        technical_component, fundamental_component, sentiment_component,
+                        consensus_component, revision_momentum, price_momentum_percentile, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(ticker, snapshot_date) DO UPDATE SET
+                        conviction_score = COALESCE(excluded.conviction_score, score_history.conviction_score),
+                        alpha_score = COALESCE(excluded.alpha_score, score_history.alpha_score),
+                        technical_component = COALESCE(excluded.technical_component, score_history.technical_component),
+                        fundamental_component = COALESCE(excluded.fundamental_component, score_history.fundamental_component),
+                        sentiment_component = COALESCE(excluded.sentiment_component, score_history.sentiment_component),
+                        consensus_component = COALESCE(excluded.consensus_component, score_history.consensus_component),
+                        revision_momentum = COALESCE(excluded.revision_momentum, score_history.revision_momentum),
+                        price_momentum_percentile = COALESCE(excluded.price_momentum_percentile, score_history.price_momentum_percentile),
+                        created_at = excluded.created_at
+                """, rows)
+                conn.commit()
+        return len(rows)
+
+    def get_score_history(
+        self,
+        ticker: Optional[str] = None,
+        metric: Optional[str] = None,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Query score_history with optional filters."""
+        query = "SELECT * FROM score_history WHERE 1=1"
+        params = []
+        if ticker:
+            query += " AND ticker = ?"
+            params.append(ticker.upper().strip())
+        if metric:
+            # Validate metric against column name injection
+            allowed_cols = {
+                "conviction_score", "alpha_score", "technical_component",
+                "fundamental_component", "sentiment_component", "consensus_component",
+                "revision_momentum", "price_momentum_percentile"
+            }
+            if metric in allowed_cols:
+                query += f" AND {metric} IS NOT NULL"
+        if from_date:
+            query += " AND snapshot_date >= ?"
+            params.append(from_date)
+        if to_date:
+            query += " AND snapshot_date <= ?"
+            params.append(to_date)
+        query += " ORDER BY snapshot_date ASC, ticker ASC"
+        if limit:
+            query += f" LIMIT {int(limit)}"
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM user_portfolio")
+            cursor.execute(query, params)
             return [dict(r) for r in cursor.fetchall()]
 
-    def add_to_portfolio(self, ticker: str, quantity: float, cost: float) -> None:
+    def get_price_on_or_after(self, ticker: str, target_date: str) -> Optional[Dict[str, Any]]:
+        """Returns the first available historical price trading day on or after target_date."""
+        clean = ticker.upper().strip()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM historical_prices WHERE ticker = ? AND date >= ? ORDER BY date ASC LIMIT 1",
+                (clean, target_date)
+            )
+            row = cursor.fetchone()
+            if not row:
+                canonical = self.resolve_ticker(clean)
+                if canonical != clean:
+                    cursor.execute(
+                        "SELECT * FROM historical_prices WHERE ticker = ? AND date >= ? ORDER BY date ASC LIMIT 1",
+                        (canonical, target_date)
+                    )
+                    row = cursor.fetchone()
+            return dict(row) if row else None
+
+    # --- User Portfolio Methods ---
+    def get_user_portfolio(self) -> List[Dict[str, Any]]:
+        # Calculate current portfolio based on transactions
+        transactions = self.get_portfolio_transactions()
+        
+        portfolio = {}
+        for tx in transactions:
+            t = tx['ticker']
+            if t not in portfolio:
+                portfolio[t] = {'quantity': 0, 'total_cost': 0}
+            
+            qty = float(tx['quantity'])
+            price = float(tx['price'])
+            
+            if tx['tx_type'] == 'BUY':
+                portfolio[t]['quantity'] += qty
+                portfolio[t]['total_cost'] += (qty * price)
+            elif tx['tx_type'] == 'SELL':
+                if portfolio[t]['quantity'] > 0:
+                    avg_cost = portfolio[t]['total_cost'] / portfolio[t]['quantity']
+                    portfolio[t]['quantity'] -= qty
+                    portfolio[t]['total_cost'] -= (qty * avg_cost)
+        
+        # Filter out closed positions and calculate average cost
+        result = []
+        for t, data in portfolio.items():
+            if data['quantity'] > 0:
+                result.append({
+                    'ticker': t,
+                    'quantity': data['quantity'],
+                    'cost': data['total_cost'] / data['quantity']
+                })
+        
+        return result
+
+    def get_portfolio_transactions(self) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM portfolio_transactions ORDER BY tx_date ASC")
+            return [dict(r) for r in cursor.fetchall()]
+
+    def add_portfolio_transaction(self, ticker: str, tx_type: str, quantity: float, price: float, tx_date: str) -> None:
         with self._lock:
             with self._get_connection() as conn:
                 conn.execute("""
-                    INSERT INTO user_portfolio (ticker, quantity, cost)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(ticker) DO UPDATE SET
-                        quantity=excluded.quantity,
-                        cost=excluded.cost
-                """, (ticker.upper(), quantity, cost))
+                    INSERT INTO portfolio_transactions (ticker, tx_type, quantity, price, tx_date)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (ticker.upper(), tx_type.upper(), quantity, price, tx_date))
                 conn.commit()
 
-    def remove_from_portfolio(self, ticker: str) -> None:
+    def add_portfolio_transactions_batch(self, transactions: List[Dict[str, Any]]) -> None:
+        """Batch insert multiple portfolio transactions in a single transaction."""
+        import datetime
+        if not transactions:
+            return
+        records = [
+            (
+                tx["ticker"].upper().strip(),
+                tx.get("tx_type", "BUY").upper(),
+                float(tx["quantity"]),
+                float(tx["price"]),
+                tx.get("tx_date") or datetime.date.today().isoformat()
+            )
+            for tx in transactions
+            if float(tx.get("quantity", 0)) > 0 and float(tx.get("price", 0)) > 0
+        ]
+        if not records:
+            return
         with self._lock:
             with self._get_connection() as conn:
-                conn.execute("DELETE FROM user_portfolio WHERE ticker = ?", (ticker.upper(),))
+                conn.executemany("""
+                    INSERT INTO portfolio_transactions (ticker, tx_type, quantity, price, tx_date)
+                    VALUES (?, ?, ?, ?, ?)
+                """, records)
                 conn.commit()
+
+    def add_to_portfolio(self, ticker: str, quantity: float, cost: float) -> None:
+        # Legacy method fallback: Just add a BUY transaction for today if we're adding via the old UI
+        import datetime
+        self.add_portfolio_transaction(ticker, 'BUY', quantity, cost, datetime.date.today().isoformat())
+
+    def log_target_revision(self, ticker: str, broker: str, old_target: float, new_target: float, revision_pct: float, report_date: str) -> int:
+        """Insert a detected target price revision into target_revision_log."""
+        import datetime
+        now_str = datetime.datetime.now().isoformat()
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO target_revision_log (ticker, broker, old_target, new_target, revision_pct, report_date, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (ticker.upper().strip(), broker.strip(), old_target, new_target, revision_pct, report_date, now_str))
+                conn.commit()
+                return cursor.lastrowid
+
+    def get_target_revision_logs(self, ticker: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """Fetch records from target_revision_log."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if ticker:
+                cursor.execute("SELECT * FROM target_revision_log WHERE ticker = ? ORDER BY id DESC LIMIT ?", (ticker.upper().strip(), limit))
+            else:
+                cursor.execute("SELECT * FROM target_revision_log ORDER BY id DESC LIMIT ?", (limit,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def count_target_revision_logs(self) -> int:
+        """Get total row count of target_revision_log."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM target_revision_log")
+            return cursor.fetchone()[0]
 
 ReportRepository = ReportDBManager

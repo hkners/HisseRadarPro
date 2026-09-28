@@ -23,7 +23,7 @@ TICKER_MAP = {
     "Avrupakent GYO": "AVPGY",
     "Aygaz": "AYGAZ",
     # B
-    "Besler Gıda": "BSRGZ",
+    "Besler Gıda": "BESLR",
     "Bor Şeker": "BORSK",
     "Büyük Şefler Gıda": "BIGCH",
     "BİM": "BIMAS", "BIM": "BIMAS",
@@ -50,7 +50,7 @@ TICKER_MAP = {
     "Gediz Ambalaj": "GEDZA",
     "Gelecek Varlık Yönetimi": "GLCVY",
     "Girişim Elektrik": "GESAN",
-    "Grainturk": "GRTRK", "Graintürk": "GRTRK",
+    "Grainturk": "GRTHO", "Graintürk": "GRTHO", "Graintürk Holding": "GRTHO",
     "Gülermak": "GLRMK", "Gülermak Ağır Sanayi": "GLRMK",
     # H
     "Halkbank": "HALKB",
@@ -69,7 +69,8 @@ TICKER_MAP = {
     "Kordsa": "KORDS",
     "Koton": "KOTON", "Koton Mağazacılık": "KOTON",
     "Koç Holding": "KCHOL",
-    "Koza Altın": "KOZAL", "Koza Anadolu": "KOZAA", "Koza Altın İşletmeleri": "KOZAL",
+    "Koza Altın": "TRALT", "Koza Altın İşletmeleri": "TRALT", "Türk Altın": "TRALT", "Türk Altın İşletmeleri": "TRALT",
+    "Koza Anadolu": "TRMET", "TR Anadolu Metal": "TRMET", "TR Anadolu Metal Madencilik": "TRMET",
     "Kuzey Boru": "KBORU",
     # L
     "Lila Kağıt": "LILAK",
@@ -121,19 +122,33 @@ TICKER_MAP = {
     "Yayla Agro Gıda": "YYLGD",
 }
 
+# Ticker Aliases: Maps historical or renamed tickers to their active canonical symbol
+ALIAS_MAP = {
+    "KOZAL": "TRALT",
+    "KOZAA": "TRMET",
+    "GRTRK": "GRTHO",
+    "BSRGZ": "BESLR",
+}
+
 
 def load_bist_tickers(all_bist_file: str) -> list:
-    """Load BIST ticker list from file and merge with TICKER_MAP values."""
+    """Load BIST ticker list from file and merge with TICKER_MAP values, resolving aliases."""
     tickers = []
     try:
         with open(all_bist_file, "r", encoding="utf-8") as f:
-            tickers = [line.strip() for line in f if line.strip()]
+            for line in f:
+                sym = line.strip().upper()
+                if sym:
+                    canonical = ALIAS_MAP.get(sym, sym)
+                    if canonical not in tickers:
+                        tickers.append(canonical)
     except Exception as e:
         print("Warning: Could not load all_bist.txt, falling back to empty list.", e)
 
     for val in TICKER_MAP.values():
-        if val not in tickers:
-            tickers.append(val)
+        canonical = ALIAS_MAP.get(val, val)
+        if canonical not in tickers:
+            tickers.append(canonical)
     return tickers
 
 
@@ -154,21 +169,26 @@ def _get_ticker_set(bist_tickers: list) -> set:
 def match_ticker(name: str, bist_tickers: list) -> str | None:
     """Match a company name or ticker string to a canonical BIST ticker.
     Uses O(1) dict lookup instead of O(n) iteration over TICKER_MAP.
+    Resolves known ticker aliases (e.g. KOZAL -> TRALT) to canonical symbols.
     """
     if not name:
         return None
     name_strip = name.strip()
 
+    # 0. Direct check in ALIAS_MAP
+    upper_name = name_strip.upper()
+    if upper_name in ALIAS_MAP:
+        return ALIAS_MAP[upper_name]
+
     # 1. O(1) exact match in pre-computed lowercase lookup
     result = _TICKER_LOOKUP.get(name_strip.lower())
     if result:
-        return result
+        return ALIAS_MAP.get(result, result)
 
     # 2. Direct ticker match via set (O(1))
-    upper_name = name_strip.upper()
     ticker_set = _get_ticker_set(bist_tickers)
     if upper_name in ticker_set:
-        return upper_name
+        return ALIAS_MAP.get(upper_name, upper_name)
 
     # 3. Short ticker heuristic (rare fallback)
     if len(upper_name) <= 5 and upper_name.isalpha():
@@ -176,13 +196,13 @@ def match_ticker(name: str, bist_tickers: list) -> str | None:
             return "BIMAS"
         if upper_name in ("TOFAŞ", "TOFAS"):
             return "TOASO"
-        return upper_name
+        return ALIAS_MAP.get(upper_name, upper_name)
 
     # 4. Substring match (slow path, only for fuzzy names — rare)
     name_lower = name_strip.lower()
     for k, v in TICKER_MAP.items():
         if k.lower() in name_lower:
-            return v
+            return ALIAS_MAP.get(v, v)
 
     return None
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ReportStats from '../components/ReportStats';
 import ReportFilters from '../components/ReportFilters';
 import ReportTable from '../components/ReportTable';
+import PageContainer from '../components/common/PageContainer';
 
 export default function ResearchReports() {
   const [reports, setReports] = useState([]);
@@ -284,15 +285,12 @@ export default function ResearchReports() {
   };
 
   return (
-    <div className="research-reports-page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Title Header */}
-      <div className="panel" style={{ marginBottom: '15px', flexShrink: 0 }}>
-        <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Araştırma Raporları</span>
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Güncel Aracı Kurum Raporları</span>
-        </div>
-      </div>
-
+    <PageContainer
+      title="ARAŞTIRMA RAPORLARI"
+      badge={{ label: `${filteredReports.length} RAPOR` }}
+      subtitle="Güncel Aracı Kurum Analiz ve Şirket Raporları"
+      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+    >
       {/* Analytical Stats Bar & Recharts Distribution */}
       <ReportStats reports={filteredReports} />
 
@@ -328,6 +326,6 @@ export default function ResearchReports() {
           onPageChange={setCurrentPage}
         />
       </div>
-    </div>
+    </PageContainer>
   );
 }
