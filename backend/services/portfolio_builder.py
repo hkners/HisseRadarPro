@@ -96,13 +96,26 @@ class PortfolioBuilder:
                       AND s.{score_col} > 0
                     ORDER BY s.{score_col} DESC
                 """)
+                try:
+                    from globals import price_service
+                    live_prices = price_service.prices
+                except Exception:
+                    live_prices = {}
                 for row in cursor.fetchall():
                     t = str(row[0] or "").upper().strip()
                     if allowed_set and t not in allowed_set:
                         continue
                     sc = float(row[1])
                     sec = row[2] or "Genel"
-                    pr = float(row[3]) if row[3] is not None and float(row[3]) > 0 else 100.0
+                    # Lots are sized with the live price; the last stored close is only a fallback, and a
+                    # stock with no price at all is skipped (it used to be sized at an assumed 100 TL).
+                    live = (live_prices.get(t) or {}).get("price")
+                    if live and live > 0:
+                        pr = float(live)
+                    elif row[3] is not None and float(row[3]) > 0:
+                        pr = float(row[3])
+                    else:
+                        continue
                     scored_candidates.append({
                         "ticker": t,
                         "score": round(sc, 1),
@@ -117,9 +130,9 @@ class PortfolioBuilder:
         if not scored_candidates:
             if score_metric == "alpha_score":
                 try:
-                    from services.alpha_engine import AlphaEngine
-                    ae = AlphaEngine()
-                    alpha_data = ae.get_screener(limit=300) or []
+                    # The running singleton: AlphaEngine() would start another endless refresh thread.
+                    from services.alpha_engine import alpha_engine
+                    alpha_data = alpha_engine.get_alpha_screener() or []
                     for item in alpha_data:
                         t = item.get("ticker", "").upper().strip()
                         if allowed_set and t not in allowed_set:
@@ -139,9 +152,9 @@ class PortfolioBuilder:
                     logger.warning(f"Error fetching alpha candidates: {e}")
             else:
                 try:
-                    from services.conviction_engine import ConvictionEngine
-                    ce = ConvictionEngine(start_background=False)
-                    cached = ce._cached_results or {}
+                    # The running singleton: a fresh ConvictionEngine has an empty cache.
+                    from services.conviction_engine import conviction_engine
+                    cached = {s["ticker"]: s for s in conviction_engine.get_all_scored_stocks()}
                     for t, setup in cached.items():
                         if allowed_set and t not in allowed_set:
                             continue

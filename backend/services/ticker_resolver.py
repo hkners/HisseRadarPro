@@ -207,13 +207,37 @@ def match_ticker(name: str, bist_tickers: list) -> str | None:
     return None
 
 
+_TR_FOLD = str.maketrans("ÇĞİIÖŞÜçğıiöşü", "CGIIOSUCGIIOSU")
+_BUY_WORDS = {"AL", "BUY", "EKLE", "ARTIR", "OUTPERFORM", "OVERWEIGHT", "ACCUMULATE"}
+_HOLD_WORDS = {"TUT", "HOLD", "NOTR", "NEUTRAL", "MARKETPERFORM", "PARALEL"}
+_SELL_WORDS = {"SAT", "SELL", "AZALT", "UNDERPERFORM", "UNDERWEIGHT", "REDUCE"}
+
+
 def parse_rating(text: str) -> str:
     """
-    Centralized rating parser. Extracts AL/TUT/SAT from a string.
-    Used by kurum-stats, screener, consensus, and LLM parser.
+    Centralized rating parser: returns AL / TUT / SAT / OTHER.
+    Used by kurum-stats, report filters, consensus signals, the alpha engine and the LLM parser.
+    Relative ratings: "Endeks Üstü / Üzeri" = AL, "Endekse Paralel" = TUT, "Endeks Altı" = SAT.
+    Words are matched whole, so "Endekse PARALEL" or "Endeks ALTI" are never read as "AL".
     """
     if not text:
         return "OTHER"
+    s = str(text).translate(_TR_FOLD).upper()
+    if "ENDEKS" in s or "PIYASA" in s:
+        if "UST" in s or "UZER" in s:
+            return "AL"
+        if "PARALEL" in s or "NOTR" in s:
+            return "TUT"
+        if "ALT" in s:
+            return "SAT"
+    words = set(re.split(r"[^A-Z]+", s))
+    if words & _SELL_WORDS:
+        return "SAT"
+    if words & _BUY_WORDS:
+        return "AL"
+    if words & _HOLD_WORDS:
+        return "TUT"
+    return "OTHER"
     pot_str = str(text).upper()
 
     if "END" in pot_str and ("ÜZER" in pot_str or "UZER" in pot_str):

@@ -307,7 +307,7 @@ def compute_bullish_ratio_relative(ticker: str, repo = None) -> float:
         """)
         rows = cursor.fetchall()
 
-    bullish_terms = {"AL", "BUY", "GÜÇLÜ AL", "STRONG_BUY", "ENDEKS ÜSTÜ", "OUTPERFORM"}
+    from services.ticker_resolver import parse_rating
 
     by_ticker_recs: Dict[str, List[str]] = {}
     total_bullish = 0
@@ -318,7 +318,7 @@ def compute_bullish_ratio_relative(ticker: str, repo = None) -> float:
         if t_sym not in by_ticker_recs:
             by_ticker_recs[t_sym] = []
         by_ticker_recs[t_sym].append(rec_clean)
-        if any(term in rec_clean for term in bullish_terms):
+        if parse_rating(rec_clean) == "AL":
             total_bullish += 1
         total_recs += 1
 

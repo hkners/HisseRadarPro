@@ -188,6 +188,17 @@ class PriceService:
             }
 
     @staticmethod
+    def _last_and_prev_close(df_d_close, df_l_close):
+        """Latest price and the close of the session BEFORE the latest one.
+        Comparing against the calendar date broke on weekends and holidays: the last daily bar and the
+        last hourly bar were the same session, so every change came out as 0."""
+        c_close = df_l_close.iloc[-1]
+        live_day = df_l_close.index[-1].date()
+        prior = df_d_close[[d.date() < live_day for d in df_d_close.index]]
+        p_close = prior.iloc[-1] if len(prior) else df_d_close.iloc[-1]
+        return c_close, p_close
+
+    @staticmethod
     def _safe_float(v) -> Optional[float]:
         try:
             f = float(v)
@@ -248,17 +259,7 @@ class PriceService:
                     df_l_close = df_l["Close"].dropna()
                     
                     if not df_d_close.empty and not df_l_close.empty:
-                        p_close = df_d_close.iloc[-1] # previous day close (since today is NaN in daily)
-                        # if today's daily close miraculously populated, we might need to handle it, but p_close being yesterday is safer.
-                        # Actually, to be perfectly safe, if len is > 1 we just take iloc[-1] from daily.
-                        # wait, if today IS populated, iloc[-1] is today. Then p_close becomes today!
-                        # Safest:
-                        if len(df_d_close) > 1 and df_d_close.index[-1].date() == datetime.now().date():
-                            p_close = df_d_close.iloc[-2]
-                        else:
-                            p_close = df_d_close.iloc[-1]
-                            
-                        c_close = df_l_close.iloc[-1]
+                        c_close, p_close = self._last_and_prev_close(df_d_close, df_l_close)
                         vol = df_d["Volume"].iloc[-1] if not df_d["Volume"].isna().all() else 0
                         chg = ((c_close - p_close) / p_close * 100) if p_close and p_close > 0 else 0
                         new_prices[t] = {
@@ -284,12 +285,7 @@ class PriceService:
                             df_l_close = df_l["Close"].dropna()
                             
                             if not df_d_close.empty and not df_l_close.empty:
-                                if len(df_d_close) > 1 and df_d_close.index[-1].date() == datetime.now().date():
-                                    p_close = df_d_close.iloc[-2]
-                                else:
-                                    p_close = df_d_close.iloc[-1]
-                                    
-                                c_close = df_l_close.iloc[-1]
+                                c_close, p_close = self._last_and_prev_close(df_d_close, df_l_close)
                                 vol = df_d["Volume"].iloc[-1] if not df_d["Volume"].isna().all() else 0
                                 chg = ((c_close - p_close) / p_close * 100) if p_close and p_close > 0 else 0
                                 new_prices[ticker] = {

@@ -162,7 +162,8 @@ def get_kurum_stats():
 
     kurum_stats = []
     for k, v in stats.items():
-        avg = v["sum_potential"] / v["count"] if v["count"] > 0 else 0
+        # Average over reports that actually state a potential, not over every report.
+        avg = v["sum_potential"] / v["pot_count"] if v["pot_count"] > 0 else None
         
         kurum_stats.append({
             "kurum": k,

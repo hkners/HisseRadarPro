@@ -6,6 +6,7 @@ import threading
 import time
 from typing import List, Dict, Any
 from globals import report_repo, price_service
+from services.ticker_resolver import parse_rating
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class AlphaEngine:
                 logger.info("AlphaEngine: Background calculation finished.")
             except Exception as e:
                 logger.error(f"AlphaEngine: Error in background refresh: {e}")
-            time.sleep(300) # Refresh every 5 minutes
+            time.sleep(900)  # Refresh every 15 minutes, in step with the live price refresh
 
     @staticmethod
     def _calculate_sma(prices: List[float], period: int = 20) -> float:
@@ -200,7 +201,7 @@ class AlphaEngine:
                     pot_count += 1
             except (ValueError, TypeError):
                 pass
-            if "AL" in str(r.get("rating", "")).upper() or "END.ÜSTÜ" in str(r.get("rating", "")).upper():
+            if parse_rating(str(r.get("rating", ""))) == "AL":
                 buy_count += 1
                 
         avg_pot = (total_potential / pot_count) if pot_count > 0 else 0.0

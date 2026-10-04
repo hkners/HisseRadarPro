@@ -3,6 +3,7 @@ import FootballField from './FootballField';
 import { fmtPrice, fmtPct, upsidePct } from './valuationModel';
 import { InfoTip } from '../ui';
 import ModelPanel from './ModelPanel';
+import { trSector } from '../../utils/sectors';
 
 function ScoreRow({ label, value, hint }) {
   return (
@@ -80,14 +81,14 @@ export default function ValuationTab({ ticker, price, rows, valuation, consensus
               <span className="text-muted">/ 100 · yüksek = ucuz</span>
             </div>
             <ScoreRow
-              label="Kendi geçmişine göre"
-              hint="Güncel F/K, hissenin son 3 yıldaki F/K serisinin yüzde kaçlık diliminde. Düşük dilim = tarihine göre ucuz."
-              value={score?.historical_percentile != null ? `%${score.historical_percentile.toFixed(0)} dilim` : '—'}
+              label={`Sektöre göre F/K${score?.sector ? ` (${trSector(score.sector)})` : ''}`}
+              hint="Hissenin F/K'sının geniş sektör medyanına oranı. 1,0'ın altı sektöre göre ucuz demektir. Football field ise daha dar emsal grubunu kullanır."
+              value={score?.sector_relative != null ? `${score.sector_relative.toFixed(2).replace('.', ',')}×` : '—'}
             />
             <ScoreRow
-              label={`Sektöre göre F/K${score?.sector ? ` (${score.sector})` : ''}`}
-              hint="Hissenin F/K'sının geniş sektör medyanına oranı. 1,0'ın altı sektöre göre ucuz demektir. Football field ise daha dar emsal grubunu kullanır."
-              value={score?.sector_relative != null ? `${score.sector_relative.toFixed(2)}×` : '—'}
+              label="Sektöre göre PD/DD"
+              hint="Hissenin PD/DD'sinin sektör medyanına oranı. Skor, F/K ve PD/DD oranlarının ortalamasıdır."
+              value={score?.sector_relative_pb != null ? `${score.sector_relative_pb.toFixed(2).replace('.', ',')}×` : '—'}
             />
             <ScoreRow label="Football field emsal grubu" value={valuation?.peer_group_name || '—'} />
             <ScoreRow label="Emsal sayısı" value={valuation?.peer_count ?? '—'} />

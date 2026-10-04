@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
-const STREAM_URL = `${import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://127.0.0.1:8015'}/api/scraped-reports/stream-scrape`;
+const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://127.0.0.1:8015';
+const STREAM_URL = `${API_BASE}/api/scraped-reports/stream-scrape`;
 
 export default function SyncButton() {
   const [syncing, setSyncing] = useState(false);
@@ -10,7 +11,9 @@ export default function SyncButton() {
   const handleSync = () => {
     if (syncing) return;
     setSyncing(true);
-    setLogs([]);
+    setLogs(['Eksik fiyat geçmişi arka planda güncelleniyor.']);
+    // Price history is synced alongside the report scrape; it runs in the background on the server.
+    fetch(`${API_BASE}/api/admin/price-history/sync`, { method: 'POST' }).catch(() => {});
 
     const eventSource = new EventSource(STREAM_URL);
 

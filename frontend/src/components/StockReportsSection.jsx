@@ -2,6 +2,7 @@ import React, { useState, useMemo, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import { slugifyBroker } from '../utils/slugify';
+import { classifyRating } from '../utils/rating';
 
 export default function StockReportsSection({
   recs = [],
@@ -112,8 +113,7 @@ export default function StockReportsSection({
       list = list.filter(r => r.is_model);
     } else if (activeFilter === 'BUY_ONLY') {
       list = list.filter(r => {
-        const t = String(r.rating || r.tavsiye || '').toUpperCase();
-        return t.includes('AL') || t.includes('BUY') || t.includes('EKLE') || t.includes('OUTPERFORM');
+        return classifyRating(r.rating || r.tavsiye) === 'AL';
       });
     } else if (activeFilter === 'POS_POT') {
       list = list.filter(r => {

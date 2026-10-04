@@ -64,7 +64,7 @@ class ConvictionEngine:
                 self.recompute()
             except Exception as e:
                 logger.error(f"ConvictionEngine: Error during recomputation: {e}", exc_info=True)
-            time.sleep(180)
+            time.sleep(600)  # live prices refresh every 15 minutes; 3-minute recomputes were wasted work
 
     def recompute(self):
         """Full recomputation of conviction scores and setups across BIST stocks."""
@@ -538,6 +538,26 @@ class ConvictionEngine:
         fresh_reports_count = 0
         latest_report_date = None
 
+        def _target_of(rep: Dict[str, Any]) -> Optional[float]:
+            raw = rep.get("target_price") or rep.get("hedefFiyat")
+            try:
+                val = float(str(raw).replace(",", "."))
+                return val if val > 0 else None
+            except (ValueError, TypeError):
+                return None
+
+        # Each broker counts once in the consensus: only its most recent report with a valid target.
+        # Otherwise a broker that revised its target would be averaged together with its own old view.
+        latest_by_broker: Dict[str, Tuple[str, int]] = {}
+        for r in recs:
+            b_name = (r.get("broker") or r.get("kurum") or "").strip()
+            if not b_name or _target_of(r) is None:
+                continue
+            d = str(r.get("report_date") or r.get("tarih") or "")[:10]
+            if b_name not in latest_by_broker or d > latest_by_broker[b_name][0]:
+                latest_by_broker[b_name] = (d, id(r))
+        consensus_ids = {v[1] for v in latest_by_broker.values()}
+
         for r in recs:
             broker = r.get("broker") or r.get("kurum") or ""
             if broker:
@@ -545,6 +565,9 @@ class ConvictionEngine:
 
             if r.get("is_model"):
                 model_count += 1
+
+            if broker.strip() and id(r) not in consensus_ids:
+                continue
 
             t_val = r.get("target_price") or r.get("hedefFiyat")
             if not t_val or str(t_val).strip() in ("0", "0.0", "N/A", "Bilinmiyor", "None"):
@@ -1058,11 +1081,11 @@ class ConvictionEngine:
 
         if len(drivers) < 3 and valuation_score is not None:
             if valuation_score >= 65.0:
-                sec_str = f" ve {val_details.get('sector', '')} sektörüne" if val_details and not val_details.get("is_fallback") else ""
-                drivers.append(f"Cazip Değerleme: Geçmiş çarpanlarına{sec_str} göre iskontolu (Değerleme: {valuation_score:.0f}/100)")
+                sec_name = (val_details or {}).get("sector") or "sektör"
+                drivers.append(f"Cazip Değerleme: {sec_name} emsallerine göre F/K ve PD/DD iskontolu (Değerleme: {valuation_score:.0f}/100)")
             elif valuation_score <= 25.0:
-                sec_str = f" ve {val_details.get('sector', '')} sektörüne" if val_details and not val_details.get("is_fallback") else ""
-                drivers.append(f"Primli Değerleme: Geçmiş çarpanlarına{sec_str} kıyasla primli (Değerleme: {valuation_score:.0f}/100)")
+                sec_name = (val_details or {}).get("sector") or "sektör"
+                drivers.append(f"Primli Değerleme: {sec_name} emsallerine göre F/K ve PD/DD primli (Değerleme: {valuation_score:.0f}/100)")
 
         if len(drivers) < 3:
             if decision in ("GÜÇLÜ AL", "KADEMELİ AL"):

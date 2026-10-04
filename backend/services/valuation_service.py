@@ -4,7 +4,8 @@ HisseRadarPro — Valuation Service (Dinamik ve Göreceli Değerleme Motoru)
 Bu servis, sabit ve sektörden bağımsız F/K ve ROE eşikleri yerine:
 1. compute_historical_percentile: Hissenin kendi 3 yıllık geçmiş çarpan serisindeki dilimini hesaplar (ucuzluk).
 2. compute_sector_relative: Hissenin aynı sektördeki diğer hisselerin medyan çarpanına oranını hesaplar.
-3. compute_valuation_score: %60 Tarihsel + %40 Sektör Göreceliği ağırlığıyla 0-100 arası tek bir değerleme skoru üretir.
+3. compute_valuation_score: F/K ve PD/DD'nin sektör medyanına oranından 0-100 arası değerleme skoru üretir.
+   (compute_historical_percentile skora girmez: geçmiş bilanço olmadan fiyat yüzdeliğinden farksızdır.)
 4. compute_sector_relative_roe: ROE'yi sektör medyanına göre göreli hale getirir (özkaynak karlılığı üstünlüğü).
 """
 
@@ -319,61 +320,49 @@ class ValuationService:
         metric: str = "pe_ratio",
         repo=None,
         return_details: bool = False
-    ) -> Union[float, Dict[str, Any]]:
+    ) -> Union[Optional[float], Dict[str, Any]]:
         """
-        İki fonksiyonu %60 (kendi tarihi) / %40 (sektör göreceliği) ağırlığıyla
-        birleştirip 0-100 arası tek bir valuation_score üretir.
-        - Düşük tarihsel dilim = cazip (örn. percentile=20 -> hist_score=80).
-        - Sektör çarpanı medyanın altındaysa (ratio < 1.0) -> sector_score > 50.
-        - Sektör göreceliği None dönerse sadece kendi tarihi percentile'a göre hesaplar.
+        0-100 değerleme skoru (yüksek = ucuz): hissenin F/K ve PD/DD çarpanlarının sektör
+        medyanına oranından. İki çarpandan hangisi varsa onların ortalaması alınır.
+
+        Not: Eskiden %60 ağırlıkla "kendi geçmişine göre" bileşeni vardı. Geçmiş fiyatlar bugünkü
+        hisse başı kâra bölündüğü için bu aslında fiyatın 3 yıllık yüzdeliğiydi (korelasyon 0,95);
+        enflasyonla yükselen her hisseyi "pahalı" gösteriyordu. Geçmiş bilanço serisi olmadan gerçek
+        geçmiş çarpan hesaplanamadığı için o bileşen kaldırıldı.
         """
         r = repo or self._get_repo()
         clean = ticker.upper().strip()
 
-        hist_percentile = self.compute_historical_percentile(clean, metric=metric, repo=r)
-        sec_relative = self.compute_sector_relative(clean, metric=metric, repo=r)
+        def ratio_score(ratio: Optional[float]) -> Optional[float]:
+            if ratio is None:
+                return None
+            if ratio <= 1.0:
+                return min(100.0, 50.0 + (1.0 - ratio) * 100.0)  # 0.5x -> 100, 1.0x -> 50
+            return max(0.0, 50.0 - (ratio - 1.0) * 50.0)          # 2.0x -> 0
 
-        # 1. Historical Attractiveness Score (0-100)
-        # Low percentile = cheaper = higher score
-        if hist_percentile is not None:
-            hist_score = 100.0 - hist_percentile
-        else:
-            hist_score = 50.0  # Neutral fallback
-
-        # 2. Sector Relative Score (0-100)
-        if sec_relative is not None:
-            if sec_relative <= 1.0:
-                # 0.5 ratio -> 100 score, 1.0 ratio -> 50 score
-                sec_score = min(100.0, 50.0 + (1.0 - sec_relative) * 100.0)
-            else:
-                # 1.0 ratio -> 50 score, 2.0 ratio -> 0 score
-                sec_score = max(0.0, 50.0 - (sec_relative - 1.0) * 50.0)
-
-            valuation_score = round(0.60 * hist_score + 0.40 * sec_score, 1)
-            is_fallback = False
-        else:
-            # Fallback to 100% historical percentile
-            sec_score = None
-            valuation_score = round(hist_score, 1)
-            is_fallback = True
-
-        valuation_score = max(0.0, min(100.0, valuation_score))
+        pe_rel = self.compute_sector_relative(clean, metric="pe_ratio", repo=r)
+        pb_rel = self.compute_sector_relative(clean, metric="pb_ratio", repo=r)
+        # A multiple below 0.2x or above 5x the sector median almost always comes from a data
+        # problem (e.g. yfinance mixing TL prices with USD statements for USD reporters like THYAO).
+        unreliable = [name for name, v in (("F/K", pe_rel), ("PD/DD", pb_rel)) if v is not None and not 0.2 <= v <= 5.0]
+        usable = [v for v in (pe_rel, pb_rel) if v is not None and 0.2 <= v <= 5.0]
+        parts = [ratio_score(v) for v in usable]
+        valuation_score = round(max(0.0, min(100.0, sum(parts) / len(parts))), 1) if parts else None
 
         if return_details:
             comp_info = r.get_company_info(clean) or {}
-            sector = comp_info.get("sector")
             return {
                 "ticker": clean,
                 "valuation_score": valuation_score,
-                "historical_percentile": hist_percentile,
-                "historical_score": round(hist_score, 1),
-                "sector_relative": sec_relative,
-                "sector_score": round(sec_score, 1) if sec_score is not None else None,
-                "sector": sector,
-                "is_fallback": is_fallback,
-                "metric": metric
+                "sector_relative": pe_rel,
+                "sector_relative_pb": pb_rel,
+                "sector_score": round(ratio_score(pe_rel), 1) if pe_rel is not None else None,
+                "sector_score_pb": round(ratio_score(pb_rel), 1) if pb_rel is not None else None,
+                "sector": comp_info.get("sector"),
+                "is_fallback": valuation_score is None,
+                "unreliable": unreliable,
+                "basis": "sector_relative_pe_pb",
             }
-
         return valuation_score
 
     def compute_peer_implied_values(

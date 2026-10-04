@@ -128,6 +128,12 @@ async def lifespan(app):
         start_ta_sync_worker()
     except Exception as e:
         logger.warning(f"Could not start TA sync worker: {e}")
+    # Keep historical_prices current (bulk download of missing closed sessions)
+    try:
+        from services.price_history_sync import start_price_history_worker
+        start_price_history_worker()
+    except Exception as e:
+        logger.warning(f"Could not start price history worker: {e}")
     # Pre-warm the recommendations cache
     get_cached_recommendations()
     # Pre-warm company info cache
@@ -149,10 +155,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Only the local frontend may call the API from a browser. With "*", any website open in the
+# browser could read or delete the portfolio, inject reports or spend the Gemini quota.
+_cors_env = os.environ.get("HR_CORS_ORIGINS", "")
+CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()] or [
+    "http://localhost:5173", "http://127.0.0.1:5173",
+    "http://localhost:4173", "http://127.0.0.1:4173",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -277,7 +290,8 @@ def get_dashboard():
     
     kurum_stats = []
     for k, v in stats_map.items():
-        avg = v["sum_potential"] / v["count"] if v["count"] > 0 else 0
+        # Average over reports that actually state a potential, not over every report.
+        avg = v["sum_potential"] / v["pot_count"] if v["pot_count"] > 0 else None
         kurum_stats.append({
             "kurum": k, "count": v["count"],
             "avg_potential": avg,

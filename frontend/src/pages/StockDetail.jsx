@@ -17,6 +17,7 @@ import ValuationStrip from '../components/valuation/ValuationStrip';
 import ValuationTab from '../components/valuation/ValuationTab';
 import { brokerTargets, buildValuationRows } from '../components/valuation/valuationModel';
 import { PillTabs } from '../components/ui';
+import { classifyRating } from '../utils/rating';
 
 const DETAIL_TABS = [
   { id: 'ozet', label: 'Özet & Kokpit' },
@@ -149,14 +150,9 @@ export default function StockDetail() {
       if (tgt && tgt !== "Bilinmiyor") {
         try { targets.push(parseFloat(tgt.toString().replace(',', '.'))); } catch { }
       }
-      const ratingStr = String(r.rating || r.tavsiye || "").toUpperCase();
-      if (ratingStr.includes("END") && (ratingStr.includes("ÜZER") || ratingStr.includes("UZER"))) ratings.AL++;
-      else if (ratingStr.includes("END") && ratingStr.includes("PARALEL")) ratings.TUT++;
-      else if (ratingStr.includes("END") && ratingStr.includes("ALT")) ratings.SAT++;
-      else if (ratingStr.includes("AL") || ratingStr.includes("BUY") || ratingStr.includes("EKLE") || ratingStr.includes("OUTPERFORM")) ratings.AL++;
-      else if (ratingStr.includes("TUT") || ratingStr.includes("HOLD") || ratingStr.includes("NEUTRAL")) ratings.TUT++;
-      else if (ratingStr.includes("SAT") || ratingStr.includes("SELL") || ratingStr.includes("AZALT") || ratingStr.includes("UNDERPERFORM")) ratings.SAT++;
-      else ratings.TUT++;
+      // Reports without a stated rating are left out instead of being counted as TUT.
+      const cat = classifyRating(r.rating || r.tavsiye);
+      if (cat !== 'OTHER') ratings[cat]++;
     });
 
     const avgTarget = targets.length > 0 ? targets.reduce((a, b) => a + b, 0) / targets.length : null;

@@ -83,8 +83,10 @@ export default function Brokerages() {
 
   const avgOverallPotential = useMemo(() => {
     if (stats.length === 0) return '0.0';
-    const sum = stats.reduce((acc, k) => acc + (k.avg_potential || 0), 0);
-    return (sum / stats.length).toFixed(1);
+    const withPot = stats.filter(k => typeof k.avg_potential === 'number');
+    if (withPot.length === 0) return '0.0';
+    const sum = withPot.reduce((acc, k) => acc + k.avg_potential, 0);
+    return (sum / withPot.length).toFixed(1);
   }, [stats]);
 
   const totalPages = Math.ceil(sortedStats.length / itemsPerPage) || 1;
@@ -275,7 +277,7 @@ export default function Brokerages() {
                           )}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: k.avg_potential > 0 ? 'var(--color-up)' : 'var(--color-down)' }}>
-                          {k.avg_potential > 0 ? '+' : ''}{k.avg_potential.toFixed(2)}%
+                          {typeof k.avg_potential === 'number' ? `${k.avg_potential > 0 ? '+' : ''}${k.avg_potential.toFixed(2)}%` : '—'}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <Link 

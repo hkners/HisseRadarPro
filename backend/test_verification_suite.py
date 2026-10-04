@@ -27,10 +27,7 @@ except Exception:
 from globals import report_repo, price_service, BIST_TICKERS
 from services.alpha_engine import AlphaEngine
 from services.conviction_engine import ConvictionEngine
-from test_score_distribution import (
-    legacy_alpha_ta, legacy_alpha_fa, legacy_alpha_sentiment,
-    legacy_conviction_evaluate
-)
+from test_score_distribution import legacy_conviction_evaluate
 
 
 def run_test_1_complete_breakpoint_equality(ae: AlphaEngine, ce: ConvictionEngine):

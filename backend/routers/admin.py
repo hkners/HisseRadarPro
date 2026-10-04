@@ -42,6 +42,19 @@ def run_scrapers_task():
             f.write(f"[{datetime.now().isoformat()}] FATAL ERROR: {str(e)}\n")
 
 
+@router.get("/price-history")
+def get_price_history_status():
+    from services.price_history_sync import status
+    return status()
+
+
+@router.post("/price-history/sync")
+def trigger_price_history_sync(background_tasks: BackgroundTasks):
+    from services.price_history_sync import sync_missing_days
+    background_tasks.add_task(sync_missing_days)
+    return {"message": "Fiyat geçmişi güncellemesi başlatıldı."}
+
+
 @router.post("/scrapers/run")
 def trigger_scrapers(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_scrapers_task)

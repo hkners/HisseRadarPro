@@ -33,7 +33,11 @@ def seed_data(days_count: int = 75, num_tickers: int = 50, negative_control: boo
     print("=" * 80)
 
     # Use backend database
-    db_path = os.path.join(backend_dir, "scraped_reports.db")
+    # Never the live database: synthetic scores correlated with future returns and random-walk prices
+    # once landed there and made the score-quality analysis look predictive. Uses a separate copy.
+    db_path = os.environ.get("HR_SEED_DB") or os.path.join(backend_dir, "seed_test.db")
+    if os.path.abspath(db_path) == os.path.abspath(os.path.join(backend_dir, "scraped_reports.db")):
+        raise SystemExit("seed_backtest_data.py canlı veritabanına yazamaz; HR_SEED_DB ile ayrı bir dosya ver.")
     repo = ReportRepository(db_path=db_path)
 
     # Pick benchmark & liquid BIST tickers

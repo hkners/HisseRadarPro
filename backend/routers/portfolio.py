@@ -54,12 +54,55 @@ class ImportCommitRequest(BaseModel):
     account: str = "real"
 
 def _get_repo():
-    try:
-        from db_manager import ReportRepository
-        return ReportRepository()
-    except Exception:
-        from globals import report_repo
-        return report_repo
+    # The shared repository: creating a new one per request re-ran table migrations and used a
+    # separate write lock.
+    from globals import report_repo
+    return report_repo
+
+
+def _validate_transactions(rows: List[Dict[str, Any]], account: str) -> List[Dict[str, Any]]:
+    """Normalises and checks transactions before anything is written.
+    Rejects unknown tickers, types other than BUY/SELL, non-positive quantity or price, invalid or
+    future dates, and any sale larger than the position held on that date (including sales that a
+    back-dated entry would turn negative)."""
+    import datetime
+    from globals import BIST_TICKERS
+    valid = set(BIST_TICKERS)
+    today = datetime.date.today()
+    clean, errors = [], []
+    for i, r in enumerate(rows, start=1):
+        ticker = str(r.get("ticker") or "").strip().upper().replace(".IS", "")
+        tx_type = str(r.get("tx_type") or "BUY").strip().upper()
+        tx_type = {"AL": "BUY", "ALIŞ": "BUY", "SAT": "SELL", "SATIŞ": "SELL"}.get(tx_type, tx_type)
+        try:
+            qty = float(r.get("quantity"))
+            price = float(r.get("price"))
+        except (TypeError, ValueError):
+            errors.append(f"{i}. satır: miktar ve fiyat sayı olmalı.")
+            continue
+        raw_date = str(r.get("tx_date") or today.isoformat())[:10]
+        try:
+            tx_date = datetime.date.fromisoformat(raw_date)
+        except ValueError:
+            errors.append(f"{i}. satır: tarih YYYY-AA-GG biçiminde olmalı.")
+            continue
+        if ticker not in valid:
+            errors.append(f"{i}. satır: {ticker or '(boş)'} BIST listesinde yok.")
+        elif tx_type not in ("BUY", "SELL"):
+            errors.append(f"{i}. satır: işlem türü BUY veya SELL olmalı.")
+        elif qty <= 0 or price <= 0:
+            errors.append(f"{i}. satır: miktar ve fiyat sıfırdan büyük olmalı.")
+        elif tx_date > today:
+            errors.append(f"{i}. satır: ileri tarihli işlem girilemez.")
+        else:
+            clean.append({"ticker": ticker, "tx_type": tx_type, "quantity": qty, "price": price,
+                          "tx_date": tx_date.isoformat(), "account": account})
+    if errors:
+        raise HTTPException(status_code=400, detail=" ".join(errors[:5]) + (f" (+{len(errors) - 5} hata)" if len(errors) > 5 else ""))
+    oversell = _get_repo().holdings_as_of(account, clean)
+    if oversell:
+        raise HTTPException(status_code=400, detail=oversell)
+    return clean
 
 def _get_deps():
     from globals import report_repo, price_service
@@ -87,12 +130,9 @@ def generate_suggested_portfolio(req: GeneratePortfolioRequest):
 def add_portfolio_batch(req: BatchTransactionsRequest):
     repo = _get_repo()
     account = _account(req.account, allow_all=False)
-    try:
-        tx_list = [t.model_dump() for t in req.transactions]
-        count = repo.add_portfolio_transactions_batch(tx_list, account=account)
-        return {"status": "success", "count": count}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    tx_list = _validate_transactions([t.model_dump() for t in req.transactions], account)
+    count = repo.add_portfolio_transactions_batch(tx_list, account=account)
+    return {"status": "success", "count": count}
 
 @router.post("/import/preview")
 def preview_import(req: ImportPreviewRequest):
@@ -106,7 +146,8 @@ def commit_import(req: ImportCommitRequest):
     """Writes previously previewed rows as transactions into one account."""
     report_repo, _ = _get_deps()
     account = _account(req.account, allow_all=False)
-    count = report_repo.add_portfolio_transactions_batch([r.model_dump() for r in req.rows], account=account)
+    rows = _validate_transactions([r.model_dump() for r in req.rows], account)
+    count = report_repo.add_portfolio_transactions_batch(rows, account=account)
     return {"status": "success", "count": count, "account": account}
 
 @router.get("/analytics")
@@ -134,11 +175,19 @@ def get_portfolio(account: Optional[str] = Query(None)):
         ticker = item["ticker"]
         p_data = price_service.get_price(ticker)
 
-        live_price = p_data.get("price") if isinstance(p_data, dict) else 0.0
-        change_pct = p_data.get("change_pct") if isinstance(p_data, dict) else 0.0
+        live_price = p_data.get("price") if isinstance(p_data, dict) else None
+        change_pct = p_data.get("change_pct") if isinstance(p_data, dict) else None
+        price_source = "live"
+        if not live_price:
+            # No live quote: value the position at its last stored close instead of zero.
+            last = report_repo.get_historical_prices(ticker, limit=1)
+            live_price = float(last[-1]["close"]) if last else None
+            change_pct = None
+            price_source = f"close {str(last[-1]['date'])[:10]}" if last else "none"
 
         item["live_price"] = live_price
         item["live_change_pct"] = change_pct
+        item["price_source"] = price_source
         enriched.append(item)
 
     return enriched
@@ -146,13 +195,10 @@ def get_portfolio(account: Optional[str] = Query(None)):
 @router.post("")
 def add_portfolio_item(item: PortfolioItem):
     report_repo, _ = _get_deps()
-    try:
-        report_repo.add_to_portfolio(item.ticker, item.quantity, item.cost, _account(item.account, allow_all=False))
-        return {"status": "success"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    account = _account(item.account, allow_all=False)
+    tx = _validate_transactions([{"ticker": item.ticker, "tx_type": "BUY", "quantity": item.quantity, "price": item.cost}], account)[0]
+    report_repo.add_to_portfolio(tx["ticker"], tx["quantity"], tx["price"], account)
+    return {"status": "success"}
 
 @router.get("/transactions")
 def get_transactions(account: Optional[str] = Query(None)):
@@ -170,15 +216,17 @@ class TransactionItem(BaseModel):
 @router.post("/transactions")
 def add_transaction(item: TransactionItem):
     report_repo, _ = _get_deps()
-    try:
-        report_repo.add_portfolio_transaction(
-            item.ticker, item.tx_type, item.quantity, item.price, item.tx_date, _account(item.account, allow_all=False)
-        )
-        return {"status": "success"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    account = _account(item.account, allow_all=False)
+    tx = _validate_transactions([item.model_dump()], account)[0]
+    report_repo.add_portfolio_transaction(tx["ticker"], tx["tx_type"], tx["quantity"], tx["price"], tx["tx_date"], account)
+    return {"status": "success"}
+
+
+@router.get("/realized")
+def get_realized(account: Optional[str] = Query(None)):
+    """Realised profit/loss from sales (average-cost method), including closed positions."""
+    report_repo, _ = _get_deps()
+    return report_repo.get_realized_pnl(_account(account))
 
 @router.get("/equity-curve")
 def get_equity_curve(days: int = 30, account: Optional[str] = Query(None)):
@@ -197,79 +245,57 @@ def get_equity_curve(days: int = 30, account: Optional[str] = Query(None)):
     # Get all unique tickers in transactions
     tickers = set(t['ticker'] for t in transactions)
 
-    # We need historical prices for these tickers. If not in DB, fallback to live price.
-    historical_data = {}
+    # Price on any day = last known close on or before it (weekends, holidays and late data carry the
+    # previous close forward). Today uses the live price. A position is never valued at 0 just because
+    # its latest bar is more than a few days old.
+    import bisect
+    histories = {}
     for ticker in tickers:
-        prices = report_repo.get_historical_prices(ticker)
-        # Create a dict mapping date_str -> close_price
-        price_map = {}
-        for p in prices:
-            # p['date'] is usually YYYY-MM-DD HH:MM:SS or YYYY-MM-DD
-            d_str = p['date'].split(' ')[0]
-            price_map[d_str] = p['close']
-
-        # Fallback to current live price if history is missing for today
+        rows = report_repo.get_historical_prices(ticker)
+        dates = [str(p['date']).split(' ')[0] for p in rows]
+        closes = [float(p['close']) for p in rows]
         live = price_service.get_price(ticker)
         if isinstance(live, dict) and live.get("price"):
-            price_map[end_date.isoformat()] = live["price"]
+            if dates and dates[-1] == end_date.isoformat():
+                closes[-1] = float(live["price"])
+            else:
+                dates.append(end_date.isoformat())
+                closes.append(float(live["price"]))
+        histories[ticker] = (dates, closes)
 
-        historical_data[ticker] = price_map
+    def price_on(ticker: str, date_str: str, fallback: float) -> float:
+        dates, closes = histories.get(ticker, ([], []))
+        i = bisect.bisect_right(dates, date_str) - 1
+        return closes[i] if i >= 0 else fallback
 
     curve = []
-
     for current_date in date_list:
         date_str = current_date.isoformat()
-
-        # Calculate portfolio holdings exactly on this date
         holdings = {}
-        cash_invested = 0
+        last_trade_price = {}
+        cash_invested = 0.0
         for tx in transactions:
-            tx_date_str = tx['tx_date'].split(' ')[0]
-            if tx_date_str > date_str:
-                continue # Transaction hasn't happened yet
-
+            if tx['tx_date'].split(' ')[0] > date_str:
+                continue
             t = tx['ticker']
             qty = float(tx['quantity'])
             price = float(tx['price'])
-
-            if t not in holdings:
-                holdings[t] = 0
-
+            holdings.setdefault(t, 0.0)
+            last_trade_price[t] = price
             if tx['tx_type'] == 'BUY':
                 holdings[t] += qty
-                cash_invested += (qty * price)
+                cash_invested += qty * price
             elif tx['tx_type'] == 'SELL':
                 holdings[t] -= qty
-                cash_invested -= (qty * price)
+                cash_invested -= qty * price  # net cash put in (sale proceeds come back out)
 
-        # Calculate market value of holdings on this date
-        market_value = 0
-        for t, qty in holdings.items():
-            if qty > 0:
-                # Find price on or before this date
-                price_map = historical_data.get(t, {})
-
-                # Check current date, then walk backwards up to 7 days to find a closing price (weekends/holidays)
-                found_price = 0
-                for back_days in range(7):
-                    check_date = (current_date - datetime.timedelta(days=back_days)).isoformat()
-                    if check_date in price_map:
-                        found_price = price_map[check_date]
-                        break
-
-                if found_price > 0:
-                    market_value += qty * found_price
-
-        # Formatting the day label for the chart
-        day_label = current_date.strftime("%d %b")
-        if current_date == end_date:
-            day_label = "NOW"
-
+        # Before a ticker's first stored bar, value it at its own trade price.
+        market_value = sum(qty * price_on(t, date_str, last_trade_price[t]) for t, qty in holdings.items() if qty > 0)
         curve.append({
-            "day": day_label,
+            "day": "Bugün" if current_date == end_date else current_date.strftime("%d.%m"),
             "date": date_str,
             "value": market_value,
-            "invested": cash_invested
+            "invested": cash_invested,
         })
 
     return curve

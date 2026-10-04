@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import ImageWithFallback from './ImageWithFallback';
 import { slugifyBroker } from '../utils/slugify';
 import FavoriteStar from './common/FavoriteStar';
+import { classifyRating } from '../utils/rating';
 
 export function ReportDetail({ r }) {
   const [history, setHistory] = useState([]);
@@ -131,14 +132,14 @@ export default function ReportRow({ r, isExpanded, onToggle }) {
   const isPositive = upside !== null && upside >= 0;
 
   const getRatingStyle = (rating) => {
-    const rStr = (rating || '').toUpperCase();
-    if (rStr === 'AL' || rStr === 'BUY') {
+    const cat = classifyRating(rating);
+    if (cat === 'AL') {
       return { backgroundColor: 'rgba(63, 138, 107, 0.15)', color: 'var(--positive)', border: '1px solid var(--positive)' };
     }
-    if (rStr === 'TUT' || rStr === 'HOLD' || rStr === 'NEUTRAL') {
+    if (cat === 'TUT') {
       return { backgroundColor: 'rgba(200, 162, 74, 0.15)', color: 'var(--gold)', border: '1px solid var(--gold-border)' };
     }
-    if (rStr === 'SAT' || rStr === 'SELL') {
+    if (cat === 'SAT') {
       return { backgroundColor: 'rgba(192, 82, 78, 0.15)', color: 'var(--negative)', border: '1px solid var(--negative)' };
     }
     return { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' };

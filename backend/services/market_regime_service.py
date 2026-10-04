@@ -3,9 +3,9 @@ Market Regime Service (services/market_regime_service.py)
 Determines market regime by combining BIST market breadth (advancers vs decliners)
 with XU100 Index technical position relative to its 50 and 200-day moving averages (MA50, MA200).
 
-3-Tier Regime Definition:
-- RISK_ON:  Breadth is advancing (up > down) AND XU100 Close > MA200
-- RISK_OFF: Breadth is declining (down > up) AND XU100 Close < MA200
+3-Tier Regime Definition (breadth = share of stocks above their own 50-day average):
+- RISK_ON:  Breadth >= 55% AND XU100 Close > MA200
+- RISK_OFF: Breadth <= 40% AND XU100 Close < MA200
 - NEUTRAL:  All other market conditions (mixed signals, choppy / transitional market)
 
 Provides:
@@ -88,6 +88,49 @@ class MarketRegimeService:
             "is_declining": is_declining,
             "is_balanced": is_balanced
         }
+
+    def calculate_trend_breadth(
+        self,
+        all_prices: Optional[Dict[str, Any]] = None,
+        as_of_date: Optional[str] = None,
+        window: int = 50,
+    ) -> Dict[str, Any]:
+        """Share of stocks trading above their own 50-day average.
+        One day's advancers/decliners flips with every session; this moves only when the trend of the
+        broad market changes, so the regime (and the 50% exposure cut it drives) stops flickering."""
+        import time as _time
+        key = (as_of_date, window)
+        cached = getattr(self, "_trend_cache", {}).get(key)
+        if cached and _time.time() - cached[0] < 900 and all_prices is None:
+            return cached[1]
+        conn = sqlite3.connect(self.db_path)
+        try:
+            end = as_of_date or conn.execute("SELECT MAX(date) FROM historical_prices WHERE ticker = 'XU100'").fetchone()[0]
+            rows = conn.execute(
+                """SELECT ticker, date, close FROM historical_prices
+                   WHERE date > date(?, '-120 days') AND date <= ? AND close > 0 AND ticker NOT LIKE 'XU%'""",
+                (end, end),
+            ).fetchall()
+        finally:
+            conn.close()
+        by_ticker: Dict[str, List[float]] = {}
+        for t, _d, c in sorted(rows, key=lambda r: (r[0], r[1])):
+            by_ticker.setdefault(t, []).append(float(c))
+        above = total = 0
+        for t, closes in by_ticker.items():
+            if len(closes) < window:
+                continue
+            ma = sum(closes[-window:]) / window
+            live = (all_prices or {}).get(t) if as_of_date is None else None
+            last = float(live["price"]) if isinstance(live, dict) and live.get("price") else closes[-1]
+            total += 1
+            above += 1 if last > ma else 0
+        pct = round(100.0 * above / total, 1) if total else None
+        result = {"above": above, "total": total, "pct_above_ma": pct, "window": window, "as_of": end}
+        if not hasattr(self, "_trend_cache"):
+            self._trend_cache = {}
+        self._trend_cache[key] = (_time.time(), result)
+        return result
 
     def get_index_metrics(
         self,
@@ -172,9 +215,10 @@ class MarketRegimeService:
     ) -> str:
         """
         Pure rule-based regime assignment:
-        - RISK_ON:  breadth yükselen ağırlıklı VE endeks MA200 üzerinde
-        - RISK_OFF: breadth düşen ağırlıklı VE endeks MA200 altında
+        - RISK_ON:  genişlik güçlü VE endeks MA200 üzerinde
+        - RISK_OFF: genişlik zayıf VE endeks MA200 altında
         - NEUTRAL:  diğer tüm durumlar
+        Genişlik, hisselerin 50 günlük ortalamasının üzerindeki payıdır (>= %55 güçlü, <= %40 zayıf).
         """
         if is_breadth_advancing and above_ma200:
             return "RISK_ON"
@@ -197,12 +241,23 @@ class MarketRegimeService:
 
         breadth = self.calculate_breadth_from_prices(all_prices)
         index_data = self.get_index_metrics(as_of_date=as_of_date, ticker="XU100")
+        trend = self.calculate_trend_breadth(all_prices if as_of_date is None else None, as_of_date)
+        pct = trend.get("pct_above_ma")
+        if pct is None:  # no history: fall back to the day's advancers/decliners
+            strong, weak = breadth["is_advancing"], breadth["is_declining"]
+        else:
+            strong, weak = pct >= 55.0, pct <= 40.0
+        breadth["trend"] = trend
 
         regime = self.determine_regime_label(
-            is_breadth_advancing=breadth["is_advancing"],
-            is_breadth_declining=breadth["is_declining"],
+            is_breadth_advancing=strong,
+            is_breadth_declining=weak,
             above_ma200=index_data["above_ma200"]
         )
+        def _pts(v: float) -> str:
+            return f"{v:,.0f}".replace(",", ".")
+
+        trend_txt = f"Hisselerin %{str(pct).replace('.', ',')} kadarı 50 günlük ortalamasının üzerinde" if pct is not None else ""
 
         # Multipliers & Threshold adjustments
         if regime == "RISK_OFF":
@@ -211,8 +266,8 @@ class MarketRegimeService:
             color = "#C0524E"
             badge_title = "AYI / DEFANSİF PİYASA"
             description = (
-                f"Piyasa zayıf (Düşen: {breadth['down']}, Yükselen: {breadth['up']}) "
-                f"ve XU100 ({index_data['close']} TL) 200 günlük ortalamanın ({index_data['ma200']} TL) altında. "
+                f"Piyasa zayıf ({trend_txt}) "
+                f"ve XU100 ({_pts(index_data['close'])} puan) 200 günlük ortalamanın ({_pts(index_data['ma200'])} puan) altında. "
                 "Riskten kaçış modu aktif; nakit tamponunu koruyun (Pozisyon tavanı: %50)."
             )
         elif regime == "RISK_ON":
@@ -221,8 +276,8 @@ class MarketRegimeService:
             color = "#3F8A6B"
             badge_title = "BOĞA / POZİTİF PİYASA"
             description = (
-                f"Piyasa alıcılı (Yükselen: {breadth['up']}, Düşen: {breadth['down']}) "
-                f"ve XU100 ({index_data['close']} TL) 200 günlük ortalamanın ({index_data['ma200']} TL) üzerinde. "
+                f"Piyasa güçlü ({trend_txt}) "
+                f"ve XU100 ({_pts(index_data['close'])} puan) 200 günlük ortalamanın ({_pts(index_data['ma200'])} puan) üzerinde. "
                 "Risk iştahı yüksek; alım fırsatları tam ağırlıkla değerlendirilebilir."
             )
         else:  # NEUTRAL
@@ -231,8 +286,8 @@ class MarketRegimeService:
             color = "#C9883A"
             badge_title = "YATAY / SEÇİCİ PİYASA"
             description = (
-                f"Kararsız piyasa görünümü (Yükselen: {breadth['up']}, Düşen: {breadth['down']}). "
-                f"XU100: {index_data['close']} TL (MA200: {index_data['ma200']} TL). "
+                f"Kararsız piyasa görünümü ({trend_txt}). "
+                f"XU100: {_pts(index_data['close'])} puan (MA200: {_pts(index_data['ma200'])} puan). "
                 "Endeks yönünden ziyade hisse bazlı değerlemelere ve güçlü bilançolara odaklanın."
             )
 

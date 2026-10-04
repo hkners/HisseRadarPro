@@ -13,6 +13,7 @@ const readAccount = () => { try { return localStorage.getItem(ACCOUNT_KEY) || 'a
 import ImageWithFallback from '../components/ImageWithFallback';
 import { getCachedData, fetchWithCache } from '../utils/apiCache';
 import PageContainer from '../components/common/PageContainer';
+import { fmtPct } from '../utils/format';
 
 
 export default function Portfolio() {
@@ -46,6 +47,8 @@ export default function Portfolio() {
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [txType, setTxType] = useState('BUY');
   const [equityCurve, setEquityCurve] = useState([]);
+  const [realized, setRealized] = useState(0);
+  const [formError, setFormError] = useState('');
   const [auditResult, setAuditResult] = useState(null);
   const [auditLoading, setAuditLoading] = useState(false);
 
@@ -189,10 +192,18 @@ export default function Portfolio() {
           account: item.account || 'real',
           quantity: item.quantity,
           avgCost: item.cost,
+          serverPrice: item.live_price,
+          priceSource: item.price_source,
+          realizedPnl: item.realized_pnl || 0,
         }));
         setHoldings(mapped);
       })
       .catch(console.error);
+
+    fetch(`${import.meta.env.VITE_API_URL}/portfolio/realized${q}`)
+      .then(res => res.json())
+      .then(d => setRealized(typeof d?.total === 'number' ? d.total : 0))
+      .catch(() => setRealized(0));
       
     fetch(`${import.meta.env.VITE_API_URL}/portfolio/equity-curve?days=30${account === 'all' ? '' : `&account=${account}`}`)
       .then(res => res.json())
@@ -232,14 +243,24 @@ export default function Portfolio() {
     const ticker = newTicker.trim().toUpperCase();
     const qty = parseFloat(newQuantity);
     const cost = parseFloat(newCost);
-    if (!ticker || isNaN(qty) || qty <= 0 || isNaN(cost) || cost <= 0) return;
+    if (!ticker || isNaN(qty) || qty <= 0 || isNaN(cost) || cost <= 0) {
+      setFormError('Hisse, sıfırdan büyük adet ve fiyat gir.');
+      return;
+    }
+    setFormError('');
 
     fetch(`${import.meta.env.VITE_API_URL}/portfolio/transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticker, tx_type: txType, quantity: qty, price: cost, tx_date: newDate, account: newAccount })
     })
-    .then(res => res.json())
+    .then(async res => {
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(typeof d.detail === 'string' ? d.detail : 'İşlem kaydedilemedi.');
+      }
+      return res.json();
+    })
     .then(() => {
       fetchPortfolio();
       setNewTicker('');
@@ -247,7 +268,7 @@ export default function Portfolio() {
       setNewCost('');
       setShowAddForm(false);
     })
-    .catch(console.error);
+    .catch(e => setFormError(e.message));
   };
 
   // Deleting removes every transaction of the ticker in that account, so it needs a second click.
@@ -265,18 +286,26 @@ export default function Portfolio() {
     let totalMarketValue = 0;
     const rows = holdings.map(h => {
       const live = livePrices[h.ticker];
-      const livePrice = live?.price || 0;
+      // Live quote first, then the server's price (live or last stored close). A position with no
+      // price at all is left out of the totals instead of being shown as a 100% loss.
+      const livePrice = live?.price || h.serverPrice || 0;
+      const priceStale = !live?.price && !!h.serverPrice && h.priceSource !== 'live';
       const costBasis = h.quantity * h.avgCost;
-      const marketValue = h.quantity * livePrice;
-      const pnl = marketValue - costBasis;
-      const pnlPct = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
-      totalCostBasis += costBasis;
-      totalMarketValue += marketValue;
+      const hasPrice = livePrice > 0;
+      const marketValue = hasPrice ? h.quantity * livePrice : 0;
+      const pnl = hasPrice ? marketValue - costBasis : null;
+      const pnlPct = hasPrice && costBasis > 0 ? (pnl / costBasis) * 100 : null;
+      if (hasPrice) {
+        totalCostBasis += costBasis;
+        totalMarketValue += marketValue;
+      }
       return {
         ...h,
         livePrice,
+        hasPrice,
+        priceStale,
         changePct: live?.change_pct || 0,
-        name: live?.name || `${h.ticker} A.Ş.`,
+        name: live?.name || h.ticker,
         costBasis,
         marketValue,
         pnl,
@@ -693,6 +722,7 @@ export default function Portfolio() {
               </div>
               <button onClick={addHolding} className="btn btn-primary">Kaydet</button>
             </div>
+            {formError && <div className="text-down" style={{ fontSize: 12, marginTop: 8 }}>{formError}</div>}
           </div>
         </div>
       )}
@@ -712,15 +742,22 @@ export default function Portfolio() {
           </div>
         </div>
         <div className="panel">
-          <div className="panel-header text-muted">TOPLAM KÂR / ZARAR</div>
+          <div className="panel-header text-muted">AÇIK POZİSYON KÂR / ZARAR</div>
           <div className="panel-content" style={{
             fontSize: '20px', fontWeight: 'bold',
             color: portfolioData.totalPnl >= 0 ? 'var(--color-up)' : 'var(--color-red)',
           }}>
             {portfolioData.totalPnl >= 0 ? '+' : ''}{formatCurrency(portfolioData.totalPnl)} ₺
             <span style={{ fontSize: '13px', marginLeft: '8px' }}>
-              ({portfolioData.totalPnlPct >= 0 ? '+' : ''}{portfolioData.totalPnlPct.toFixed(2)}%)
+              ({fmtPct(portfolioData.totalPnlPct, 2)})
             </span>
+          </div>
+        </div>
+        <div className="panel">
+          <div className="panel-header text-muted">GERÇEKLEŞMİŞ KÂR / ZARAR</div>
+          <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: realized > 0 ? 'var(--color-up)' : realized < 0 ? 'var(--color-red)' : 'var(--text-primary)' }}>
+            {realized > 0 ? '+' : ''}{formatCurrency(realized)} ₺
+            <div className="text-muted" style={{ fontSize: 11, fontWeight: 400 }}>Satışlardan, ortalama maliyet yöntemiyle</div>
           </div>
         </div>
         <div className="panel">
@@ -830,7 +867,8 @@ export default function Portfolio() {
                       <td style={{ fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{r.quantity.toLocaleString('tr-TR')}</td>
                       <td style={{ fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(r.avgCost)}</td>
                       <td style={{ fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
-                        {formatCurrency(r.livePrice)}
+                        {r.hasPrice ? formatCurrency(r.livePrice) : <span className="text-muted">Fiyat yok</span>}
+                        {r.priceStale && <div className="text-muted" style={{ fontSize: 10, fontWeight: 400 }}>son kapanış</div>}
                         {r.changePct !== 0 && (
                           <span style={{
                             color: r.changePct > 0 ? 'var(--color-up)' : 'var(--color-red)',
@@ -840,17 +878,19 @@ export default function Portfolio() {
                           </span>
                         )}
                       </td>
-                      <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(r.marketValue)}</td>
+                      <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{r.hasPrice ? formatCurrency(r.marketValue) : '—'}</td>
                       <td style={{
                         fontWeight: 'bold',
-                        color: r.pnl >= 0 ? 'var(--color-up)' : 'var(--color-red)',
+                        color: r.pnl == null ? 'var(--text-muted)' : r.pnl >= 0 ? 'var(--color-up)' : 'var(--color-red)',
                         fontSize: '13px',
                         fontVariantNumeric: 'tabular-nums'
                       }}>
-                        {r.pnl >= 0 ? '+' : ''}{formatCurrency(r.pnl)}
-                        <div style={{ fontSize: '11px' }}>
-                          ({r.pnlPct >= 0 ? '+' : ''}{r.pnlPct.toFixed(2)}%)
-                        </div>
+                        {r.pnl == null ? '—' : <>
+                          {r.pnl >= 0 ? '+' : ''}{formatCurrency(r.pnl)}
+                          <div style={{ fontSize: '11px' }}>
+                            ({fmtPct(r.pnlPct, 2)})
+                          </div>
+                        </>}
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <WeightBar value={r.weight} max={maxWeight} /> <span style={{ marginLeft: 6 }}>{r.weight.toFixed(1)}%</span>

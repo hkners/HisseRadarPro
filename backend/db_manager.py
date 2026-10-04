@@ -471,9 +471,16 @@ class ReportDBManager:
             query += " AND UPPER(broker) LIKE UPPER(?)"
             params.append(f"%{broker.strip()}%")
 
+        rating_category = None
         if rating and rating.strip():
-            query += " AND UPPER(rating) LIKE UPPER(?)"
-            params.append(f"%{rating.strip()}%")
+            if rating.strip().upper() in ("AL", "TUT", "SAT"):
+                # Category filter through the shared parser ("Endeks Üstü" is AL, "Endekse Paralel" is not).
+                rating_category = rating.strip().upper()
+                query += " AND rating_cat(rating) = ?"
+                params.append(rating_category)
+            else:
+                query += " AND UPPER(rating) LIKE UPPER(?)"
+                params.append(f"%{rating.strip()}%")
 
         if min_upside is not None:
             query += " AND potansiyel >= ?"
@@ -497,6 +504,9 @@ class ReportDBManager:
             params.append(int(offset))
 
         with self._get_connection() as conn:
+            if rating_category:
+                from services.ticker_resolver import parse_rating
+                conn.create_function("rating_cat", 1, parse_rating, deterministic=True)
             cursor = conn.cursor()
             cursor.execute(query, params)
             rows = cursor.fetchall()
@@ -830,41 +840,71 @@ class ReportDBManager:
     # --- User Portfolio Methods ---
     PORTFOLIO_ACCOUNTS = ("real", "paper")
 
+    def _replay_transactions(self, account: Optional[str] = None) -> Dict[tuple, Dict[str, float]]:
+        """Average-cost replay of every transaction, per (ticker, account).
+        A sale realises (sale price - average cost) x quantity. A sale larger than the position is
+        capped at the position (the API rejects such sales; this guards older data)."""
+        book: Dict[tuple, Dict[str, float]] = {}
+        for tx in self.get_portfolio_transactions(account):
+            key = (tx['ticker'], tx.get('account') or 'real')
+            pos = book.setdefault(key, {'quantity': 0.0, 'total_cost': 0.0, 'realized': 0.0, 'sold_qty': 0.0})
+            qty = float(tx['quantity'])
+            price = float(tx['price'])
+            if tx['tx_type'] == 'BUY':
+                pos['quantity'] += qty
+                pos['total_cost'] += qty * price
+            elif tx['tx_type'] == 'SELL' and pos['quantity'] > 1e-9:
+                sold = min(qty, pos['quantity'])
+                avg_cost = pos['total_cost'] / pos['quantity']
+                pos['realized'] += sold * (price - avg_cost)
+                pos['sold_qty'] += sold
+                pos['quantity'] -= sold
+                pos['total_cost'] -= sold * avg_cost
+        return book
+
     def get_user_portfolio(self, account: Optional[str] = None) -> List[Dict[str, Any]]:
         """Open positions derived from transactions, one row per (ticker, account).
         account: 'real' | 'paper' | None (both)."""
-        transactions = self.get_portfolio_transactions(account)
-
-        portfolio: Dict[tuple, Dict[str, float]] = {}
-        for tx in transactions:
-            key = (tx['ticker'], tx.get('account') or 'real')
-            if key not in portfolio:
-                portfolio[key] = {'quantity': 0, 'total_cost': 0}
-
-            qty = float(tx['quantity'])
-            price = float(tx['price'])
-
-            if tx['tx_type'] == 'BUY':
-                portfolio[key]['quantity'] += qty
-                portfolio[key]['total_cost'] += (qty * price)
-            elif tx['tx_type'] == 'SELL':
-                if portfolio[key]['quantity'] > 0:
-                    avg_cost = portfolio[key]['total_cost'] / portfolio[key]['quantity']
-                    portfolio[key]['quantity'] -= qty
-                    portfolio[key]['total_cost'] -= (qty * avg_cost)
-
-        # Filter out closed positions and calculate average cost
         result = []
-        for (t, acc), data in portfolio.items():
+        for (t, acc), data in self._replay_transactions(account).items():
             if data['quantity'] > 1e-9:
                 result.append({
                     'ticker': t,
                     'account': acc,
                     'quantity': data['quantity'],
-                    'cost': data['total_cost'] / data['quantity']
+                    'cost': data['total_cost'] / data['quantity'],
+                    'realized_pnl': data['realized'],
                 })
-
         return result
+
+    def get_realized_pnl(self, account: Optional[str] = None) -> Dict[str, Any]:
+        """Realised profit/loss from sales, including fully closed positions."""
+        rows = [
+            {'ticker': t, 'account': acc, 'realized_pnl': d['realized'], 'sold_quantity': d['sold_qty'],
+             'open_quantity': d['quantity']}
+            for (t, acc), d in self._replay_transactions(account).items() if d['sold_qty'] > 0
+        ]
+        return {'total': sum(r['realized_pnl'] for r in rows), 'rows': sorted(rows, key=lambda r: r['realized_pnl'])}
+
+    def holdings_as_of(self, account: str, extra: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
+        """Replays the account's transactions plus `extra` in date order and returns an error message
+        if any sale exceeds the quantity held at that moment, otherwise None."""
+        txs = [dict(t, _order=(str(t['tx_date'])[:10], 0, t['id'])) for t in self.get_portfolio_transactions(account)]
+        for i, t in enumerate(extra or []):
+            txs.append(dict(t, _order=(str(t.get('tx_date') or '')[:10], 1, i)))
+        held: Dict[str, float] = {}
+        for t in sorted(txs, key=lambda x: x['_order']):
+            tk = str(t['ticker']).upper()
+            qty = float(t['quantity'])
+            if str(t['tx_type']).upper() == 'BUY':
+                held[tk] = held.get(tk, 0.0) + qty
+            else:
+                have = held.get(tk, 0.0)
+                if qty > have + 1e-9:
+                    n = lambda v: f"{v:.4f}".rstrip("0").rstrip(".").replace(".", ",")
+                    return f"{tk}: {t['_order'][0]} tarihinde elde {n(have)} adet varken {n(qty)} adet satış girilemez."
+                held[tk] = have - qty
+        return None
 
     def get_portfolio_transactions(self, account: Optional[str] = None) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
