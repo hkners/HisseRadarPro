@@ -3,6 +3,7 @@ import { ShieldAlert } from 'lucide-react';
 import PageContainer from '../components/common/PageContainer';
 import { PillTabs, StatTile, TickerCell, Button, EmptyState, InfoTip } from '../components/ui';
 import { fmtNum, fmtPct } from '../utils/format';
+import { FactorsView, HedgesView } from '../components/analytics/FactorViews';
 import { trSector } from '../utils/sectors';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -13,6 +14,8 @@ const TABS = [
   { id: 'concentration', label: 'Yoğunlaşma' },
   { id: 'correlation', label: 'Korelasyon' },
   { id: 'scenarios', label: 'Senaryolar' },
+  { id: 'factors', label: 'Faktörler' },
+  { id: 'hedges', label: 'Hedge önerileri' },
   { id: 'optimization', label: 'Optimizasyon' },
 ];
 
@@ -263,6 +266,18 @@ export default function Analytics() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('overview');
+  const [factors, setFactors] = useState(null);
+  const [factorsRequested, setFactorsRequested] = useState(false);
+
+  // Factor and hedge analysis needs the full price matrix, so it is loaded only when one of its tabs opens.
+  useEffect(() => {
+    if (factorsRequested || (tab !== 'factors' && tab !== 'hedges')) return;
+    setFactorsRequested(true);
+    fetch(`${API}/portfolio/factors${data?.is_demo ? '?demo=true' : ''}`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(setFactors)
+      .catch(e => setFactors({ empty: true, error: e.message }));
+  }, [tab, factorsRequested, data]);
 
   useEffect(() => {
     fetch(`${API}/portfolio/analytics`)
@@ -275,6 +290,8 @@ export default function Analytics() {
     if (error) return <EmptyState icon={ShieldAlert} title="Analiz yüklenemedi">{error}</EmptyState>;
     if (!data) return <div className="text-muted" style={{ padding: 16 }}>Risk analizi hesaplanıyor…</div>;
     if (data.empty) return <EmptyState icon={ShieldAlert} title="Analiz için pozisyon yok" actions={<Button variant="primary" to="/portfolio">Portföye hisse ekle</Button>} />;
+    if (tab === 'factors') return <FactorsView f={factors} />;
+    if (tab === 'hedges') return <HedgesView f={factors} />;
     const views = { overview: Overview, positions: Positions, concentration: Concentration, correlation: Correlation, scenarios: Scenarios, optimization: Optimization };
     const View = views[tab];
     return <View d={data} />;

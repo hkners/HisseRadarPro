@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, RotateCcw, Save, History, Search, X, AlertTriangle } from 'lucide-react';
+import { Plus, RotateCcw, Save, History, Search, X, AlertTriangle, FileDown } from 'lucide-react';
+import { exportTables } from '../utils/download';
 import PageContainer from '../components/common/PageContainer';
 import FavoriteStar from '../components/common/FavoriteStar';
 import ImageWithFallback from '../components/ImageWithFallback';
@@ -201,6 +202,27 @@ export default function UnifiedScreener() {
             }}
           >
             <History size={13} /> Backtest et
+          </Button>
+          <Button
+            title="Taramanın tüm sonuçlarını Excel'e indir"
+            disabled={!sorted.length}
+            onClick={() => exportTables('hisseradar-tarama', 'Tarayıcı sonuçları', [{
+              name: 'Tarama',
+              columns: [
+                { key: 'ticker', label: 'Hisse' }, { key: 'name', label: 'Şirket' }, { key: 'sector_tr', label: 'Sektör' },
+                { key: 'market_cap', label: 'Piyasa değeri (TL)', format: 'int' }, { key: 'price', label: 'Fiyat', format: 'num' },
+                { key: 'change_pct', label: 'Gün %', format: 'pct100' }, { key: 'pe', label: 'F/K', format: 'num' },
+                { key: 'pb', label: 'PD/DD', format: 'num' }, { key: 'div_yield', label: 'Temettü %', format: 'pct100' },
+                { key: 'roe', label: 'ROE %', format: 'pct100' }, { key: 'broker_count', label: 'Kurum', format: 'int' },
+                { key: 'upside', label: 'Kurum potansiyeli %', format: 'pct100' }, { key: 'model_count', label: 'Model portföy', format: 'int' },
+                { key: 'r1m', label: '1A %', format: 'pct100' }, { key: 'r3m', label: '3A %', format: 'pct100' }, { key: 'r1y', label: '1Y %', format: 'pct100' },
+                { key: 'dist_52w_high', label: '52H zirveye %', format: 'pct100' }, { key: 'rsi14', label: 'RSI', format: 'num' },
+                { key: 'vol30', label: 'Volatilite %', format: 'pct100' }, { key: 'score', label: 'Karar skoru', format: 'int' },
+              ],
+              rows: sorted.map(r => ({ ...r, sector_tr: trSector(r.sector) })),
+            }]).catch(e => setError(e.message))}
+          >
+            <FileDown size={13} /> Excel
           </Button>
         </>
       }

@@ -2,6 +2,7 @@ import React from 'react';
 import FootballField from './FootballField';
 import { fmtPrice, fmtPct, upsidePct } from './valuationModel';
 import { InfoTip } from '../ui';
+import ModelPanel from './ModelPanel';
 
 function ScoreRow({ label, value, hint }) {
   return (
@@ -12,7 +13,7 @@ function ScoreRow({ label, value, hint }) {
   );
 }
 
-export default function ValuationTab({ price, rows, valuation, consensus }) {
+export default function ValuationTab({ ticker, price, rows, valuation, consensus }) {
   const score = valuation?.score;
   const ratings = consensus?.ratings || { AL: 0, TUT: 0, SAT: 0 };
   const totalRatings = ratings.AL + ratings.TUT + ratings.SAT;
@@ -64,6 +65,8 @@ export default function ValuationTab({ price, rows, valuation, consensus }) {
             </table>
           </div>
         </div>
+
+        {ticker && <ModelPanel ticker={ticker} />}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

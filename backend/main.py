@@ -202,6 +202,10 @@ from routers.copilot import router as copilot_router
 app.include_router(copilot_router)
 from routers.studio import router as studio_router
 app.include_router(studio_router)
+from routers.export import router as export_router
+app.include_router(export_router)
+from routers.baskets import router as baskets_router
+app.include_router(baskets_router)
 
 
 # --- Health check (stays in main) ---

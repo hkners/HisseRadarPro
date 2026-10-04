@@ -116,6 +116,13 @@ def get_portfolio_analytics(demo: bool = False, account: Optional[str] = Query(N
     return compute_portfolio_analytics(demo=demo, account=_account(account))
 
 
+@router.get("/factors")
+def get_portfolio_factors(demo: bool = False, account: Optional[str] = Query(None)):
+    """Factor exposures, return attribution and hedge ideas (first call builds the price matrix, ~20s)."""
+    from services.portfolio_factors import compute
+    return compute(account=_account(account), demo=demo)
+
+
 @router.get("")
 def get_portfolio(account: Optional[str] = Query(None)):
     report_repo, price_service = _get_deps()

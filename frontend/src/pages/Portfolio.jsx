@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis } from 'recharts';
-import { Upload } from 'lucide-react';
+import { Upload, FileDown } from 'lucide-react';
+import { exportTables } from '../utils/download';
 import { WeightBar, TickerCell, PillTabs, Chip } from '../components/ui';
 import ImportCsvModal from '../components/ImportCsvModal';
 
@@ -320,6 +321,23 @@ export default function Portfolio() {
           <PillTabs tabs={ACCOUNT_TABS} value={account} onChange={setAccount} />
           <button className="btn" onClick={() => setShowImport(true)}>
             <Upload size={13} /> CSV içe aktar
+          </button>
+          <button
+            className="btn"
+            disabled={!portfolioData.rows.length}
+            onClick={() => exportTables('portfoy', `Portföy · ${ACCOUNT_TABS.find(t => t.id === account)?.label}`, [{
+              name: 'Pozisyonlar',
+              columns: [
+                { key: 'ticker', label: 'Hisse' }, { key: 'name', label: 'Şirket' }, { key: 'account_label', label: 'Hesap' },
+                { key: 'quantity', label: 'Adet', format: 'num' }, { key: 'avgCost', label: 'Ortalama maliyet', format: 'num' },
+                { key: 'livePrice', label: 'Güncel fiyat', format: 'num' }, { key: 'marketValue', label: 'Piyasa değeri', format: 'num' },
+                { key: 'pnl', label: 'Kâr / zarar (TL)', format: 'num' }, { key: 'pnlPct', label: 'Kâr / zarar %', format: 'pct100' },
+                { key: 'weight', label: 'Ağırlık %', format: 'pct100' },
+              ],
+              rows: portfolioData.rows.map(r => ({ ...r, account_label: ACCOUNT_LABEL[r.account] })),
+            }]).catch(console.error)}
+          >
+            <FileDown size={13} /> Excel
           </button>
           <button
             onClick={() => {

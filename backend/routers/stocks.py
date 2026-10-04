@@ -2,7 +2,10 @@
 Stocks Router
 Handles /api/stocks, /api/stocks/{ticker}, /api/stocks/{ticker}/fundamentals, /api/stocks/{ticker}/history
 """
-from fastapi import APIRouter, HTTPException
+from typing import Dict, Optional
+
+from fastapi import APIRouter, HTTPException, Response
+from pydantic import BaseModel
 import logging
 import time
 
@@ -485,3 +488,40 @@ def get_stock_score_breakdown(ticker: str):
         }
     }
 
+
+
+class ModelOverrides(BaseModel):
+    overrides: Dict[str, Optional[float]] = {}
+
+
+@router.get("/stocks/{ticker}/model")
+def get_valuation_model(ticker: str):
+    """Intrinsic value model (DCF for non-financials, justified P/B for financials) with sources and reverse model."""
+    from services.dcf_service import build_model
+    return build_model(ticker.replace(".IS", "").upper())
+
+
+@router.post("/stocks/{ticker}/model")
+def run_valuation_model(ticker: str, body: ModelOverrides):
+    """Same model with user overrides ("Senin tezin"); returns base and thesis side by side."""
+    from services.dcf_service import build_model
+    clean = {k: v for k, v in (body.overrides or {}).items() if v is not None}
+    return build_model(ticker.replace(".IS", "").upper(), clean or None)
+
+
+@router.post("/stocks/{ticker}/model.xlsx")
+def export_valuation_model(ticker: str, body: ModelOverrides):
+    """Live Excel workbook of the model; uses the thesis inputs when overrides are given."""
+    from services.dcf_service import build_model
+    from services.excel_export import build_model_workbook
+    t = ticker.replace(".IS", "").upper()
+    clean = {k: v for k, v in (body.overrides or {}).items() if v is not None}
+    m = build_model(t, clean or None)
+    if not m.get("model_ok"):
+        raise HTTPException(status_code=422, detail=m.get("model_note") or "Model kurulamadı.")
+    data = build_model_workbook(m, use_thesis=bool(clean))
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{t}-degerleme-modeli.xlsx"'},
+    )

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Briefcase, History } from 'lucide-react';
+import { ChevronDown, ChevronRight, Briefcase, History, FileDown } from 'lucide-react';
+import { exportTables } from '../utils/download';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import PageContainer from '../components/common/PageContainer';
 import { PillTabs, Chip, Button, InfoTip } from '../components/ui';
@@ -8,6 +9,7 @@ import { fetchWithCache } from '../utils/apiCache';
 import { fmtPct, signClass } from '../utils/format';
 import { seriesPalette } from '../theme';
 import { encodeSpec } from './backtest/strategy';
+import Baskets from './strategies/Baskets';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 const FOLLOW_KEY = 'hr.followed.strategies';
@@ -36,6 +38,7 @@ export default function Strategies() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('all');
+  const [section, setSection] = useState('strategies');
   const [open, setOpen] = useState(null);
   const [followed, setFollowed] = useState(readFollowed);
   const [notice, setNotice] = useState('');
@@ -75,17 +78,35 @@ export default function Strategies() {
     <PageContainer
       title="Strateji Merkezi"
       badge={data ? `${data.strategies.length} strateji` : undefined}
-      subtitle="Kurallı stratejilerin geçmiş performansı ve bugünkü pozisyonları. Beğendiğini takip et ya da kâğıt portföyde dene."
-      headerRight={
+      subtitle="Kurallı stratejiler ve tematik sepetler: geçmiş performans ve bugünkü pozisyonlar. Beğendiğini takip et ya da kâğıt portföyde dene."
+      headerRight={section === 'strategies' && (
         <>
           <PillTabs tabs={[{ id: 'all', label: 'Tüm stratejiler' }, { id: 'followed', label: `Takip ettiklerim (${followed.size})` }]} value={tab} onChange={setTab} />
+          <Button
+            disabled={!data}
+            onClick={() => exportTables('strateji-merkezi', 'Strateji Merkezi · backtest sonuçları', [{
+              name: 'Stratejiler',
+              columns: [
+                { key: 'name', label: 'Strateji' }, { key: 'tag', label: 'Tür' }, { key: 'start', label: 'Başlangıç' },
+                { key: 'cagr', label: 'Yıllık getiri', format: 'pct' }, { key: 'benchmark_cagr', label: 'Kıyas yıllık getiri', format: 'pct' },
+                { key: 'excess_cagr', label: 'Kıyasa göre fark', format: 'pct' }, { key: 'max_drawdown', label: 'Maks. düşüş', format: 'pct' },
+                { key: 'volatility', label: 'Volatilite', format: 'pct' }, { key: 'ytd', label: 'Yılbaşından beri', format: 'pct' },
+                { key: 'rebalance', label: 'Dengeleme' }, { key: 'holdings_text', label: 'Bugünkü pozisyonlar' },
+              ],
+              rows: data.strategies.map(s => ({ ...s, holdings_text: s.holdings.join(', ') || 'Nakit' })),
+            }]).catch(e => setError(e.message))}
+          >
+            <FileDown size={13} /> Excel
+          </Button>
           <Button variant="outline-gold" to="/backtest"><History size={13} /> Kendi stratejini kur</Button>
         </>
-      }
+      )}
       scrollable
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 16 }}>
+        <div><PillTabs tabs={[{ id: 'strategies', label: 'Stratejileri takip et' }, { id: 'baskets', label: 'Sepetleri takip et' }]} value={section} onChange={setSection} /></div>
         {notice && <div className="notice"><span>{notice}</span><Button size="sm" variant="ghost" onClick={() => setNotice('')}>Kapat</Button></div>}
+        {section === 'baskets' ? <Baskets onNotice={setNotice} /> : (<>
         {error && <div className="notice" style={{ borderColor: 'rgba(192, 82, 78, 0.5)', background: 'var(--negative-tint)' }}>Stratejiler yüklenemedi: {error}</div>}
         {!data && !error && <div className="text-muted">Stratejiler hesaplanıyor… İlk açılışta yarım dakika kadar sürebilir.</div>}
 
@@ -186,6 +207,7 @@ export default function Strategies() {
           Tüm getiriler kuralların geçmiş fiyatlara uygulandığı backtest sonuçlarıdır; canlı işlem kaydı değildir. Nominal TL cinsindendir, işlem maliyeti (%0,20) düşülmüştür.
           Borsadan çıkmış hisseler veri setinde olmadığı için sonuçlar gerçekte olacağından iyi görünebilir. Yatırım tavsiyesi değildir.
         </p>
+        </>)}
       </div>
     </PageContainer>
   );

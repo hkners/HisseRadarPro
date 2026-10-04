@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Trash2, Sparkles, ArrowRight, Briefcase, ArrowLeftRight } from 'lucide-react';
+import { Plus, Search, Trash2, Sparkles, ArrowRight, Briefcase, ArrowLeftRight, Layers } from 'lucide-react';
 import { Button, StatTile, Chip, InfoTip } from '../components/ui';
 import { fetchWithCache } from '../utils/apiCache';
 import { fmtNum, fmtPct, signClass } from '../utils/format';
@@ -31,7 +31,7 @@ function ImpactBar({ value }) {
   );
 }
 
-function Result({ r, onPaper, paperMsg }) {
+function Result({ r, onPaper, paperMsg, onSaveBasket }) {
   const navigate = useNavigate();
   const maxW = Math.max(...r.allocation.map(a => a.weight || 0), 0.01);
   return (
@@ -95,6 +95,7 @@ function Result({ r, onPaper, paperMsg }) {
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12, flexWrap: 'wrap' }}>
           <Button variant="primary" onClick={onPaper} disabled={!r.allocation.length}><Briefcase size={13} /> Kâğıt portföye aktar (100.000 TL)</Button>
+          <Button onClick={onSaveBasket} disabled={!r.allocation.length}><Layers size={13} /> Sepet olarak kaydet ve takip et</Button>
           <Button onClick={() => navigate(`/compare?t=${[...r.allocation.slice(0, 3).map(a => a.ticker), 'XU100'].join(',')}&d=365`)}><ArrowLeftRight size={13} /> İlk üçü XU100 ile karşılaştır</Button>
         </div>
         {paperMsg && <div className="notice" style={{ marginTop: 10, justifyContent: 'center' }}>{paperMsg}</div>}
@@ -191,6 +192,23 @@ export default function Studio() {
     setPaperMsg(r.ok ? `${transactions.length} hisse tez ağırlıklarıyla kâğıt hesaba eklendi.` : 'Kâğıt hesaba eklenemedi.');
   };
 
+  const saveBasket = async () => {
+    const res = active?.result;
+    if (!res?.allocation?.length) return;
+    const r = await fetch(`${API}/baskets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: res.title.slice(0, 80),
+        description: (res.summary || active.thesis).slice(0, 400),
+        tickers: res.allocation.map(a => a.ticker),
+        weights: res.allocation.map(a => a.weight),
+        source: 'studio',
+      }),
+    });
+    setPaperMsg(r.ok ? 'Sepet kaydedildi. Strateji Merkezi > Sepetleri takip et bölümünden izleyebilirsin.' : 'Sepet kaydedilemedi.');
+  };
+
   const remove = (id) => { const next = theses.filter(t => t.id !== id); setTheses(next); storeTheses(next); if (id === activeId) setActiveId(null); };
   const filtered = useMemo(() => theses.filter(t => (t.title + t.thesis).toLocaleLowerCase('tr').includes(query.toLocaleLowerCase('tr'))), [theses, query]);
 
@@ -219,7 +237,7 @@ export default function Studio() {
         {active ? (
           <>
             <div className="text-muted" style={{ fontSize: 12, marginBottom: 6 }}>Tez: "{active.thesis}" · {active.at}</div>
-            <Result r={active.result} onPaper={toPaper} paperMsg={paperMsg} />
+            <Result r={active.result} onPaper={toPaper} paperMsg={paperMsg} onSaveBasket={saveBasket} />
           </>
         ) : (
           <div style={{ maxWidth: 760, margin: '0 auto', width: '100%', paddingTop: 30 }}>

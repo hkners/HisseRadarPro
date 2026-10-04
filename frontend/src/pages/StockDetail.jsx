@@ -657,7 +657,7 @@ export default function StockDetail() {
       {/* ─── TAB: DEĞERLEME ─── */}
       {activeTab === 'degerleme' && (
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingBottom: 12 }}>
-          <ValuationTab price={livePrice} rows={valuationRows} valuation={valuation} consensus={consensus} />
+          <ValuationTab ticker={ticker} price={livePrice} rows={valuationRows} valuation={valuation} consensus={consensus} />
         </div>
       )}
 

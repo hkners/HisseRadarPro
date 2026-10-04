@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowUp, Plus, Trash2, Play, Search, Briefcase, AlertTriangle, History } from 'lucide-react';
+import { ArrowUp, Plus, Trash2, Play, Search, Briefcase, AlertTriangle, History, FileDown } from 'lucide-react';
+import { exportTables } from '../utils/download';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import { Button, PillTabs, StatTile, Chip, InfoTip, TickerCell } from '../components/ui';
 import { fetchWithCache } from '../utils/apiCache';
@@ -277,6 +278,24 @@ export default function Backtest() {
     setPaperMsg(r.ok ? `${transactions.length} hisse 100.000 TL'lik eşit ağırlıklı olarak kâğıt hesaba eklendi.` : 'Kâğıt hesaba eklenemedi.');
   };
 
+  const exportResult = () => {
+    if (!result) return;
+    const m0 = result.metrics, b0 = result.benchmark_metrics;
+    const metricRows = [
+      ['Yıllık getiri', 'cagr'], ['Toplam getiri', 'total_return'], ['Yıllık volatilite', 'volatility'], ['Maksimum düşüş', 'max_drawdown'],
+      ['En iyi ay', 'best_month'], ['En kötü ay', 'worst_month'], ['Pozitif ay oranı', 'positive_months'], ['Yılbaşından beri', 'ytd'],
+    ].map(([label, k]) => ({ label, strategy: m0[k], benchmark: b0[k] }));
+    metricRows.push({ label: 'Sharpe', strategy: m0.sharpe, benchmark: b0.sharpe });
+    const monthly = Object.entries(result.monthly).map(([year, months]) => ({ year, ...Object.fromEntries(MONTHS.map((_, i) => [`m${i + 1}`, months[String(i + 1)] ?? null])) }));
+    exportTables(`backtest-${(spec?.name || 'strateji').replace(/\s+/g, '-')}`, `${spec?.name || 'Backtest'} · ${result.start} – ${result.end}`, [
+      { name: 'Özet', columns: [{ key: 'label', label: 'Ölçüt' }, { key: 'strategy', label: 'Strateji', format: 'pct' }, { key: 'benchmark', label: result.benchmark_name, format: 'pct' }], rows: metricRows },
+      { name: 'Kural', columns: [{ key: 'text', label: 'Açıklama' }], rows: [{ text: describeSpec(spec, factors) }, ...result.assumptions.map(a => ({ text: a })), ...result.warnings.map(w => ({ text: `Uyarı: ${w}` }))] },
+      { name: 'Aylık getiriler', columns: [{ key: 'year', label: 'Yıl' }, ...MONTHS.map((mo, i) => ({ key: `m${i + 1}`, label: mo, format: 'pct' }))], rows: monthly },
+      { name: 'Büyüme eğrisi', columns: [{ key: 'date', label: 'Tarih' }, { key: 'strategy', label: 'Strateji (100 tabanlı)', format: 'num' }, { key: 'benchmark', label: `${result.benchmark_name} (100 tabanlı)`, format: 'num' }, { key: 'drawdown', label: 'Düşüş', format: 'pct' }], rows: result.series },
+      { name: 'Dengelemeler', columns: [{ key: 'date', label: 'Tarih' }, { key: 'holdings_text', label: 'Pozisyonlar' }, { key: 'turnover', label: 'Devir', format: 'pct' }], rows: result.rebalances.map(r => ({ ...r, holdings_text: r.holdings.join(', ') || 'Nakit' })) },
+    ]).catch(e => setError(e.message));
+  };
+
   const filteredSaved = useMemo(() => saved.filter(s => s.name.toLocaleLowerCase('tr').includes(query.toLocaleLowerCase('tr'))), [saved, query]);
   const m = result?.metrics;
   const b = result?.benchmark_metrics;
@@ -415,7 +434,7 @@ export default function Backtest() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12, alignItems: 'start' }}>
                   <div className="panel" style={{ marginBottom: 0 }}>
                     <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>Son dengeleme · {result.last_holdings?.date}</span>
+                      <span>Son dengeleme · {result.last_holdings?.date} <button type="button" className="btn btn-sm btn-ghost" onClick={exportResult} title="Tüm sonuçları Excel'e indir"><FileDown size={12} /> Excel</button></span>
                       {result.spec.kind === 'rank' && result.last_holdings?.holdings?.length > 0 && (
                         <Button size="sm" variant="outline-gold" onClick={toPaper}><Briefcase size={12} /> Kâğıt portföye aktar</Button>
                       )}
