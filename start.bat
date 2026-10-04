@@ -8,11 +8,11 @@ echo [1/3] Backend baslatiliyor (Port 8015)...
 start "HisseRadarPro Backend" cmd /k "cd backend && python main.py"
 
 :: Short pause to let backend start up before frontend
-timeout /t 2 /nobreak >nul
+ping 127.0.0.1 -n 3 >nul
 
 :: Start Frontend (Vite Dev Server)
 echo [2/3] Frontend baslatiliyor (Vite - Port 5173)...
-start "HisseRadarPro Frontend" cmd /k "cd frontend && npm run dev"
+start "HisseRadarPro Frontend" cmd /k "cd frontend && npm.cmd run dev"
 
 echo.
 echo ==============================================
