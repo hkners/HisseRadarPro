@@ -46,11 +46,11 @@ export default function BrokerageDetail() {
     const str = String(pot);
     const num = parseFloat(str.replace('%', '').replace(',', '.'));
     if (isNaN(num)) return 'var(--text-muted)';
-    if (num > 50) return '#00ff00';
-    if (num > 20) return '#55cc55';
-    if (num > 0) return '#88aa88';
-    if (num < -20) return '#ff0000';
-    if (num < 0) return '#cc5555';
+    if (num > 50) return 'var(--positive)';
+    if (num > 20) return 'var(--positive)';
+    if (num > 0) return 'var(--positive)';
+    if (num < -20) return 'var(--negative)';
+    if (num < 0) return 'var(--negative)';
     return 'var(--color-neutral)';
   };
 
@@ -169,14 +169,14 @@ export default function BrokerageDetail() {
 
   return (
     <PageContainer
-      title={`KURUM ANALİZİ: ${displayName}`}
+      title={displayName}
       badge={{
         label: `${totalRecs} RAPOR`,
-        background: 'rgba(88, 166, 255, 0.12)',
+        background: 'rgba(200, 162, 74, 0.12)',
         color: 'var(--color-neutral)',
-        borderColor: 'rgba(88, 166, 255, 0.3)'
+        borderColor: 'rgba(200, 162, 74, 0.3)'
       }}
-      subtitle={`Eşleşen: ${matchedRecs}/${totalRecs} BIST Hissesi`}
+      subtitle={`${totalRecs} raporun ${matchedRecs} tanesi bir BIST hissesiyle eşleşti.`}
       statusDot="var(--color-neutral)"
       headerRight={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -207,7 +207,7 @@ export default function BrokerageDetail() {
                   padding: '3px 10px',
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border-color)',
-                  color: '#fff',
+                  color: 'var(--text-primary)',
                   borderRadius: '4px',
                   fontSize: '11px',
                   outline: 'none'
@@ -217,42 +217,37 @@ export default function BrokerageDetail() {
                 onClick={() => { setFilter('ALL'); setSearch(''); setCurrentPage(1); }}
                 className={`action-button ${filter === 'ALL' && !search ? 'active' : ''}`}
               >
-                [TÜMÜ]
+                Tümü
               </button>
               <button 
                 onClick={() => { setFilter('POSITIVE'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'POSITIVE' ? 'active-green' : ''}`}
-                style={filter === 'POSITIVE' ? {} : { color: 'var(--color-up)', borderColor: 'rgba(0, 230, 118, 0.3)' }}
               >
-                [POZİTİF POTANSİYEL]
+                Pozitif potansiyel
               </button>
               <button 
                 onClick={() => { setFilter('HIGH_POT'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'HIGH_POT' ? 'active-purple' : ''}`}
-                style={filter === 'HIGH_POT' ? {} : { color: '#b388ff', borderColor: 'rgba(179, 136, 255, 0.3)' }}
               >
-                [YÜKSEK POTANSİYEL (%40+)]
+                Yüksek potansiyel (%40+)
               </button>
               <button 
                 onClick={() => { setFilter('LIVE_ONLY'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'LIVE_ONLY' ? 'active-cyan' : ''}`}
-                style={filter === 'LIVE_ONLY' ? {} : { color: 'var(--color-cyan)', borderColor: 'rgba(0, 229, 255, 0.3)' }}
               >
-                [GÜNCEL FİYATLI]
+                Güncel fiyatlı
               </button>
               <button 
                 onClick={() => { setFilter('FAVORITES'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'FAVORITES' ? 'active-warning' : ''}`}
-                style={filter === 'FAVORITES' ? {} : { color: 'var(--color-warning)', borderColor: 'rgba(255, 170, 0, 0.3)' }}
               >
-                [⭐ FAVORİLER{favorites.length > 0 ? ` (${favorites.length})` : ''}]
+                Favoriler{favorites.length > 0 ? ` (${favorites.length})` : ''}
               </button>
               <button 
                 onClick={() => { setFilter('ALL'); setSearch(''); setCurrentPage(1); }}
                 className="action-button"
-                style={{ color: 'var(--text-muted)' }}
               >
-                [SIFIRLA]
+                Sıfırla
               </button>
             </div>
           </div>
@@ -356,7 +351,7 @@ export default function BrokerageDetail() {
                           <td style={{ textAlign: 'right', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
                             {r.reportPrice !== null ? r.reportPrice.toFixed(2) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: '#fff' }}>
+                          <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
                             {r.targetPrice !== null ? r.targetPrice.toFixed(2) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
@@ -399,7 +394,7 @@ export default function BrokerageDetail() {
                               }}
                               onClick={(e) => { e.stopPropagation(); toggleRow(i); }}
                             >
-                              {isExpanded ? '[KAPAT]' : ((!r.full_text || r.full_text === "Metin bulunamadı.") && !r.pdf_url) ? '[DETAY]' : '[METİN]'}
+                              {isExpanded ? 'Kapat' : ((!r.full_text || r.full_text === "Metin bulunamadı.") && !r.pdf_url) ? 'Detay' : 'Metin'}
                             </button>
                           </td>
                         </tr>
@@ -411,11 +406,11 @@ export default function BrokerageDetail() {
                                   <span>{r.hisse} RAPOR ÖZET VE METNİ ({r.tarih}):</span>
                                   {r.ticker && (
                                     <Link to={`/hisse/${r.ticker}`} className="action-button" style={{ padding: '1px 6px', fontSize: '9.5px', textDecoration: 'none' }}>
-                                      [HİSSE KOKPİTİNE GİT]
+                                      Hisse kokpitine git
                                     </Link>
                                   )}
                                 </div>
-                                <div style={{ color: '#ccc', marginBottom: '8px' }}>
+                                <div style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>
                                   {(!r.full_text || r.full_text === "Metin bulunamadı.") && (!r.metin || r.metin === "Metin bulunamadı.") ? 
                                     <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
                                       Bu veri Fintables üzerinden aracı kurumun hedef fiyat ve model portföy tablolarından otomatik olarak entegre edilmiştir. Aracı kurumun detaylı PDF rapor metnine ulaşılamamaktadır.
@@ -432,7 +427,7 @@ export default function BrokerageDetail() {
                                       className="action-button active-cyan"
                                       style={{ display: 'inline-block', textDecoration: 'none', padding: '3px 8px', fontSize: '10px' }}
                                     >
-                                      [ORİJİNAL KAYNAĞA GİT ↗]
+                                      Orijinal kaynağa git ↗
                                     </a>
                                   </div>
                                 )}

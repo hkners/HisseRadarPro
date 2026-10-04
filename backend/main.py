@@ -190,6 +190,18 @@ from routers.conviction import router as conviction_router
 app.include_router(conviction_router)
 from routers.backtest import router as backtest_router
 app.include_router(backtest_router)
+from routers.universe import router as universe_router
+app.include_router(universe_router)
+from routers.compare import router as compare_router
+app.include_router(compare_router)
+from routers.macro import router as macro_router
+app.include_router(macro_router)
+from routers.strategy_backtest import router as strategy_backtest_router
+app.include_router(strategy_backtest_router)
+from routers.copilot import router as copilot_router
+app.include_router(copilot_router)
+from routers.studio import router as studio_router
+app.include_router(studio_router)
 
 
 # --- Health check (stays in main) ---
@@ -397,7 +409,7 @@ def get_dashboard():
         from services.market_regime_service import market_regime_service
         market_regime_data = market_regime_service.get_current_regime(all_prices=all_prices)
     except Exception as e:
-        market_regime_data = {"regime": "NEUTRAL", "exposure_multiplier": 1.0, "color": "#ffab00"}
+        market_regime_data = {"regime": "NEUTRAL", "exposure_multiplier": 1.0, "color": "#C9883A"}
 
     result = {
         "kurum_stats": kurum_stats,
@@ -424,7 +436,7 @@ def api_get_market_regime():
         all_prices = price_service.prices if price_service else {}
         return market_regime_service.get_current_regime(all_prices=all_prices)
     except Exception as e:
-        return {"error": str(e), "regime": "NEUTRAL", "exposure_multiplier": 1.0, "color": "#ffab00"}
+        return {"error": str(e), "regime": "NEUTRAL", "exposure_multiplier": 1.0, "color": "#C9883A"}
 
 
 if __name__ == "__main__":

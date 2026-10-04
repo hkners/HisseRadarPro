@@ -99,13 +99,13 @@ class ViopService:
                 trend_color = "var(--color-up)"
             elif spot_change > 0 and aps_change_pct < -5:
                 trend = "SHORT COVERING"
-                trend_color = "#4ade80"
+                trend_color = "#3F8A6B"
             elif spot_change < 0 and aps_change_pct > 5:
                 trend = "STRONG SHORT (New Sellers)"
                 trend_color = "var(--color-red)"
             elif spot_change < 0 and aps_change_pct < -5:
                 trend = "LONG LIQUIDATION"
-                trend_color = "#f87171"
+                trend_color = "#C0524E"
 
             results.append({
                 "contract": f"F_{ticker}{contract_month_str}",

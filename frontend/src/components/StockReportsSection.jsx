@@ -202,7 +202,7 @@ export default function StockReportsSection({
         {stats && (
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', fontSize: '10px' }}>
             <span style={{ color: 'var(--text-muted)' }}>
-              Ort: <strong style={{ color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{stats.avgTarget ? stats.avgTarget.toFixed(1) + ' TL' : '-'}</strong>
+              Ort: <strong style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{stats.avgTarget ? stats.avgTarget.toFixed(1) + ' TL' : '-'}</strong>
               {stats.avgPotential !== null && (
                 <span style={{ color: stats.avgPotential >= 0 ? 'var(--color-up)' : 'var(--color-down)', marginLeft: '3px', fontWeight: 'bold' }}>
                   ({stats.avgPotential >= 0 ? '+' : ''}{stats.avgPotential.toFixed(0)}%)
@@ -211,7 +211,7 @@ export default function StockReportsSection({
             </span>
 
             {stats.modelCount > 0 && (
-              <span style={{ background: 'rgba(255,171,0,0.15)', color: '#ffab00', border: '1px solid rgba(255,171,0,0.3)', padding: '0 4px', borderRadius: '2px', fontWeight: 'bold' }}>
+              <span style={{ background: 'rgba(201, 136, 58, 0.15)', color: 'var(--warning)', border: '1px solid rgba(201, 136, 58, 0.3)', padding: '0 4px', borderRadius: '2px', fontWeight: 'bold' }}>
                 {stats.modelCount} Model
               </span>
             )}
@@ -349,7 +349,7 @@ export default function StockReportsSection({
                   const brokerSlug = slugifyBroker(r.kurum);
                   const isBest = i === bestIdx && filteredReports.length > 1;
                   const isWorst = i === worstIdx && filteredReports.length > 1 && bestIdx !== worstIdx;
-                  const rowBg = isBest ? 'rgba(0, 200, 83, 0.07)' : isWorst ? 'rgba(255, 50, 50, 0.07)' : undefined;
+                  const rowBg = isBest ? 'rgba(63, 138, 107, 0.07)' : isWorst ? 'rgba(192, 82, 78, 0.07)' : undefined;
 
                   return (
                     <Fragment key={i}>
@@ -373,7 +373,7 @@ export default function StockReportsSection({
                               {r.kurum}
                             </Link>
                             {r.is_model && (
-                              <span style={{ fontSize: '7.5px', fontWeight: 'bold', background: 'rgba(255,171,0,0.15)', color: '#ffab00', border: '1px solid rgba(255,171,0,0.3)', padding: '0 2px', borderRadius: '2px', flexShrink: 0 }}>
+                              <span style={{ fontSize: '7.5px', fontWeight: 'bold', background: 'rgba(201, 136, 58, 0.15)', color: 'var(--warning)', border: '1px solid rgba(201, 136, 58, 0.3)', padding: '0 2px', borderRadius: '2px', flexShrink: 0 }}>
                                 MOD
                               </span>
                             )}
@@ -384,7 +384,7 @@ export default function StockReportsSection({
                           {r.tarih ? r.tarih.slice(5) : '-'}
                           {r.tarih && (() => {
                             const age = (new Date() - new Date(r.tarih)) / (1000 * 60 * 60 * 24);
-                            if (age <= 30) return <span style={{ fontSize: '7px', background: 'rgba(0,255,136,0.15)', color: '#00ff88', padding: '1px 3px', borderRadius: '2px', marginLeft: '3px', fontWeight: 'bold' }}>T</span>;
+                            if (age <= 30) return <span style={{ fontSize: '7px', background: 'rgba(63, 138, 107, 0.15)', color: 'var(--positive)', padding: '1px 3px', borderRadius: '2px', marginLeft: '3px', fontWeight: 'bold' }}>T</span>;
                             return null;
                           })()}
                         </td>
@@ -395,7 +395,7 @@ export default function StockReportsSection({
                           </td>
                         )}
 
-                        <td style={{ fontWeight: '700', color: '#fff', textAlign: 'right', fontSize: '11px', fontVariantNumeric: 'tabular-nums', padding: compactMode ? '4px 3px' : '6px 8px' }}>
+                        <td style={{ fontWeight: '700', color: 'var(--text-primary)', textAlign: 'right', fontSize: '11px', fontVariantNumeric: 'tabular-nums', padding: compactMode ? '4px 3px' : '6px 8px' }}>
                           {targetPrice !== null ? targetPrice.toFixed(1) : '-'}
                         </td>
 
@@ -430,13 +430,13 @@ export default function StockReportsSection({
                       {isExpanded && (
                         <tr className="accordion-row">
                           <td colSpan={compactMode ? 5 : 7}>
-                            <div className="accordion-content" style={{ padding: '10px 12px', background: 'rgba(10, 14, 20, 0.98)', borderTop: '1px solid rgba(0, 229, 255, 0.2)' }}>
+                            <div className="accordion-content" style={{ padding: '10px 12px', background: 'rgba(10, 14, 20, 0.98)', borderTop: '1px solid rgba(200, 162, 74, 0.2)' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                                 <div style={{ color: 'var(--text-highlight)', fontWeight: 'bold', fontSize: '11px' }}>
                                   {r.kurum.toUpperCase()} ({r.tarih}):
                                 </div>
                                 {r.tavsiye && (
-                                  <span style={{ fontSize: '10px', fontWeight: 'bold', background: 'rgba(0, 229, 255, 0.1)', color: 'var(--color-cyan)', padding: '1px 6px', borderRadius: '3px' }}>
+                                  <span style={{ fontSize: '10px', fontWeight: 'bold', background: 'rgba(200, 162, 74, 0.1)', color: 'var(--color-cyan)', padding: '1px 6px', borderRadius: '3px' }}>
                                     {r.tavsiye}
                                   </span>
                                 )}
@@ -455,7 +455,7 @@ export default function StockReportsSection({
                               {r.pdf_url && (
                                 <div style={{ marginBottom: '8px' }}>
                                   <a href={r.pdf_url} target="_blank" rel="noreferrer" className="ticker-link text-neutral" style={{ fontSize: '11px' }}>
-                                    [ORİJİNAL RAPORU AÇ / PDF ↗]
+                                    Orijinal raporu aç / PDF ↗
                                   </a>
                                 </div>
                               )}
@@ -471,7 +471,7 @@ export default function StockReportsSection({
                                       {groupedRecs.history[r.kurum].map((hist, hIdx) => (
                                         <tr key={hIdx} style={{ borderBottom: '1px dotted rgba(255,255,255,0.05)' }}>
                                           <td style={{ padding: '3px 0' }}>{hist.tarih}</td>
-                                          <td style={{ padding: '3px 0', textDecoration: 'line-through', color: '#999' }}>{hist.hedefFiyat}</td>
+                                          <td style={{ padding: '3px 0', textDecoration: 'line-through', color: 'var(--text-tertiary)' }}>{hist.hedefFiyat}</td>
                                           <td style={{ padding: '3px 0' }}>{hist.mevcutFiyat}</td>
                                           <td style={{ padding: '3px 0' }}>{hist.tavsiye}</td>
                                         </tr>

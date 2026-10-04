@@ -20,17 +20,17 @@ export default function TabMultiples({ fundamentals }) {
     <div style={{ padding: '10px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
         {items.map((item, idx) => (
-          <div key={idx} style={{ padding: '15px', background: '#111', borderRadius: '8px', border: '1px solid #333', position: 'relative' }}>
+          <div key={idx} style={{ padding: '15px', background: 'var(--bg-base)', borderRadius: '8px', border: '1px solid var(--border-default)', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
               <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{item.label}</div>
               <span 
                 title={item.desc}
-                style={{ cursor: 'help', color: 'var(--color-cyan)', fontSize: '12px', background: 'rgba(0, 229, 255, 0.1)', padding: '2px 6px', borderRadius: '4px' }}
+                style={{ cursor: 'help', color: 'var(--color-cyan)', fontSize: '12px', background: 'rgba(200, 162, 74, 0.1)', padding: '2px 6px', borderRadius: '4px' }}
               >
                 ?
               </span>
             </div>
-            <div style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold' }}>
+            <div style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: 'bold' }}>
               {item.value !== null && item.value !== undefined && item.value !== '-' && typeof item.value === 'number' ? item.value.toFixed(2) : item.value}
             </div>
           </div>

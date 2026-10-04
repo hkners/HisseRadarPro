@@ -439,7 +439,7 @@ class ConvictionEngine:
                 "exposure_multiplier": reg_info.get("exposure_multiplier", 1.0),
                 "strong_buy_threshold": reg_info.get("strong_buy_threshold", 75),
                 "badge": f"{regime} ({reg_info.get('badge_title')})",
-                "color": reg_info.get("color", "#ffab00"),
+                "color": reg_info.get("color", "#C9883A"),
                 "advice": reg_info.get("description", ""),
                 "advancing": breadth.get("up", 0),
                 "declining": breadth.get("down", 0),
@@ -473,17 +473,17 @@ class ConvictionEngine:
             if up_ratio >= 0.55:
                 status = "BULL"
                 badge = "BOĞA PİYASASI (ALIM İŞTAHI YÜKSEK)"
-                color = "#00ff88"
+                color = "#3F8A6B"
                 advice = "Piyasa genelinde alım iştahı güçlü. Yüksek inançlı alım sinyalleri tam ağırlıkla değerlendirilebilir."
             elif up_ratio <= 0.40:
                 status = "BEAR"
                 badge = "AYI PİYASASI (SATIŞ BASKISI VAR)"
-                color = "#ff3366"
+                color = "#C0524E"
                 advice = "Piyasa genel baskı altında. Yeni pozisyonlarda nakit oranını yüksek tutun, sadece defansif hisselerde kademeli alım yapın."
             else:
                 status = "NEUTRAL"
                 badge = "TESTERE / SEÇİCİ PİYASA"
-                color = "#ffab00"
+                color = "#C9883A"
                 advice = "Piyasada kararsız ve yatay seyir hakim. Endeks yerine hisse bazlı hikayelere ve güçlü bilançolara odaklanın."
 
             return {
@@ -939,31 +939,31 @@ class ConvictionEngine:
             score = min(final_score, 35)
             decision = "RİSKLİ / SAT"
             decision_badge = "STRONG_SELL"
-            color = "#ff3366"
+            color = "#C0524E"
         elif ta_rec == "SELL":
             score = min(final_score, 50)
             if score < 40:
                 decision = "RİSKLİ / SAT"
                 decision_badge = "AVOID"
-                color = "#ff3366"
+                color = "#C0524E"
             else:
                 decision = "BEKLE / İZLE"
                 decision_badge = "HOLD"
-                color = "#ffab00"
+                color = "#C9883A"
         elif ta_rec == "NEUTRAL":
             score = min(final_score, 68)
             if score >= 58:
                 decision = "KADEMELİ AL"
                 decision_badge = "BUY"
-                color = "#00e5ff"
+                color = "#C8A24A"
             elif score >= 42:
                 decision = "BEKLE / İZLE"
                 decision_badge = "HOLD"
-                color = "#ffab00"
+                color = "#C9883A"
             else:
                 decision = "RİSKLİ / SAT"
                 decision_badge = "AVOID"
-                color = "#ff3366"
+                color = "#C0524E"
         else:  # BUY, STRONG_BUY or None
             score = final_score
             # GÜÇLÜ AL requires multi-broker institutional conviction, beating inflation, and score >= strong_buy_threshold
@@ -971,19 +971,19 @@ class ConvictionEngine:
             if score >= strong_buy_threshold and broker_count >= 2 and ta_rec in ("BUY", "STRONG_BUY"):
                 decision = "GÜÇLÜ AL"
                 decision_badge = "STRONG_BUY"
-                color = "#00ff88"
+                color = "#3F8A6B"
             elif score >= 58:
                 decision = "KADEMELİ AL"
                 decision_badge = "BUY"
-                color = "#00e5ff"
+                color = "#C8A24A"
             elif score >= 42:
                 decision = "BEKLE / İZLE"
                 decision_badge = "HOLD"
-                color = "#ffab00"
+                color = "#C9883A"
             else:
                 decision = "RİSKLİ / SAT"
                 decision_badge = "AVOID"
-                color = "#ff3366"
+                color = "#C0524E"
 
         drivers = []
         if ta_rec == "STRONG_SELL":

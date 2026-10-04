@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 import time
@@ -41,11 +42,24 @@ CANDIDATE_MODELS = [
 
 _active_model_name = None
 
+# The UI never shows emojis; ask the model not to produce them and strip any that slip through.
+_NO_EMOJI_RULE = "\n\nBiçim kuralı: Yanıtta hiçbir emoji, ikon veya piktogram kullanma; yalnızca düz metin ve Markdown."
+_EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF\u2600-\u27BF\u2B50\u2B06\u2B07\u2B05\uFE0F\u200D]")
+
+
+def strip_emoji(text: str) -> str:
+    """Removes emoji/pictograph code points (and the space they leave behind)."""
+    if not text:
+        return text
+    return re.sub(r"[ \t]{2,}", " ", _EMOJI_RE.sub("", text))
+
+
 def _generate_content_with_fallback(prompt: str, generation_config=None):
     """Tries generating content with candidate models, caching the working model."""
     global _active_model_name
 
     configure_ai()
+    prompt = f"{prompt}{_NO_EMOJI_RULE}"
 
     models_to_try = []
     if _active_model_name and _active_model_name in CANDIDATE_MODELS:
@@ -116,7 +130,7 @@ def get_ai_financial_analysis(ticker: str) -> Dict[str, Any]:
                 max_output_tokens=2500
             ),
         )
-        summary = response.text
+        summary = strip_emoji(response.text)
         
         # Enforce LRU cache limit
         _ai_summary_cache[ticker] = summary
@@ -206,7 +220,7 @@ Yanıtını SADECE geçerli bir JSON formatında ver:
                 response_mime_type="application/json"
             )
         )
-        parsed = json.loads(res.text)
+        parsed = json.loads(strip_emoji(res.text))
         result = {
             "ticker": ticker,
             "bull_cases": parsed.get("bull_cases", fallback_bulls)[:3],
@@ -252,7 +266,7 @@ Yatırımcıya sabah bülteni tadında TAM OLARAK 2 CÜMLELİK son derece akıc�
                 max_output_tokens=600
             )
         )
-        summary = res.text.strip()
+        summary = strip_emoji(res.text).strip()
         data = {"summary": summary, "source": "gemini"}
         _ai_market_cache["timestamp"] = now
         _ai_market_cache["data"] = data

@@ -1,16 +1,20 @@
-import React, { Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import TopBar from "./components/shell/TopBar";
+import Sidebar from "./components/shell/Sidebar";
+import StatusBar from "./components/shell/StatusBar";
+import CommandPalette from "./components/shell/CommandPalette";
+import Tour from "./components/shell/Tour";
 import ErrorBoundary from "./components/ErrorBoundary";
-import ScraperStatus from "./components/ScraperStatus";
 import { prefetchAllCoreData } from "./utils/apiCache";
+import { SOON_ITEMS, titleForPath } from "./navigation";
 import './index.css';
 
 // Eagerly loaded core pages for instant, lag-free navigation
 import Home from "./pages/Home";
 import Stocks from "./pages/Stocks";
 import Models from "./pages/Models";
-import Screener from "./pages/Screener";
+import UnifiedScreener from "./pages/UnifiedScreener";
 import TechnicalScreener from "./pages/TechnicalScreener";
 import Portfolio from "./pages/Portfolio";
 import AlphaInsights from "./pages/AlphaInsights";
@@ -18,6 +22,16 @@ import Brokerages from "./pages/Brokerages";
 import ResearchReports from "./pages/ResearchReports";
 import ViopScreener from "./pages/ViopScreener";
 import Discovery from "./pages/Discovery";
+import Analytics from "./pages/Analytics";
+import Industries from "./pages/Industries";
+import Compare from "./pages/Compare";
+import Macro from "./pages/Macro";
+import Backtest from "./pages/Backtest";
+import Strategies from "./pages/Strategies";
+import Copilot from "./pages/Copilot";
+import Studio from "./pages/Studio";
+import ComingSoon from "./pages/ComingSoon";
+import NotFound from "./pages/NotFound";
 
 // Only dynamic parameter pages are lazily loaded
 const StockDetail = React.lazy(() => import("./pages/StockDetail"));
@@ -25,88 +39,78 @@ const BrokerageDetail = React.lazy(() => import("./pages/BrokerageDetail"));
 
 const PageLoader = () => null; // Seamless transitions without jarring loading screens
 
-function SyncButton() {
-  const [syncing, setSyncing] = React.useState(false);
-  const [logs, setLogs] = React.useState([]);
+function DocumentTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    document.title = titleForPath(pathname);
+  }, [pathname]);
+  return null;
+}
 
-  const handleSync = () => {
-    if (syncing) return;
-    setSyncing(true);
-    setLogs([]);
+function Shell() {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
-    const eventSource = new EventSource(`${import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://127.0.0.1:8015'}/api/scraped-reports/stream-scrape`);
-
-    eventSource.onmessage = (event) => {
-      if (event.data === "[DONE]") {
-        eventSource.close();
-        setLogs(prev => [...prev, "Sync completed successfully. Refreshing..."]);
-        setTimeout(() => {
-          setSyncing(false);
-          window.location.reload(); // Reload to fetch fresh data everywhere
-        }, 2000);
-      } else {
-        setLogs(prev => [...prev, event.data]);
+  // Ctrl/⌘+K is reserved for global search only.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(o => !o);
       }
     };
-
-    eventSource.onerror = (err) => {
-      console.error("EventSource failed:", err);
-      eventSource.close();
-      setLogs(prev => [...prev, "ERROR: Connection lost or failed to start sync."]);
-      setSyncing(false);
-    };
-  };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
-    <>
-      <button 
-        onClick={handleSync}
-        disabled={syncing}
-        style={{
-          background: 'rgba(255,255,255,0.04)',
-          color: 'var(--color-neutral)',
-          border: '1px solid var(--border-color)',
-          padding: '4px 10px',
-          marginRight: '10px',
-          cursor: 'pointer',
-          fontSize: '11px',
-          fontWeight: 'bold',
-          borderRadius: '4px',
-          transition: 'all 0.15s ease'
-        }}
-      >
-        {syncing ? "[...] Senkronize Ediliyor" : "⚡ Verileri Senkronize Et"}
-      </button>
+    <div className="terminal-container">
+      <DocumentTitle />
+      <TopBar onOpenSearch={() => setSearchOpen(true)} />
 
-      {syncing && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', zIndex: 9999,
-          display: 'flex', justifyContent: 'center', alignItems: 'center'
-        }}>
-          <div style={{
-            width: '80%', maxWidth: '800px', height: '60vh',
-            background: 'var(--bg-panel)', border: '1px solid var(--border-color)',
-            borderRadius: '8px', padding: '20px',
-            display: 'flex', flexDirection: 'column'
-          }}>
-            <h3 style={{ margin: '0 0 15px 0', color: 'var(--text-highlight)' }}>Veri Senkronizasyonu</h3>
-            <div style={{
-              flex: 1, overflowY: 'auto', background: '#111', 
-              padding: '10px', borderRadius: '4px', fontFamily: 'monospace',
-              fontSize: '12px', color: '#0f0', whiteSpace: 'pre-wrap'
-            }}>
-              {logs.map((log, i) => (
-                <div key={i}>{log}</div>
-              ))}
-              <div style={{ float: 'left', clear: 'both' }}
-                ref={(el) => { el && el.scrollIntoView({ behavior: 'smooth' }) }}>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+      <div className="app-container">
+        <Sidebar />
+
+        <main className="main-content">
+          <ErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/discovery" element={<Discovery />} />
+                <Route path="/stocks" element={<Stocks />} />
+                <Route path="/screener" element={<UnifiedScreener />} />
+                <Route path="/technical-screener" element={<TechnicalScreener />} />
+                <Route path="/teknik-radar" element={<TechnicalScreener />} />
+                <Route path="/alpha" element={<AlphaInsights />} />
+                <Route path="/viop" element={<ViopScreener />} />
+                <Route path="/reports" element={<ResearchReports />} />
+                <Route path="/brokerages" element={<Brokerages />} />
+                <Route path="/models" element={<Models />} />
+                <Route path="/portfolio" element={<Portfolio />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/industries" element={<Industries />} />
+                <Route path="/compare" element={<Compare />} />
+                <Route path="/macro" element={<Macro />} />
+                <Route path="/backtest" element={<Backtest />} />
+                <Route path="/strategies" element={<Strategies />} />
+                <Route path="/copilot" element={<Copilot />} />
+                <Route path="/studio" element={<Studio />} />
+                <Route path="/hisse/:ticker" element={<StockDetail />} />
+                <Route path="/kurum/:kurumName" element={<BrokerageDetail />} />
+                {SOON_ITEMS.map(item => (
+                  <Route key={item.to} path={item.to} element={<ComingSoon item={item} />} />
+                ))}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </main>
+      </div>
+
+      <StatusBar />
+      <CommandPalette open={searchOpen} onClose={closeSearch} />
+      <Tour />
+    </div>
   );
 }
 
@@ -118,45 +122,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
-        <div className="terminal-container">
-          <header className="terminal-header">
-            <div className="terminal-logo">HisseRadar Pro</div>
-            <div className="terminal-status" style={{ display: 'flex', alignItems: 'center' }}>
-              <SyncButton />
-              <ScraperStatus />
-              <span style={{ color: 'var(--color-up)', marginRight: '5px' }}>●</span> BIST Canlı
-            </div>
-          </header>
-          
-          <div className="app-container">
-            <Sidebar />
-            
-            <main className="main-content">
-              <ErrorBoundary>
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/discovery" element={<Discovery />} />
-                    <Route path="/stocks" element={<Stocks />} />
-                    <Route path="/screener" element={<Screener />} />
-                    <Route path="/technical-screener" element={<TechnicalScreener />} />
-                    <Route path="/teknik-radar" element={<TechnicalScreener />} />
-                    <Route path="/alpha" element={<AlphaInsights />} />
-                    <Route path="/viop" element={<ViopScreener />} />
-                    <Route path="/reports" element={<ResearchReports />} />
-                    <Route path="/brokerages" element={<Brokerages />} />
-                    <Route path="/models" element={<Models />} />
-                    <Route path="/portfolio" element={<Portfolio />} />
-                    <Route path="/hisse/:ticker" element={<StockDetail />} />
-                    <Route path="/kurum/:kurumName" element={<BrokerageDetail />} />
-                  </Routes>
-                </Suspense>
-              </ErrorBoundary>
-            </main>
-          </div>
-        </div>
+        <Shell />
       </ErrorBoundary>
     </BrowserRouter>
   );
 }
-

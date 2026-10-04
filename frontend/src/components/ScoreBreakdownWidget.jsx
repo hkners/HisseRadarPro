@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 
 const getPillarColor = (percentage) => {
-  if (percentage >= 75) return '#00ff88';
-  if (percentage >= 50) return '#00d0ff';
-  if (percentage >= 35) return '#ffab00';
+  if (percentage >= 75) return 'var(--positive)';
+  if (percentage >= 50) return 'var(--gold)';
+  if (percentage >= 35) return 'var(--warning)';
   if (percentage >= 20) return '#ff7700';
-  return '#ff3366';
+  return 'var(--negative)';
 };
 
 export default function ScoreBreakdownWidget({ 
@@ -66,7 +67,7 @@ export default function ScoreBreakdownWidget({
 
   return (
     <div style={{
-      background: compact ? 'rgba(10, 14, 23, 0.85)' : 'var(--bg-secondary)',
+      background: compact ? 'rgba(18, 18, 20, 0.85)' : 'var(--bg-secondary)',
       border: '1px solid var(--border-color)',
       borderRadius: '5px',
       padding: compact ? '8px 10px' : '14px 18px',
@@ -86,8 +87,8 @@ export default function ScoreBreakdownWidget({
             KARAR SKORU DÖKÜMÜ
           </span>
           <span style={{
-            background: decision_color || '#ffab00',
-            color: ['#ff3366', '#ef4444', '#dc2626', '#f85149'].includes(decision_color) ? '#fff' : '#000',
+            background: decision_color || 'var(--warning)',
+            color: ['var(--negative)', 'var(--negative)', 'var(--negative)', 'var(--negative)'].includes(decision_color) ? 'var(--text-primary)' : '#000',
             fontSize: '9.5px',
             fontWeight: '900',
             padding: '1px 6px',
@@ -106,7 +107,7 @@ export default function ScoreBreakdownWidget({
 
         {compact && showCockpitLink && (
           <Link to={`/hisse/${ticker}`} className="action-button" style={{ padding: '2px 6px', fontSize: '9.5px' }}>
-            [KOKPİT ↗]
+            Kokpit ↗
           </Link>
         )}
       </div>
@@ -114,8 +115,8 @@ export default function ScoreBreakdownWidget({
       {/* ─── DISAGREEMENT ALERT BANNER ─── */}
       {disagreement?.is_disagreeing && (
         <div style={{
-          background: 'rgba(255, 171, 0, 0.12)',
-          border: '1px solid rgba(255, 171, 0, 0.45)',
+          background: 'rgba(201, 136, 58, 0.12)',
+          border: '1px solid rgba(201, 136, 58, 0.45)',
           borderRadius: '4px',
           padding: '5px 8px',
           display: 'flex',
@@ -124,12 +125,12 @@ export default function ScoreBreakdownWidget({
           fontSize: '10px',
           lineHeight: 1.3
         }}>
-          <span style={{ fontSize: '12px', flexShrink: 0 }}>⚠️</span>
+          <span style={{ fontSize: '12px', flexShrink: 0 }}><AlertTriangle size={12} /></span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-            <span style={{ fontWeight: 'bold', color: '#ffab00' }}>
+            <span style={{ fontWeight: 'bold', color: 'var(--warning)' }}>
               İki Motor Farklı Görüşte
             </span>
-            <span style={{ color: '#fff', fontSize: '9px', wordBreak: 'break-word' }}>
+            <span style={{ color: 'var(--text-primary)', fontSize: '9px', wordBreak: 'break-word' }}>
               {disagreement.reason}
             </span>
           </div>
@@ -175,7 +176,7 @@ export default function ScoreBreakdownWidget({
                   width: `${Math.min(100, Math.max(0, comp.percentage))}%`,
                   height: '100%',
                   background: isNegative 
-                    ? 'linear-gradient(90deg, #ff3366, #ff0055)' 
+                    ? 'linear-gradient(90deg, var(--negative), #ff0055)' 
                     : `linear-gradient(90deg, ${color}88, ${color})`,
                   borderRadius: '3px',
                   transition: 'width 0.4s ease'
@@ -207,7 +208,7 @@ export default function ScoreBreakdownWidget({
       }}>
         <div>
           <span style={{ fontWeight: 'bold', color: 'var(--text-highlight)' }}>Formül: </span>
-          +2.0 + {components.map(c => (c.points > 0 ? `+${c.points.toFixed(1)}` : `${c.points.toFixed(1)}`)).join(' ')} = <strong style={{ color: '#fff' }}>{raw_score?.toFixed(1)} pt</strong> → <strong style={{ color: decision_color }}>{score}p</strong>
+          +2.0 + {components.map(c => (c.points > 0 ? `+${c.points.toFixed(1)}` : `${c.points.toFixed(1)}`)).join(' ')} = <strong style={{ color: 'var(--text-primary)' }}>{raw_score?.toFixed(1)} pt</strong> → <strong style={{ color: decision_color }}>{score}p</strong>
         </div>
       </div>
     </div>

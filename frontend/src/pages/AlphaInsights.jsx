@@ -6,6 +6,7 @@ import PageContainer from '../components/common/PageContainer';
 import { usePolling } from '../hooks/usePolling';
 import { useFavorites } from '../hooks/useFavorites';
 import { BIST30, BIST100 } from '../utils/bistIndices';
+import { AlertTriangle } from 'lucide-react';
 
 export default function AlphaInsights() {
     const { data, loading: loadingScreener } = usePolling(`${import.meta.env.VITE_API_URL}/alpha/screener`, 0);
@@ -66,11 +67,11 @@ export default function AlphaInsights() {
     };
 
     const getScoreColor = (score) => {
-        if (score >= 80) return '#00ff88'; 
-        if (score >= 60) return '#00d0ff'; 
-        if (score >= 40) return '#ffab00'; 
-        if (score >= 20) return '#ff3366'; 
-        return '#ff0000'; 
+        if (score >= 80) return 'var(--positive)'; 
+        if (score >= 60) return 'var(--gold)'; 
+        if (score >= 40) return 'var(--warning)'; 
+        if (score >= 20) return 'var(--negative)'; 
+        return 'var(--negative)'; 
     };
 
     const renderProgressBar = (score, label) => {
@@ -100,7 +101,7 @@ export default function AlphaInsights() {
                     fontWeight: 'bold'
                 }}
             >
-                [KANTİTATİF PUANLAMA]
+                Kantitatif puanlama
             </button>
             <button 
                 className="action-button"
@@ -112,21 +113,21 @@ export default function AlphaInsights() {
                     fontWeight: 'bold'
                 }}
             >
-                [GERİYE DÖNÜK TEST]
+                Geriye dönük test
             </button>
         </div>
     );
 
     return (
         <PageContainer 
-            title="AI ALPHA INSIGHTS"
+            title="Alpha Insights"
             badge={{
                 label: `${filteredData.length} HİSSE`,
-                background: 'rgba(57, 197, 207, 0.15)',
+                background: 'rgba(200, 162, 74, 0.15)',
                 color: 'var(--color-cyan)',
-                borderColor: 'rgba(57, 197, 207, 0.35)'
+                borderColor: 'rgba(200, 162, 74, 0.35)'
             }}
-            subtitle="622 hisse arasında çok faktörlü göreceli tarama ve sıralama motoru (Teknik %30, Temel %30, Kurum %40)"
+            subtitle="Tüm BIST'i teknik %30, temel %30 ve kurum görüşü %40 ağırlıkla sıralayan çok faktörlü skor."
             headerRight={headerRight}
         >
             <div className="panel flex-1" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, marginBottom: 0 }}>
@@ -147,7 +148,7 @@ export default function AlphaInsights() {
                                             padding: '4px 10px', 
                                             background: 'var(--bg-secondary)', 
                                             border: '1px solid var(--border-color)', 
-                                            color: '#fff',
+                                            color: 'var(--text-primary)',
                                             borderRadius: '4px',
                                             fontSize: '11px',
                                             outline: 'none'
@@ -157,33 +158,31 @@ export default function AlphaInsights() {
                                         onClick={() => setQuickFilter('ALL')} 
                                         className={`action-button ${quickFilter === 'ALL' ? 'active' : ''}`}
                                     >
-                                        [TÜMÜ]
+                                        Tümü
                                     </button>
                                     <button 
                                         onClick={() => setQuickFilter('STRONG_BUY')} 
                                         className={`action-button ${quickFilter === 'STRONG_BUY' ? 'active-green' : ''}`}
-                                        style={quickFilter === 'STRONG_BUY' ? {} : { color: 'var(--color-up)', borderColor: 'rgba(0, 230, 118, 0.3)' }}
                                     >
-                                        [GÜÇLÜ AL]
+                                        Güçlü AL
                                     </button>
                                     <button 
                                         onClick={() => setQuickFilter('FAVORITES')} 
                                         className={`action-button ${quickFilter === 'FAVORITES' ? 'active-warning' : ''}`}
-                                        style={quickFilter === 'FAVORITES' ? {} : { color: 'var(--color-warning)', borderColor: 'rgba(255, 170, 0, 0.3)' }}
                                     >
-                                        [FAVORİLER]
+                                        Favoriler
                                     </button>
                                     <button 
                                         onClick={() => setQuickFilter('BIST30')} 
                                         className={`action-button ${quickFilter === 'BIST30' ? 'active' : ''}`}
                                     >
-                                        [BIST 30]
+                                        BIST 30
                                     </button>
                                     <button 
                                         onClick={() => setQuickFilter('BIST100')} 
                                         className={`action-button ${quickFilter === 'BIST100' ? 'active' : ''}`}
                                     >
-                                        [BIST 100]
+                                        BIST 100
                                     </button>
                                 </div>
                             </div>
@@ -277,13 +276,13 @@ export default function AlphaInsights() {
                                                                     style={{
                                                                         position: 'absolute',
                                                                         right: '0px',
-                                                                        color: '#f59e0b',
+                                                                        color: 'var(--warning)',
                                                                         fontSize: '11px',
                                                                         cursor: 'help',
                                                                         lineHeight: 1
                                                                     }}
                                                                 >
-                                                                    ⚠️
+                                                                    <AlertTriangle size={12} />
                                                                 </span>
                                                             )}
                                                         </div>
@@ -300,7 +299,7 @@ export default function AlphaInsights() {
                                                             className="action-button" 
                                                             style={{ padding: '3px 8px', fontSize: '10.5px' }}
                                                         >
-                                                            [KOKPİT]
+                                                            Kokpit
                                                         </Link>
                                                     </td>
                                                 </tr>
@@ -375,7 +374,7 @@ export default function AlphaInsights() {
                                         <div className="panel-content" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                             <div>
                                                 <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Metrik</label>
-                                                <select value={backtestMetric} onChange={e => setBacktestMetric(e.target.value)} style={{ width: '100%', padding: '5px', background: 'var(--bg-dark)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+                                                <select value={backtestMetric} onChange={e => setBacktestMetric(e.target.value)} style={{ width: '100%', padding: '5px', background: 'var(--bg-dark)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
                                                     <option value="ALPHA">Alpha Skoru</option>
                                                     <option value="RSI">RSI (14)</option>
                                                     <option value="SMA">Fiyat vs SMA (20) %</option>
@@ -384,18 +383,18 @@ export default function AlphaInsights() {
                                             </div>
                                             <div>
                                                 <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Koşul</label>
-                                                <select value={backtestCondition} onChange={e => setBacktestCondition(e.target.value)} style={{ width: '100%', padding: '5px', background: 'var(--bg-dark)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+                                                <select value={backtestCondition} onChange={e => setBacktestCondition(e.target.value)} style={{ width: '100%', padding: '5px', background: 'var(--bg-dark)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
                                                     <option value="GREATER">Büyüktür (&gt;)</option>
                                                     <option value="LESS">Küçüktür (&lt;)</option>
                                                 </select>
                                             </div>
                                             <div>
                                                 <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Değer (Threshold)</label>
-                                                <input type="number" value={backtestThreshold} onChange={e => setBacktestThreshold(Number(e.target.value))} style={{ width: '100%', padding: '5px', background: 'var(--bg-dark)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '4px' }} />
+                                                <input type="number" value={backtestThreshold} onChange={e => setBacktestThreshold(Number(e.target.value))} style={{ width: '100%', padding: '5px', background: 'var(--bg-dark)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px' }} />
                                             </div>
                                             <div>
                                                 <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Test Edilecek Hisseler (İsteğe Bağlı)</label>
-                                                <input type="text" placeholder="Örn: THYAO, ASELS, FROTO" value={backtestTickers} onChange={e => setBacktestTickers(e.target.value)} style={{ width: '100%', padding: '5px', background: 'var(--bg-dark)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '4px' }} />
+                                                <input type="text" placeholder="Örn: THYAO, ASELS, FROTO" value={backtestTickers} onChange={e => setBacktestTickers(e.target.value)} style={{ width: '100%', padding: '5px', background: 'var(--bg-dark)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px' }} />
                                                 <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '3px' }}>Boş bırakırsanız tüm BIST test edilir.</div>
                                             </div>
                                         </div>

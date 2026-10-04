@@ -23,6 +23,7 @@ class ValuationService:
     def __init__(self, repo=None):
         self._repo = repo
         self._sector_cache: Dict[str, Dict[str, Any]] = {}
+        self._industry_cache: Dict[str, Dict[str, Any]] = {}
         self._sector_cache_time: float = 0.0
         self._hist_cache: Dict[Tuple[str, str, int], Tuple[float, float]] = {}
         self._lock = threading.Lock()
@@ -46,6 +47,7 @@ class ValuationService:
 
             all_companies = repo.get_all_company_info() or {}
             sector_data: Dict[str, Dict[str, List[float]]] = {}
+            industry_data: Dict[str, Dict[str, List[float]]] = {}
 
             for ticker, row in all_companies.items():
                 sec = row.get("sector")
@@ -99,7 +101,17 @@ class ValuationService:
                 except (ValueError, TypeError):
                     pass
 
+                industry = f.get("industry")
+                if industry:
+                    ind = industry_data.setdefault(industry, {"pe_list": [], "pb_list": [], "tickers": []})
+                    ind["tickers"].append(ticker)
+                    for key in ("pe_list", "pb_list"):
+                        hit = [m for (t, m) in sector_data[sec][key] if t == ticker]
+                        if hit:
+                            ind[key].append((ticker, hit[0]))
+
             self._sector_cache = sector_data
+            self._industry_cache = industry_data
             self._sector_cache_time = now
 
     def compute_historical_percentile(
@@ -364,6 +376,106 @@ class ValuationService:
 
         return valuation_score
 
+    def compute_peer_implied_values(
+        self,
+        ticker: str,
+        price: Optional[float],
+        repo=None,
+        book_price: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Sektör emsallerinin F/K ve PD/DD dağılımını (çeyreklikler) hissenin kendi
+        hisse başı kârı ve defter değerine uygulayarak ima edilen fiyat aralığını üretir.
+        Football field grafiği için düşük (%25) / orta (medyan) / yüksek (%75) değer döner.
+        Sektörde 3'ten az emsal varsa ilgili yöntem None olur.
+        """
+        r = repo or self._get_repo()
+        clean = ticker.upper().strip()
+        self._refresh_sector_cache_if_needed(r)
+
+        comp_info = r.get_company_info(clean) or {}
+        sector = comp_info.get("sector")
+        f_json = comp_info.get("fundamentals_json")
+        f = {}
+        if f_json:
+            try:
+                f = json.loads(f_json) if isinstance(f_json, str) else f_json
+            except Exception:
+                f = {}
+
+        def _num(v) -> Optional[float]:
+            try:
+                return float(v) if v is not None else None
+            except (ValueError, TypeError):
+                return None
+
+        def _quartiles(values: List[float]) -> Optional[Tuple[float, float, float]]:
+            if len(values) < 3:
+                return None
+            q = statistics.quantiles(sorted(values), n=4, method="inclusive")
+            return q[0], q[1], q[2]
+
+        # Prefer the narrower industry group (e.g. "Banks - Regional") when it has enough peers.
+        industry = f.get("industry")
+        ind_data = self._industry_cache.get(industry) if industry else None
+        sec_data = self._sector_cache.get(sector) if sector else None
+
+        def _peers(group, key):
+            return [m for (t, m) in group[key] if t != clean] if group else []
+
+        use_industry = ind_data is not None and len(_peers(ind_data, "pe_list")) >= 5
+        group = ind_data if use_industry else sec_data
+        peers_pe = _peers(group, "pe_list")
+        peers_pb = _peers(group, "pb_list")
+
+        result: Dict[str, Any] = {
+            "ticker": clean,
+            "sector": sector,
+            "industry": industry,
+            "peer_group": "industry" if use_industry else "sector",
+            "peer_group_name": industry if use_industry else sector,
+            "peer_count": len(group["tickers"]) - 1 if group else 0,
+            "pe": None,
+            "pb": None,
+        }
+
+        eps = _num(f.get("trailingEps"))
+        pe_now = _num(f.get("trailingPE"))
+        q_pe = _quartiles(peers_pe)
+        if q_pe and eps and eps > 0:
+            result["pe"] = {
+                "current_multiple": round(pe_now, 2) if pe_now and pe_now > 0 else None,
+                "sector_p25": round(q_pe[0], 2),
+                "sector_median": round(q_pe[1], 2),
+                "sector_p75": round(q_pe[2], 2),
+                "per_share": round(eps, 4),
+                "low": round(q_pe[0] * eps, 2),
+                "mid": round(q_pe[1] * eps, 2),
+                "high": round(q_pe[2] * eps, 2),
+                "peers_used": len(peers_pe),
+            }
+
+        # Book value per share is not stored; derive it from the P/B multiple and the price it was
+        # computed at (close on the fundamentals date), falling back to the current price.
+        pb_now = _num(f.get("priceToBook"))
+        q_pb = _quartiles(peers_pb)
+        pb_base = book_price if book_price and book_price > 0 else price
+        if q_pb and pb_now and pb_now > 0 and pb_base and pb_base > 0:
+            bvps = pb_base / pb_now
+            result["pb"] = {
+                "current_multiple": round(pb_now, 2),
+                "sector_p25": round(q_pb[0], 2),
+                "sector_median": round(q_pb[1], 2),
+                "sector_p75": round(q_pb[2], 2),
+                "per_share": round(bvps, 4),
+                "low": round(q_pb[0] * bvps, 2),
+                "mid": round(q_pb[1] * bvps, 2),
+                "high": round(q_pb[2] * bvps, 2),
+                "peers_used": len(peers_pb),
+            }
+
+        return result
+
     def compute_sector_relative_roe(
         self,
         ticker: str,
@@ -499,3 +611,6 @@ def compute_valuation_score(ticker: str, metric: str = "pe_ratio", repo=None, re
 
 def compute_sector_relative_roe(ticker: str, repo=None) -> Optional[Dict[str, Any]]:
     return _valuation_service.compute_sector_relative_roe(ticker, repo=repo)
+
+def compute_peer_implied_values(ticker: str, price: Optional[float], repo=None, book_price: Optional[float] = None) -> Dict[str, Any]:
+    return _valuation_service.compute_peer_implied_values(ticker, price, repo=repo, book_price=book_price)

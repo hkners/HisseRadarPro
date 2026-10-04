@@ -29,9 +29,9 @@ export default function ViopScreener() {
 
   return (
     <PageContainer 
-      title="VİOP AÇIK POZİSYON & ARBİTRAJ"
+      title="VİOP"
       badge={{ label: `${filteredData.length} SÖZLEŞME` }}
-      subtitle="Gerçek Zamanlı Arbitraj Getirisi ve APS Analizi"
+      subtitle="Vadeli kontratlarda arbitraj getirisi ve açık pozisyon analizi."
     >
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', marginBottom: '0', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
         <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -51,7 +51,7 @@ export default function ViopScreener() {
                   borderRadius: '4px', 
                   border: '1px solid var(--border-color)', 
                   background: 'rgba(0,0,0,0.3)', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   outline: 'none',
                   fontSize: '11px'
                 }}

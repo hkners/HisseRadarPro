@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PillTabs } from './ui';
 
 export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onClose, onSuccess }) {
   const [buyMode, setBuyMode] = useState('amount'); // 'amount' (Tutar/TL) | 'quantity' (Adet)
@@ -9,6 +10,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [account, setAccount] = useState('real');
 
   // Fiyat güncellendiğinde maliyet alanını güncelle
   useEffect(() => {
@@ -87,7 +89,8 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
         tx_type: 'BUY',
         quantity: finalQty,
         price: priceNum,
-        tx_date: date
+        tx_date: date,
+        account
       })
     })
       .then(res => {
@@ -96,7 +99,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
       })
       .then(() => {
         setSubmitting(false);
-        setSuccessMsg(`${finalQty} adet ${ticker} (Toplam ${actualTotalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL) portföye eklendi.`);
+        setSuccessMsg(`${finalQty} adet ${ticker} (Toplam ${actualTotalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL) ${account === 'paper' ? 'kâğıt' : 'gerçek'} hesaba eklendi.`);
         setTimeout(() => {
           setSuccessMsg('');
           if (onSuccess) onSuccess();
@@ -170,23 +173,29 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
 
         {/* Hata ve Başarı Bildirimleri */}
         {error && (
-          <div style={{ background: 'rgba(248, 81, 73, 0.15)', color: 'var(--color-down)', padding: '10px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px', border: '1px solid rgba(248, 81, 73, 0.3)' }}>
-            ⚠️ {error}
+          <div style={{ background: 'rgba(192, 82, 78, 0.15)', color: 'var(--color-down)', padding: '10px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px', border: '1px solid rgba(192, 82, 78, 0.3)' }}>
+            {error}
           </div>
         )}
 
         {successMsg && (
-          <div style={{ background: 'rgba(63, 185, 80, 0.15)', color: 'var(--color-up)', padding: '10px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px', border: '1px solid rgba(63, 185, 80, 0.3)', fontWeight: 'bold' }}>
+          <div style={{ background: 'rgba(63, 138, 107, 0.15)', color: 'var(--color-up)', padding: '10px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px', border: '1px solid rgba(63, 138, 107, 0.3)', fontWeight: 'bold' }}>
             ✓ {successMsg}
           </div>
         )}
+
+        {/* HESAP SEÇİCİ */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <span className="eyebrow">Hesap</span>
+          <PillTabs tabs={[{ id: 'real', label: 'Gerçek' }, { id: 'paper', label: 'Kâğıt' }]} value={account} onChange={setAccount} />
+        </div>
 
         {/* ALIM YÖNTEMİ SEÇİCİ (TUTAR / ADET TOGGLE) */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: '6px',
-          background: '#12141a',
+          background: 'var(--bg-raised)',
           padding: '4px',
           borderRadius: '8px',
           marginBottom: '16px',
@@ -196,7 +205,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
             type="button"
             onClick={() => handleModeChange('amount')}
             style={{
-              background: buyMode === 'amount' ? 'rgba(57, 197, 207, 0.2)' : 'transparent',
+              background: buyMode === 'amount' ? 'rgba(200, 162, 74, 0.2)' : 'transparent',
               color: buyMode === 'amount' ? 'var(--color-cyan)' : 'var(--text-muted)',
               border: `1px solid ${buyMode === 'amount' ? 'var(--color-cyan)' : 'transparent'}`,
               borderRadius: '6px',
@@ -211,13 +220,13 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
               transition: 'all 0.15s ease'
             }}
           >
-            <span>💰</span> Tutar (TL) ile Al
+            Tutar (TL) ile Al
           </button>
           <button
             type="button"
             onClick={() => handleModeChange('quantity')}
             style={{
-              background: buyMode === 'quantity' ? 'rgba(57, 197, 207, 0.2)' : 'transparent',
+              background: buyMode === 'quantity' ? 'rgba(200, 162, 74, 0.2)' : 'transparent',
               color: buyMode === 'quantity' ? 'var(--color-cyan)' : 'var(--text-muted)',
               border: `1px solid ${buyMode === 'quantity' ? 'var(--color-cyan)' : 'transparent'}`,
               borderRadius: '6px',
@@ -232,7 +241,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
               transition: 'all 0.15s ease'
             }}
           >
-            <span>📊</span> Adet ile Al
+            Adet ile Al
           </button>
         </div>
 
@@ -293,7 +302,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
                     type="button"
                     onClick={() => setTargetAmount(String(chip.val))}
                     style={{
-                      background: targetAmount === String(chip.val) ? 'rgba(57, 197, 207, 0.25)' : 'rgba(255,255,255,0.05)',
+                      background: targetAmount === String(chip.val) ? 'rgba(200, 162, 74, 0.25)' : 'rgba(255,255,255,0.05)',
                       color: targetAmount === String(chip.val) ? 'var(--color-cyan)' : 'var(--text-muted)',
                       border: `1px solid ${targetAmount === String(chip.val) ? 'var(--color-cyan)' : 'var(--border-color)'}`,
                       borderRadius: '4px',
@@ -314,8 +323,8 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
                 <div style={{
                   marginTop: '10px',
                   padding: '10px 12px',
-                  background: calculatedQtyFromAmount >= 1 ? 'rgba(57, 197, 207, 0.08)' : 'rgba(248, 81, 73, 0.08)',
-                  border: `1px solid ${calculatedQtyFromAmount >= 1 ? 'rgba(57, 197, 207, 0.25)' : 'rgba(248, 81, 73, 0.25)'}`,
+                  background: calculatedQtyFromAmount >= 1 ? 'rgba(200, 162, 74, 0.08)' : 'rgba(192, 82, 78, 0.08)',
+                  border: `1px solid ${calculatedQtyFromAmount >= 1 ? 'rgba(200, 162, 74, 0.25)' : 'rgba(192, 82, 78, 0.25)'}`,
                   borderRadius: '6px',
                   fontSize: '12px'
                 }}>
@@ -327,7 +336,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Gerçekleşecek Tutar:</span>
-                        <span style={{ color: '#fff', fontWeight: '600' }}>{actualTotalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{actualTotalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL</span>
                       </div>
                       {remainingBudget > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -368,7 +377,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
                     type="button"
                     onClick={() => setQuantity(String(qty))}
                     style={{
-                      background: quantity === String(qty) ? 'rgba(57, 197, 207, 0.25)' : 'rgba(255,255,255,0.05)',
+                      background: quantity === String(qty) ? 'rgba(200, 162, 74, 0.25)' : 'rgba(255,255,255,0.05)',
                       color: quantity === String(qty) ? 'var(--color-cyan)' : 'var(--text-muted)',
                       border: `1px solid ${quantity === String(qty) ? 'var(--color-cyan)' : 'var(--border-color)'}`,
                       borderRadius: '4px',
@@ -438,7 +447,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
 
           {/* Özet Kutusu */}
           <div style={{
-            background: '#12141a',
+            background: 'var(--bg-raised)',
             padding: '12px 16px',
             borderRadius: '8px',
             border: '1px solid var(--border-color)',
@@ -448,7 +457,7 @@ export default function AddToPortfolioModal({ ticker, currentPrice, isOpen, onCl
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
               <span>Portföye Eklenecek:</span>
-              <strong style={{ color: '#fff' }}>{effectiveQty} Adet {ticker}</strong>
+              <strong style={{ color: 'var(--text-primary)' }}>{effectiveQty} Adet {ticker}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '6px' }}>
               <span style={{ fontSize: '12.5px', color: 'var(--text-muted)', fontWeight: '600' }}>Toplam Portföy Girişi:</span>

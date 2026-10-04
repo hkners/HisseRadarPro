@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { getFinancialItemMeta } from '../utils/financialDictionary';
+import { Search } from 'lucide-react';
 
 export default function TabFundamentals({ fundamentals }) {
   const [activeSubTab, setActiveSubTab] = useState('income_statement'); // 'income_statement' | 'balance_sheet' | 'cash_flow'
@@ -173,13 +174,13 @@ export default function TabFundamentals({ fundamentals }) {
       <div style={{ overflowX: 'auto', marginTop: '10px', paddingBottom: '20px' }}>
         <table className="data-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'right' }}>
           <thead>
-            <tr style={{ background: '#161920', borderBottom: '2px solid var(--border-color)' }}>
+            <tr style={{ background: 'var(--bg-raised)', borderBottom: '2px solid var(--border-color)' }}>
               <th style={{
                 textAlign: 'left',
                 minWidth: '380px',
                 position: 'sticky',
                 left: 0,
-                background: '#161920',
+                background: 'var(--bg-raised)',
                 zIndex: 2,
                 padding: '14px 16px',
                 fontSize: '12px',
@@ -228,14 +229,14 @@ export default function TabFundamentals({ fundamentals }) {
                 }
 
                 const isMajor = item.isMajor;
-                const rowBg = isMajor ? 'rgba(57, 197, 207, 0.05)' : 'transparent';
-                const textColor = isMajor ? '#ffffff' : 'var(--text-main)';
+                const rowBg = isMajor ? 'rgba(200, 162, 74, 0.05)' : 'transparent';
+                const textColor = isMajor ? 'var(--text-primary)' : 'var(--text-main)';
                 const fontWeight = isMajor ? '700' : '400';
 
                 return (
                   <React.Fragment key={item.originalKey || i}>
                     {showCategoryBanner && (
-                      <tr style={{ background: '#12141a' }}>
+                      <tr style={{ background: 'var(--bg-raised)' }}>
                         <td 
                           colSpan={dates.length + 2} 
                           style={{
@@ -246,11 +247,11 @@ export default function TabFundamentals({ fundamentals }) {
                             textTransform: 'uppercase',
                             letterSpacing: '0.8px',
                             color: 'var(--color-cyan)',
-                            borderTop: '1px solid rgba(57, 197, 207, 0.2)',
+                            borderTop: '1px solid rgba(200, 162, 74, 0.2)',
                             borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
                           }}
                         >
-                          📂 {currentCategory}
+                          {currentCategory}
                         </td>
                       </tr>
                     )}
@@ -258,7 +259,7 @@ export default function TabFundamentals({ fundamentals }) {
                       className="row-hoverable" 
                       style={{ 
                         background: rowBg,
-                        borderBottom: isMajor ? '1px solid rgba(57, 197, 207, 0.2)' : '1px solid rgba(255,255,255,0.04)',
+                        borderBottom: isMajor ? '1px solid rgba(200, 162, 74, 0.2)' : '1px solid rgba(255,255,255,0.04)',
                         transition: 'background 0.15s ease'
                       }}
                     >
@@ -267,7 +268,7 @@ export default function TabFundamentals({ fundamentals }) {
                         textAlign: 'left',
                         position: 'sticky',
                         left: 0,
-                        background: isMajor ? '#172028' : '#14171c',
+                        background: isMajor ? '#172028' : 'var(--bg-raised)',
                         zIndex: 1,
                         borderRight: '1px solid rgba(255,255,255,0.08)',
                         padding: isMajor ? '13px 16px' : '10px 16px'
@@ -332,7 +333,7 @@ export default function TabFundamentals({ fundamentals }) {
                                 padding: '14px',
                                 boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
                                 textAlign: 'left',
-                                color: '#fff',
+                                color: 'var(--text-primary)',
                                 fontSize: '12px',
                                 lineHeight: '1.5'
                               }}>
@@ -340,14 +341,14 @@ export default function TabFundamentals({ fundamentals }) {
                                   <strong style={{ color: 'var(--color-cyan)', fontSize: '13px' }}>{item.tr}</strong>
                                   <button 
                                     onClick={() => setActiveTooltip(null)}
-                                    style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '14px', padding: 0 }}
+                                    style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '14px', padding: 0 }}
                                   >
                                     ✕
                                   </button>
                                 </div>
-                                <p style={{ color: '#d0d7de', margin: '0 0 8px 0' }}>{item.desc}</p>
+                                <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>{item.desc}</p>
                                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
-                                  <span style={{ color: '#888' }}>Teknik Kod: </span>
+                                  <span style={{ color: 'var(--text-tertiary)' }}>Teknik Kod: </span>
                                   <code>{item.originalKey}</code>
                                 </div>
                               </div>
@@ -368,9 +369,9 @@ export default function TabFundamentals({ fundamentals }) {
                             style={{ 
                               padding: isMajor ? '13px 12px' : '10px 12px', 
                               fontWeight: isMajor ? '700' : (isLatest ? '600' : '400'),
-                              color: isNegative ? 'var(--color-down)' : (isMajor ? '#ffffff' : '#d0d7de'),
+                              color: isNegative ? 'var(--color-down)' : (isMajor ? 'var(--text-primary)' : 'var(--text-secondary)'),
                               fontSize: isMajor ? '13px' : '12.5px',
-                              background: isMajor ? 'rgba(57, 197, 207, 0.03)' : 'transparent',
+                              background: isMajor ? 'rgba(200, 162, 74, 0.03)' : 'transparent',
                               borderLeft: '1px solid rgba(255,255,255,0.03)'
                             }}
                           >
@@ -391,7 +392,7 @@ export default function TabFundamentals({ fundamentals }) {
                             borderRadius: '4px',
                             fontSize: '11px',
                             fontWeight: '600',
-                            background: item.qoqText === 'Kâra Geçti' ? 'rgba(63, 185, 80, 0.2)' : 'rgba(248, 81, 73, 0.2)',
+                            background: item.qoqText === 'Kâra Geçti' ? 'rgba(63, 138, 107, 0.2)' : 'rgba(192, 82, 78, 0.2)',
                             color: item.qoqText === 'Kâra Geçti' ? 'var(--color-up)' : 'var(--color-down)'
                           }}>
                             {item.qoqText}
@@ -406,9 +407,9 @@ export default function TabFundamentals({ fundamentals }) {
                             fontSize: '11px',
                             fontWeight: '600',
                             background: item.qoqChange > 0 
-                              ? 'rgba(63, 185, 80, 0.12)' 
+                              ? 'rgba(63, 138, 107, 0.12)' 
                               : item.qoqChange < 0 
-                                ? 'rgba(248, 81, 73, 0.12)' 
+                                ? 'rgba(192, 82, 78, 0.12)' 
                                 : 'rgba(255,255,255,0.05)',
                             color: item.qoqChange > 0 
                               ? 'var(--color-up)' 
@@ -448,7 +449,7 @@ export default function TabFundamentals({ fundamentals }) {
       }}>
         {/* KART 1: HASILAT (SATIŞ GELİRLERİ) */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(20, 24, 32, 0.9) 0%, rgba(26, 32, 44, 0.7) 100%)',
+          background: 'linear-gradient(135deg, rgba(18, 18, 20, 0.9) 0%, rgba(18, 18, 20, 0.7) 100%)',
           border: '1px solid var(--border-color)',
           borderRadius: '8px',
           padding: '14px 16px',
@@ -457,7 +458,7 @@ export default function TabFundamentals({ fundamentals }) {
           <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Hasılat (Net Satışlar)
           </div>
-          <div style={{ fontSize: '19px', fontWeight: '700', color: '#fff', margin: '6px 0 4px 0' }}>
+          <div style={{ fontSize: '19px', fontWeight: '700', color: 'var(--text-primary)', margin: '6px 0 4px 0' }}>
             {formatCardVal(kpiData.revenue.val)}
           </div>
           <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -479,7 +480,7 @@ export default function TabFundamentals({ fundamentals }) {
 
         {/* KART 2: FAVÖK (EBITDA) */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(20, 24, 32, 0.9) 0%, rgba(26, 32, 44, 0.7) 100%)',
+          background: 'linear-gradient(135deg, rgba(18, 18, 20, 0.9) 0%, rgba(18, 18, 20, 0.7) 100%)',
           border: '1px solid var(--border-color)',
           borderRadius: '8px',
           padding: '14px 16px'
@@ -497,14 +498,14 @@ export default function TabFundamentals({ fundamentals }) {
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             {kpiData.ebitda.margin !== null ? (
-              <span>FAVÖK Marjı: <strong style={{ color: '#fff' }}>%{kpiData.ebitda.margin.toFixed(1)}</strong></span>
+              <span>FAVÖK Marjı: <strong style={{ color: 'var(--text-primary)' }}>%{kpiData.ebitda.margin.toFixed(1)}</strong></span>
             ) : "Nakit kârlılık göstergesi"}
           </div>
         </div>
 
         {/* KART 3: NET DÖNEM KÂRI / ZARARI */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(20, 24, 32, 0.9) 0%, rgba(26, 32, 44, 0.7) 100%)',
+          background: 'linear-gradient(135deg, rgba(18, 18, 20, 0.9) 0%, rgba(18, 18, 20, 0.7) 100%)',
           border: '1px solid var(--border-color)',
           borderRadius: '8px',
           padding: '14px 16px'
@@ -522,14 +523,14 @@ export default function TabFundamentals({ fundamentals }) {
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             {kpiData.netIncome.margin !== null ? (
-              <span>Net Kâr Marjı: <strong style={{ color: '#fff' }}>%{kpiData.netIncome.margin.toFixed(1)}</strong></span>
+              <span>Net Kâr Marjı: <strong style={{ color: 'var(--text-primary)' }}>%{kpiData.netIncome.margin.toFixed(1)}</strong></span>
             ) : "Vergi & finansman sonrası kâr"}
           </div>
         </div>
 
         {/* KART 4: SERMAYE VE BORÇ DURUMU */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(20, 24, 32, 0.9) 0%, rgba(26, 32, 44, 0.7) 100%)',
+          background: 'linear-gradient(135deg, rgba(18, 18, 20, 0.9) 0%, rgba(18, 18, 20, 0.7) 100%)',
           border: '1px solid var(--border-color)',
           borderRadius: '8px',
           padding: '14px 16px'
@@ -540,7 +541,7 @@ export default function TabFundamentals({ fundamentals }) {
           <div style={{ 
             fontSize: '19px', 
             fontWeight: '700', 
-            color: kpiData.netDebt.val !== null && kpiData.netDebt.val > 0 ? '#d0d7de' : 'var(--color-up)',
+            color: kpiData.netDebt.val !== null && kpiData.netDebt.val > 0 ? 'var(--text-secondary)' : 'var(--color-up)',
             margin: '6px 0 4px 0' 
           }}>
             {kpiData.netDebt.val !== null ? (
@@ -551,7 +552,7 @@ export default function TabFundamentals({ fundamentals }) {
             {kpiData.netDebt.val !== null && kpiData.netDebt.val <= 0 ? (
               <span style={{ color: 'var(--color-up)' }}>Kasadaki nakit borçlardan fazla</span>
             ) : kpiData.equity.val !== null ? (
-              <span>Özkaynak: <strong style={{ color: '#fff' }}>{formatCardVal(kpiData.equity.val)}</strong></span>
+              <span>Özkaynak: <strong style={{ color: 'var(--text-primary)' }}>{formatCardVal(kpiData.equity.val)}</strong></span>
             ) : "Finansal kaldıraç dengesi"}
           </div>
         </div>
@@ -572,9 +573,9 @@ export default function TabFundamentals({ fundamentals }) {
         {/* TAB BUTONLARI (GELİR, BİLANÇO, NAKİT AKIŞI) */}
         <div style={{ display: 'flex', gap: '8px' }}>
           {[
-            { id: 'income_statement', label: '📊 GELİR TABLOSU' },
-            { id: 'balance_sheet', label: '📑 BİLANÇO' },
-            { id: 'cash_flow', label: '💧 NAKİT AKIŞI' }
+            { id: 'income_statement', label: 'GELİR TABLOSU' },
+            { id: 'balance_sheet', label: 'BİLANÇO' },
+            { id: 'cash_flow', label: 'NAKİT AKIŞI' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -609,17 +610,17 @@ export default function TabFundamentals({ fundamentals }) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
-                background: '#14171c',
+                background: 'var(--bg-raised)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '6px',
                 padding: '7px 12px 7px 30px',
                 fontSize: '12px',
-                color: '#fff',
+                color: 'var(--text-primary)',
                 width: '240px',
                 outline: 'none'
               }}
             />
-            <span style={{ position: 'absolute', left: '10px', top: '7px', color: '#666', fontSize: '13px' }}>🔍</span>
+            <span style={{ position: 'absolute', left: '10px', top: '7px', color: 'var(--text-tertiary)', fontSize: '13px' }}><Search size={13} /></span>
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
@@ -629,7 +630,7 @@ export default function TabFundamentals({ fundamentals }) {
                   top: '6px',
                   background: 'none',
                   border: 'none',
-                  color: '#888',
+                  color: 'var(--text-tertiary)',
                   cursor: 'pointer',
                   fontSize: '13px'
                 }}
@@ -642,7 +643,7 @@ export default function TabFundamentals({ fundamentals }) {
           {/* Görünüm Modu Toggle (Özet vs Detaylı) */}
           <div style={{
             display: 'inline-flex',
-            background: '#14171c',
+            background: 'var(--bg-raised)',
             border: '1px solid var(--border-color)',
             borderRadius: '6px',
             padding: '2px'
@@ -650,7 +651,7 @@ export default function TabFundamentals({ fundamentals }) {
             <button
               onClick={() => setViewMode('summary')}
               style={{
-                background: viewMode === 'summary' ? 'rgba(57, 197, 207, 0.2)' : 'transparent',
+                background: viewMode === 'summary' ? 'rgba(200, 162, 74, 0.2)' : 'transparent',
                 color: viewMode === 'summary' ? 'var(--color-cyan)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '4px',
@@ -661,12 +662,12 @@ export default function TabFundamentals({ fundamentals }) {
               }}
               title="Yalnızca en kritik 10-12 temel finansal kalemi gösterir"
             >
-              ⚡ Özet Görünüm
+              Özet Görünüm
             </button>
             <button
               onClick={() => setViewMode('all')}
               style={{
-                background: viewMode === 'all' ? 'rgba(57, 197, 207, 0.2)' : 'transparent',
+                background: viewMode === 'all' ? 'rgba(200, 162, 74, 0.2)' : 'transparent',
                 color: viewMode === 'all' ? 'var(--color-cyan)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '4px',
@@ -677,7 +678,7 @@ export default function TabFundamentals({ fundamentals }) {
               }}
               title="Tüm muhasebe kalemlerini ve alt detayları gruplandırarak listeler"
             >
-              📋 Detaylı Rapor
+              Detaylı Rapor
             </button>
           </div>
         </div>
@@ -693,7 +694,7 @@ export default function TabFundamentals({ fundamentals }) {
         marginTop: '-10px'
       }}>
         <span>
-          💡 <strong>İpucu:</strong> Tüm parasal değerler <strong>Milyon TL</strong> cinsindendir. Kalem açıklamaları için <span style={{ color: 'var(--color-cyan)', fontWeight: 'bold' }}>?</span> butonuna tıklayabilirsiniz.
+          <strong>İpucu:</strong> Tüm parasal değerler <strong>Milyon TL</strong> cinsindendir. Kalem açıklamaları için <span style={{ color: 'var(--color-cyan)', fontWeight: 'bold' }}>?</span> butonuna tıklayabilirsiniz.
         </span>
         {viewMode === 'summary' && !searchQuery && (
           <span style={{ color: 'var(--color-cyan)' }}>

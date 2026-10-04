@@ -42,7 +42,7 @@ export function ReportDetail({ r }) {
             {r.report_title || `${r.ticker || r.category} - Şirket Raporu`}
           </div>
           <div style={{ marginBottom: '8px' }}>
-            <strong style={{ color: '#00e5ff' }}>Özet:</strong> {r.summary || 'Özet bulunmuyor.'}
+            <strong style={{ color: 'var(--gold)' }}>Özet:</strong> {r.summary || 'Özet bulunmuyor.'}
           </div>
           {r.catalysts && (
             <div style={{ marginBottom: '8px' }}>
@@ -50,7 +50,7 @@ export function ReportDetail({ r }) {
             </div>
           )}
           {(r.full_text || r.metin) && (
-            <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', borderTop: '1px dashed #333', paddingTop: '8px' }}>
+            <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-tertiary)', borderTop: '1px dashed var(--border-default)', paddingTop: '8px' }}>
               <strong>Metin Çıktısı:</strong>
               <p style={{ marginTop: '4px' }}>{r.full_text || r.metin}</p>
             </div>
@@ -73,11 +73,11 @@ export function ReportDetail({ r }) {
                         <XAxis dataKey="date" hide />
                         <YAxis domain={['auto', 'auto']} hide />
                         <Tooltip 
-                          contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }}
-                          itemStyle={{ color: '#00e5ff' }}
-                          labelStyle={{ color: '#aaa' }}
+                          contentStyle={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-default)' }}
+                          itemStyle={{ color: 'var(--gold)' }}
+                          labelStyle={{ color: 'var(--text-secondary)' }}
                         />
-                        <Line type="monotone" dataKey="close" stroke="#00e5ff" dot={false} strokeWidth={2} />
+                        <Line type="monotone" dataKey="close" stroke="var(--gold)" dot={false} strokeWidth={2} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -87,29 +87,29 @@ export function ReportDetail({ r }) {
                 
                 {fundamentals && (
                   <div style={{ marginTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', fontSize: '11px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>Sektör:</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.sector || 'N/A'}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-default)' }}>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Sektör:</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{fundamentals.sector || 'N/A'}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>F/K (P/E):</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.trailingPE ? fundamentals.trailingPE.toFixed(2) : 'N/A'}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-default)' }}>
+                      <span style={{ color: 'var(--text-tertiary)' }}>F/K (P/E):</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{fundamentals.trailingPE ? fundamentals.trailingPE.toFixed(2) : 'N/A'}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>PD/DD (P/B):</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.priceToBook ? fundamentals.priceToBook.toFixed(2) : 'N/A'}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-default)' }}>
+                      <span style={{ color: 'var(--text-tertiary)' }}>PD/DD (P/B):</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{fundamentals.priceToBook ? fundamentals.priceToBook.toFixed(2) : 'N/A'}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>Temettü:</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.dividendYield ? (fundamentals.dividendYield * 100).toFixed(2) + '%' : 'N/A'}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-default)' }}>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Temettü:</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{fundamentals.dividendYield ? (fundamentals.dividendYield * 100).toFixed(2) + '%' : 'N/A'}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>Piyasa Değeri:</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.marketCap ? (fundamentals.marketCap / 1e9).toFixed(2) + ' Mlyr ₺' : 'N/A'}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-default)' }}>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Piyasa Değeri:</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{fundamentals.marketCap ? (fundamentals.marketCap / 1e9).toFixed(2) + ' Mlyr ₺' : 'N/A'}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                      <span style={{ color: '#888' }}>Özsermaye K.:</span>
-                      <span style={{ color: '#fff' }}>{fundamentals.returnOnEquity ? (fundamentals.returnOnEquity * 100).toFixed(2) + '%' : 'N/A'}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-default)' }}>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Özsermaye K.:</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{fundamentals.returnOnEquity ? (fundamentals.returnOnEquity * 100).toFixed(2) + '%' : 'N/A'}</span>
                     </div>
                   </div>
                 )}
@@ -133,15 +133,15 @@ export default function ReportRow({ r, isExpanded, onToggle }) {
   const getRatingStyle = (rating) => {
     const rStr = (rating || '').toUpperCase();
     if (rStr === 'AL' || rStr === 'BUY') {
-      return { backgroundColor: 'rgba(0, 255, 0, 0.15)', color: '#00ff00', border: '1px solid #00ff00' };
+      return { backgroundColor: 'rgba(63, 138, 107, 0.15)', color: 'var(--positive)', border: '1px solid var(--positive)' };
     }
     if (rStr === 'TUT' || rStr === 'HOLD' || rStr === 'NEUTRAL') {
-      return { backgroundColor: 'rgba(255, 204, 0, 0.15)', color: '#ffcc00', border: '1px solid #ffcc00' };
+      return { backgroundColor: 'rgba(200, 162, 74, 0.15)', color: 'var(--gold)', border: '1px solid var(--gold-border)' };
     }
     if (rStr === 'SAT' || rStr === 'SELL') {
-      return { backgroundColor: 'rgba(255, 51, 51, 0.15)', color: '#ff3333', border: '1px solid #ff3333' };
+      return { backgroundColor: 'rgba(192, 82, 78, 0.15)', color: 'var(--negative)', border: '1px solid var(--negative)' };
     }
-    return { backgroundColor: '#222', color: '#ccc', border: '1px solid #555' };
+    return { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' };
   };
 
   const hasFinancials = r.target_price > 0 || (r.rating && r.rating !== 'N/A' && r.rating.trim() !== '');
@@ -201,7 +201,7 @@ export default function ReportRow({ r, isExpanded, onToggle }) {
               gap: '6px',
               width: '80%'
             }}>
-              <span style={{ fontSize: '12px' }}>📄</span>
+              
               <span style={{ fontSize: '11px', letterSpacing: '1px', color: 'var(--text-muted)' }}>
                 {r.category ? r.category.toUpperCase() : 'RAPOR'} {r.ticker ? '- HEDEF FİYAT/TAVSİYE İÇERMEZ' : ''}
               </span>

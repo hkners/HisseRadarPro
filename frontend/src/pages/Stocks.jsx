@@ -7,6 +7,8 @@ import FavoriteStar from '../components/common/FavoriteStar';
 import { getCachedData, setCachedData } from '../utils/apiCache';
 import PageContainer from '../components/common/PageContainer';
 import ScoreBreakdownWidget from '../components/ScoreBreakdownWidget';
+import { tintStyle } from '../utils/format';
+import { AlertTriangle } from 'lucide-react';
 
 const BIST30 = ['AKBNK', 'ALARK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'CCOMP', 'CWENE', 'ENKAI', 'EREGL', 'FROTO', 'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KRDMD', 'MIATK', 'ODAS', 'PGSUS', 'PETKM', 'SAHOL', 'SASA', 'SISE', 'TCELL', 'THYAO', 'TOASO', 'TRALT', 'TRMET', 'TUPRS', 'YKBNK'];
 const BIST100 = [
@@ -24,11 +26,11 @@ const BIST100 = [
 const XBANK = ['AKBNK', 'GARAN', 'YKBNK', 'ISCTR', 'VAKBN', 'HALKB', 'TSKB', 'SKBNK', 'ALBRK', 'ICBCT', 'KLNMA', 'QNBFL'];
 
 const getPotentialColor = (pct) => {
-  if (pct > 50) return '#00ff00';
-  if (pct > 20) return '#55cc55';
-  if (pct > 0) return '#88aa88';
-  if (pct < -20) return '#ff0000';
-  if (pct < 0) return '#cc5555';
+  if (pct > 50) return 'var(--positive)';
+  if (pct > 20) return 'var(--positive)';
+  if (pct > 0) return 'var(--positive)';
+  if (pct < -20) return 'var(--negative)';
+  if (pct < 0) return 'var(--negative)';
   return 'var(--color-neutral)';
 };
 
@@ -200,14 +202,14 @@ export default function Stocks() {
 
   return (
     <PageContainer
-      title="BIST HİSSE RADARI"
+      title="Hisseler"
       badge={{
         label: `${processedData.length} SEMBOL`,
-        background: 'rgba(88, 166, 255, 0.12)',
+        background: 'rgba(200, 162, 74, 0.12)',
         color: 'var(--color-neutral)',
-        borderColor: 'rgba(88, 166, 255, 0.3)'
+        borderColor: 'rgba(200, 162, 74, 0.3)'
       }}
-      subtitle="Giriş/çıkış seviyeleri, dinamik stop-loss ve risk/ödül optimizasyonu ile kısa-orta vadeli işlem kararları"
+      subtitle="Giriş bölgesi, dinamik stop ve risk/ödül ile kısa–orta vade işlem kurulumları."
       statusDot={data.status === 'FETCHING' ? 'var(--color-warning)' : 'var(--color-up)'}
       headerRight={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px' }}>
@@ -239,7 +241,7 @@ export default function Stocks() {
                   padding: '3px 10px', 
                   background: 'var(--bg-secondary)', 
                   border: '1px solid var(--border-color)', 
-                  color: '#fff',
+                  color: 'var(--text-primary)',
                   borderRadius: '4px',
                   fontSize: '11px',
                   outline: 'none'
@@ -249,45 +251,43 @@ export default function Stocks() {
                 onClick={() => setFilter('ALL')} 
                 className={`action-button ${filter === 'ALL' ? 'active' : ''}`}
               >
-                [TÜMÜ]
+                Tümü
               </button>
               <button 
                 onClick={() => setFilter('STRONG_BUY')} 
                 className={`action-button ${filter === 'STRONG_BUY' ? 'active-green' : ''}`}
-                style={filter === 'STRONG_BUY' ? {} : { color: 'var(--color-up)', borderColor: 'rgba(0, 230, 118, 0.3)' }}
               >
-                [GÜÇLÜ AL]
+                Güçlü AL
               </button>
               <button 
                 onClick={() => setFilter('IN_ENTRY')} 
                 className={`action-button ${filter === 'IN_ENTRY' ? 'active-cyan' : ''}`}
               >
-                [ALIM BÖLGESİ]
+                Alım bölgesi
               </button>
               <button 
                 onClick={() => setFilter('BUY_RECOMMENDED')} 
                 className={`action-button ${filter === 'BUY_RECOMMENDED' ? 'active' : ''}`}
               >
-                [ÖNERİLENLER]
+                Önerilenler
               </button>
               <button 
                 onClick={() => setFilter('FAVORITES')} 
                 className={`action-button ${filter === 'FAVORITES' ? 'active-warning' : ''}`}
-                style={filter === 'FAVORITES' ? {} : { color: 'var(--color-warning)', borderColor: 'rgba(255, 170, 0, 0.3)' }}
               >
-                [FAVORİLER]
+                Favoriler
               </button>
               <button 
                 onClick={() => setFilter('BIST30')} 
                 className={`action-button ${filter === 'BIST30' ? 'active' : ''}`}
               >
-                [BIST 30]
+                BIST 30
               </button>
               <button 
                 onClick={() => setFilter('BIST100')} 
                 className={`action-button ${filter === 'BIST100' ? 'active' : ''}`}
               >
-                [BIST 100]
+                BIST 100
               </button>
             </div>
           </div>
@@ -369,14 +369,14 @@ export default function Stocks() {
                           </Link>
                           {BIST30.includes(s.ticker) && <span className="badge badge-subtle" style={{ fontSize: '9px', padding: '1px 3px' }}>B30</span>}
                           {s.model_count > 0 && (
-                            <span style={{ fontSize: '9px', color: '#ffab00', fontWeight: 'bold', background: 'rgba(255, 171, 0, 0.15)', padding: '1px 4px', borderRadius: '3px', flexShrink: 0 }}>MOD</span>
+                            <span style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: 'bold', background: 'rgba(201, 136, 58, 0.15)', padding: '1px 4px', borderRadius: '3px', flexShrink: 0 }}>MOD</span>
                           )}
                         </div>
                       </div>
                     </td>
 
                     {/* Price */}
-                    <td style={{ fontWeight: 'bold', textAlign: 'right', color: '#fff', fontSize: '13px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                    <td style={{ fontWeight: 'bold', textAlign: 'right', color: 'var(--text-primary)', fontSize: '13px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                       {s.price ? s.price.toFixed(2) : 'N/A'}
                     </td>
 
@@ -401,8 +401,7 @@ export default function Stocks() {
                           title="Karar Skoru alt bileşen dökümünü aç/kapat"
                           style={{
                             width: '128px',
-                            background: s.decision_color || 'var(--color-warning)',
-                            color: ['#ff3366', '#ef4444', '#dc2626', '#f85149'].includes(s.decision_color) ? '#ffffff' : '#000000',
+                            ...tintStyle(s.decision_color || 'var(--color-warning)'),
                             fontSize: '9.5px',
                             fontWeight: '900',
                             padding: '3px 6px',
@@ -430,13 +429,13 @@ export default function Stocks() {
                             style={{
                               position: 'absolute',
                               right: '0px',
-                              color: '#ffab00',
+                              color: 'var(--warning)',
                               cursor: 'help',
                               fontSize: '12px',
                               lineHeight: 1
                             }}
                           >
-                            ⚠️
+                            <AlertTriangle size={12} />
                           </span>
                         )}
                       </div>
@@ -445,7 +444,7 @@ export default function Stocks() {
                     {/* Entry Zone */}
                     <td style={{ textAlign: 'center', fontSize: '12px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       {s.entry_zone ? (
-                        <span style={{ color: '#00e5ff', fontWeight: 'bold' }}>
+                        <span style={{ color: 'var(--gold)', fontWeight: 'bold' }}>
                           {s.entry_zone.low} - {s.entry_zone.high}
                         </span>
                       ) : '-'}
@@ -456,20 +455,20 @@ export default function Stocks() {
                       {s.rec_count > 0 ? (
                         <span 
                           style={{ 
-                            color: s.is_excessive_rr ? '#ffab00' : getPotentialColor(s.avg_potential),
+                            color: s.is_excessive_rr ? 'var(--warning)' : getPotentialColor(s.avg_potential),
                             fontWeight: 'bold',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '3px',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            background: s.is_excessive_rr ? 'rgba(255, 171, 0, 0.12)' : 'rgba(255,255,255,0.03)',
-                            border: s.is_excessive_rr ? '1px solid rgba(255, 171, 0, 0.3)' : 'none',
+                            background: s.is_excessive_rr ? 'rgba(201, 136, 58, 0.12)' : 'rgba(255,255,255,0.03)',
+                            border: s.is_excessive_rr ? '1px solid rgba(201, 136, 58, 0.3)' : 'none',
                             fontVariantNumeric: 'tabular-nums'
                           }}
                           title={s.is_excessive_rr ? "Aşırı yüksek getiri/R:R - sermaye artırımı/bölünme sonrası hedef fiyat doğrulaması gerekebilir" : ""}
                         >
-                          {s.is_excessive_rr && <span style={{ fontSize: '10px' }}>⚠️</span>}
+                          {s.is_excessive_rr && <span style={{ fontSize: '10px' }}><AlertTriangle size={12} /></span>}
                           {s.avg_potential > 0 ? '+' : ''}{s.avg_potential.toFixed(1)}%
                         </span>
                       ) : (
@@ -490,12 +489,12 @@ export default function Stocks() {
 
                     <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                       <Link to={`/hisse/${s.ticker}`} className="action-button" style={{ padding: '3px 8px', fontSize: '10px' }}>
-                        [KOKPİT]
+                        Kokpit
                       </Link>
                     </td>
                   </tr>
                   {expandedRows[s.ticker] && (
-                    <tr key={`${s.ticker}-breakdown`} style={{ background: 'rgba(10, 15, 25, 0.95)' }}>
+                    <tr key={`${s.ticker}-breakdown`} style={{ background: 'rgba(18, 18, 20, 0.95)' }}>
                       <td colSpan="10" style={{ padding: '8px 14px 12px 14px', borderBottom: '1px solid var(--border-color)' }}>
                         <ScoreBreakdownWidget ticker={s.ticker} compact={true} />
                       </td>

@@ -42,7 +42,7 @@ export default function ReportStats({ reports = [] }) {
     }));
   }, [reports]);
 
-  const barColors = ['#88aa88', '#55cc55', '#00ff00', '#00e5ff', '#ffaa00'];
+  const barColors = ['var(--positive)', 'var(--positive)', 'var(--positive)', 'var(--gold)', 'var(--warning)'];
 
   return (
     <div style={{ marginBottom: '15px' }}>
@@ -56,7 +56,7 @@ export default function ReportStats({ reports = [] }) {
 
         <div className="panel flex-1" style={{ margin: 0 }}>
           <div className="panel-header">ARACI KURUM SAYISI</div>
-          <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: '#00e5ff' }}>
+          <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--gold)' }}>
             {uniqueBrokersCount} <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Kurum</span>
           </div>
         </div>
@@ -80,10 +80,10 @@ export default function ReportStats({ reports = [] }) {
           <div className="panel-content" style={{ height: '140px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={distributionData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <XAxis dataKey="range" stroke="#888" fontSize={11} tickLine={false} />
-                <YAxis stroke="#888" fontSize={11} allowDecimals={false} />
+                <XAxis dataKey="range" stroke="var(--text-tertiary)" fontSize={11} tickLine={false} />
+                <YAxis stroke="var(--text-tertiary)" fontSize={11} allowDecimals={false} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0c0d10', border: '1px solid #333', fontSize: '12px' }}
+                  contentStyle={{ backgroundColor: '#0c0d10', border: '1px solid var(--border-default)', fontSize: '12px' }}
                   cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                 />
                 <Bar dataKey="count" name="Rapor Sayısı" radius={[4, 4, 0, 0]}>

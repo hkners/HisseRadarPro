@@ -286,9 +286,9 @@ export default function ResearchReports() {
 
   return (
     <PageContainer
-      title="ARAŞTIRMA RAPORLARI"
+      title="Raporlar"
       badge={{ label: `${filteredReports.length} RAPOR` }}
-      subtitle="Güncel Aracı Kurum Analiz ve Şirket Raporları"
+      subtitle="Aracı kurumların güncel şirket ve analiz raporları."
       style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
     >
       {/* Analytical Stats Bar & Recharts Distribution */}

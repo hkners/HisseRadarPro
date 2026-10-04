@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FavoriteStar from './common/FavoriteStar';
 import { getCachedData } from '../utils/apiCache';
+import { AlertTriangle } from 'lucide-react';
 
 const BIST30 = new Set(['AKBNK', 'ALARK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'CCOMP', 'CWENE', 'ENKAI', 'EREGL', 'FROTO', 'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KRDMD', 'MIATK', 'ODAS', 'PGSUS', 'PETKM', 'SAHOL', 'SASA', 'SISE', 'TCELL', 'THYAO', 'TOASO', 'TRALT', 'TRMET', 'TUPRS', 'YKBNK']);
 
@@ -105,7 +106,7 @@ export default function StockCommandHeader({
           gap: '8px',
           padding: '5px 12px',
           borderRadius: '6px',
-          background: 'linear-gradient(90deg, rgba(20,24,33,0.98) 0%, rgba(15,18,25,0.98) 100%)',
+          background: 'linear-gradient(90deg, rgba(18, 18, 20, 0.98) 0%, rgba(18, 18, 20, 0.98) 100%)',
           border: '1px solid var(--border-color)',
           fontSize: '11px',
           whiteSpace: 'nowrap',
@@ -133,11 +134,11 @@ export default function StockCommandHeader({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <FavoriteStar ticker={ticker} />
-            <span style={{ fontSize: '15px', fontWeight: '900', color: '#fff' }} title={companyName}>
+            <span style={{ fontSize: '15px', fontWeight: '900', color: 'var(--text-primary)' }} title={companyName}>
               {ticker}
             </span>
             {isBist30 && (
-              <span style={{ fontSize: '8px', fontWeight: 'bold', background: 'rgba(0, 229, 255, 0.15)', color: 'var(--color-cyan)', border: '1px solid rgba(0, 229, 255, 0.3)', padding: '1px 3px', borderRadius: '2px' }}>
+              <span style={{ fontSize: '8px', fontWeight: 'bold', background: 'rgba(200, 162, 74, 0.15)', color: 'var(--color-cyan)', border: '1px solid rgba(200, 162, 74, 0.3)', padding: '1px 3px', borderRadius: '2px' }}>
                 B30
               </span>
             )}
@@ -145,7 +146,7 @@ export default function StockCommandHeader({
 
           {/* Live Price & Delta Pill */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', background: 'rgba(0,0,0,0.35)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <span style={{ fontSize: '15px', fontWeight: '900', color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '15px', fontWeight: '900', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
               {currentPriceVal ? currentPriceVal.toFixed(2) : '-'}
             </span>
             <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>TL</span>
@@ -169,7 +170,7 @@ export default function StockCommandHeader({
             {/* Decision Pill */}
             <span style={{
               background: decisionColor,
-              color: ['#ff3366', '#ef4444', '#dc2626', '#f85149'].includes(decisionColor) ? '#ffffff' : '#000000',
+              color: ['var(--negative)', 'var(--negative)', 'var(--negative)', 'var(--negative)'].includes(decisionColor) ? 'var(--text-primary)' : '#000000',
               fontSize: '9px',
               fontWeight: '900',
               padding: '2px 6px',
@@ -184,9 +185,9 @@ export default function StockCommandHeader({
               <span 
                 title={setup.disagreement_reason || `Karar Skoru: ${Math.round(score)}p (${decisionText}) vs Alpha Motoru: ${setup.alpha_score}p (${setup.alpha_signal}) zıt görüşte`}
                 style={{
-                  background: 'rgba(245, 158, 11, 0.15)',
-                  border: '1px solid rgba(245, 158, 11, 0.4)',
-                  color: '#f59e0b',
+                  background: 'rgba(201, 136, 58, 0.15)',
+                  border: '1px solid rgba(201, 136, 58, 0.4)',
+                  color: 'var(--warning)',
                   fontSize: '9px',
                   fontWeight: 'bold',
                   padding: '2px 6px',
@@ -197,7 +198,7 @@ export default function StockCommandHeader({
                   gap: '2px'
                 }}
               >
-                ⚠ İki motor farklı görüşte
+                <AlertTriangle size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />İki motor farklı görüşte
               </span>
             )}
 
@@ -205,7 +206,7 @@ export default function StockCommandHeader({
             {setup.entry_zone?.low && (
               <div style={{ display: 'flex', gap: '3px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Alım:</span>
-                <span style={{ color: '#00e5ff', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ color: 'var(--gold)', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
                   {setup.entry_zone.low}-{setup.entry_zone.high}
                 </span>
               </div>
@@ -236,7 +237,7 @@ export default function StockCommandHeader({
             {setup.risk_reward && (
               <div style={{ display: 'flex', gap: '3px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>R:R:</span>
-                <span style={{ color: '#fff', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
                   1:{setup.risk_reward.toFixed(1)}
                 </span>
               </div>
@@ -248,8 +249,8 @@ export default function StockCommandHeader({
               data-testid="ai-thesis-btn"
               onClick={() => setShowThesis(!showThesis)}
               style={{
-                background: showThesis ? 'rgba(0, 229, 255, 0.15)' : 'transparent',
-                border: '1px solid rgba(0, 229, 255, 0.3)',
+                background: showThesis ? 'rgba(200, 162, 74, 0.15)' : 'transparent',
+                border: '1px solid rgba(200, 162, 74, 0.3)',
                 color: 'var(--color-cyan)',
                 fontSize: '10px',
                 padding: '2px 6px',
@@ -269,8 +270,8 @@ export default function StockCommandHeader({
                 onClick={onOpenBreakdown}
                 title="Karar Skoru 5 alt bileşenini incele"
                 style={{
-                  background: 'rgba(0, 229, 255, 0.12)',
-                  border: '1px solid rgba(0, 229, 255, 0.35)',
+                  background: 'rgba(200, 162, 74, 0.12)',
+                  border: '1px solid rgba(200, 162, 74, 0.35)',
                   color: 'var(--color-cyan)',
                   fontSize: '10px',
                   padding: '2px 6px',
@@ -282,7 +283,7 @@ export default function StockCommandHeader({
                   gap: '3px'
                 }}
               >
-                📊 Skor Detayı
+                Skor Detayı
               </button>
             )}
           </div>
@@ -355,10 +356,10 @@ export default function StockCommandHeader({
                       alignItems: 'center',
                       fontSize: '11px'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(0, 229, 255, 0.1)'}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(200, 162, 74, 0.1)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
-                    <span style={{ fontWeight: 'bold', color: '#fff' }}>{s.ticker}</span>
+                    <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{s.ticker}</span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>{s.price ? `${s.price.toFixed(2)} TL` : ''}</span>
                   </div>
                 ))}
@@ -373,9 +374,9 @@ export default function StockCommandHeader({
             onClick={onOpenPortfolioModal}
             className="action-button"
             style={{
-              background: 'rgba(0, 229, 255, 0.15)',
+              background: 'rgba(200, 162, 74, 0.15)',
               color: 'var(--color-cyan)',
-              border: '1px solid rgba(0, 229, 255, 0.4)',
+              border: '1px solid rgba(200, 162, 74, 0.4)',
               padding: '3px 8px',
               fontSize: '10px',
               fontWeight: 'bold',
@@ -394,9 +395,9 @@ export default function StockCommandHeader({
               onClick={onToggleLayoutMode}
               className="action-button"
               style={{
-                background: layoutMode === 'terminal' ? 'rgba(0,200,83,0.15)' : 'rgba(255,255,255,0.05)',
+                background: layoutMode === 'terminal' ? 'rgba(63, 138, 107, 0.15)' : 'rgba(255,255,255,0.05)',
                 color: layoutMode === 'terminal' ? 'var(--color-up)' : 'var(--text-muted)',
-                border: `1px solid ${layoutMode === 'terminal' ? 'rgba(0,200,83,0.4)' : 'var(--border-color)'}`,
+                border: `1px solid ${layoutMode === 'terminal' ? 'rgba(63, 138, 107, 0.4)' : 'var(--border-color)'}`,
                 padding: '3px 8px',
                 fontSize: '10px',
                 fontWeight: 'bold',
@@ -414,8 +415,8 @@ export default function StockCommandHeader({
       {showThesis && (
         <div 
           style={{
-            background: 'rgba(14, 18, 25, 0.98)',
-            border: '1px solid rgba(0, 229, 255, 0.25)',
+            background: 'rgba(18, 18, 20, 0.98)',
+            border: '1px solid rgba(200, 162, 74, 0.25)',
             borderRadius: '6px',
             padding: '10px 14px',
             display: 'grid',

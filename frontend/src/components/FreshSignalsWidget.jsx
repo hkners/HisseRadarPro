@@ -91,10 +91,10 @@ const FreshSignalsWidget = () => {
   }, []);
 
   return (
-    <div className={`panel-neon panel-flex ${error ? 'neon-down' : 'neon-up'}`} style={{ height: '100%', minHeight: '250px', display: 'flex', flexDirection: 'column' }}>
-      <div className="panel-header" style={{ color: 'var(--color-up)', display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '11px' }}>
-        <span>⚡ TAZE AL SİNYALLERİ (MACD/SMA)</span>
-        <Link to="/technical-screener" className="ticker-link text-neutral" style={{ fontSize: '9px' }}>[TÜMÜ]</Link>
+    <div className="panel panel-flex" style={{ height: '100%', minHeight: '250px', display: 'flex', flexDirection: 'column' }}>
+      <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '11px' }}>
+        <span>TAZE AL SİNYALLERİ (MACD/SMA)</span>
+        <Link to="/technical-screener" className="ticker-link text-neutral" style={{ fontSize: '9px' }}>Tümü</Link>
       </div>
       <div className="panel-content panel-scrollable">
         {loading ? (

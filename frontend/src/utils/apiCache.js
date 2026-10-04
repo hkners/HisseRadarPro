@@ -107,4 +107,5 @@ export function prefetchAllCoreData() {
   fetchWithCache(`${apiUrl}/screener`);
   fetchWithCache(`${apiUrl}/technical-screener`);
   fetchWithCache(`${apiUrl}/alpha/screener`);
+  fetchWithCache(`${apiUrl}/screener/universe`, { ttl: 120000 });
 }

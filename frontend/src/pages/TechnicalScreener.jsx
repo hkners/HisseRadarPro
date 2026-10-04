@@ -40,14 +40,14 @@ const ScreenerRow = React.memo(({ row, getSignalColor, getSignalBadge }) => {
       </td>
 
       {/* RSI */}
-      <td style={{ textAlign: 'center', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums', color: row.rsi < 30 ? 'var(--color-up)' : row.rsi > 70 ? 'var(--color-down)' : '#aaa' }}>
+      <td style={{ textAlign: 'center', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums', color: row.rsi < 30 ? 'var(--color-up)' : row.rsi > 70 ? 'var(--color-down)' : 'var(--text-secondary)' }}>
         {row.rsi !== null ? row.rsi.toFixed(1) : 'N/A'}
       </td>
       
       {/* MACD */}
       <td style={{ textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         <span style={{ 
-          color: row.macd_state === 'AL' ? 'var(--color-up)' : row.macd_state === 'SAT' ? 'var(--color-down)' : '#aaa',
+          color: row.macd_state === 'AL' ? 'var(--color-up)' : row.macd_state === 'SAT' ? 'var(--color-down)' : 'var(--text-secondary)',
           fontWeight: 'bold',
           fontSize: '11px'
         }}>
@@ -63,7 +63,7 @@ const ScreenerRow = React.memo(({ row, getSignalColor, getSignalBadge }) => {
       {/* SMA Trend */}
       <td style={{ textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         <span style={{ 
-          color: row.sma_state === 'AL' ? 'var(--color-up)' : row.sma_state === 'SAT' ? 'var(--color-down)' : '#aaa',
+          color: row.sma_state === 'AL' ? 'var(--color-up)' : row.sma_state === 'SAT' ? 'var(--color-down)' : 'var(--text-secondary)',
           fontWeight: 'bold',
           fontSize: '11px'
         }}>
@@ -77,7 +77,7 @@ const ScreenerRow = React.memo(({ row, getSignalColor, getSignalBadge }) => {
       </td>
 
       {/* Detay */}
-      <td style={{ fontSize: '0.75rem', color: '#aaa', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.reasons?.join(', ')}>
+      <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.reasons?.join(', ')}>
         {row.reasons?.join(', ') || '-'}
       </td>
 
@@ -88,7 +88,7 @@ const ScreenerRow = React.memo(({ row, getSignalColor, getSignalBadge }) => {
           className="action-button" 
           style={{ padding: '3px 8px', fontSize: '10.5px' }}
         >
-          [KOKPİT]
+          Kokpit
         </Link>
       </td>
     </tr>
@@ -155,16 +155,16 @@ export default function TechnicalScreener() {
   const getSignalColor = (signal) => {
     if (signal.includes('AL')) return 'var(--color-up)';
     if (signal.includes('SAT')) return 'var(--color-down)';
-    return '#aaa';
+    return 'var(--text-secondary)';
   };
 
   const getSignalBadge = (signal) => {
-    let bg = '#333';
-    let color = '#aaa';
+    let bg = 'var(--bg-elevated)';
+    let color = 'var(--text-secondary)';
     if (signal === 'GÜÇLÜ AL') { bg = 'rgba(0,255,128,0.2)'; color = 'var(--color-up)'; }
     if (signal === 'AL') { bg = 'rgba(0,255,128,0.1)'; color = 'var(--color-up)'; }
-    if (signal === 'SAT') { bg = 'rgba(255,80,80,0.1)'; color = 'var(--color-down)'; }
-    if (signal === 'GÜÇLÜ SAT') { bg = 'rgba(255,80,80,0.2)'; color = 'var(--color-down)'; }
+    if (signal === 'SAT') { bg = 'rgba(192, 82, 78, 0.1)'; color = 'var(--color-down)'; }
+    if (signal === 'GÜÇLÜ SAT') { bg = 'rgba(192, 82, 78, 0.2)'; color = 'var(--color-down)'; }
     
     return (
       <span style={{
@@ -251,14 +251,14 @@ export default function TechnicalScreener() {
 
   return (
     <PageContainer 
-      title="TEKNİK RADAR"
+      title="Teknik Radar"
       badge={{
         label: `${sortedData.length} HİSSE`,
-        background: 'rgba(63, 185, 80, 0.15)',
+        background: 'rgba(63, 138, 107, 0.15)',
         color: 'var(--color-up)',
-        borderColor: 'rgba(63, 185, 80, 0.35)'
+        borderColor: 'rgba(63, 138, 107, 0.35)'
       }}
-      subtitle="Günlük Kapanışlara Göre TradingView, MACD, RSI ve SMA Kesişimleri"
+      subtitle="Günlük kapanışlara göre TradingView, MACD, RSI ve SMA kesişimleri."
       statusDot="var(--color-up)"
     >
       <div className="panel flex-1" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, marginBottom: 0 }}>
@@ -277,7 +277,7 @@ export default function TechnicalScreener() {
                   borderRadius: '4px', 
                   border: '1px solid var(--border-color)', 
                   background: 'var(--bg-secondary)', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   fontSize: '11px',
                   outline: 'none'
                 }}
@@ -286,47 +286,43 @@ export default function TechnicalScreener() {
                 onClick={() => { setSignalFilter('ALL'); setIndexFilter('ALL'); setOnlyFavorites(false); setSearch(''); }}
                 className={`action-button ${signalFilter === 'ALL' && indexFilter === 'ALL' && !onlyFavorites ? 'active' : ''}`}
               >
-                [TÜMÜ]
+                Tümü
               </button>
               <button 
                 onClick={() => { setSignalFilter('DOUBLE_CONFIRM'); }}
                 className={`action-button ${signalFilter === 'DOUBLE_CONFIRM' ? 'active-cyan' : ''}`}
-                style={signalFilter === 'DOUBLE_CONFIRM' ? {} : { color: 'var(--color-cyan)', borderColor: 'rgba(0, 229, 255, 0.3)' }}
               >
-                [ÇİFTE TEYİT]
+                Çifte teyit
               </button>
               <button 
                 onClick={() => { setSignalFilter('AL'); }}
                 className={`action-button ${signalFilter === 'AL' ? 'active-green' : ''}`}
-                style={signalFilter === 'AL' ? {} : { color: 'var(--color-up)', borderColor: 'rgba(0, 230, 118, 0.3)' }}
               >
-                [AL SİNYALİ]
+                AL sinyali
               </button>
               <button 
                 onClick={() => { setSignalFilter('RECENT_BUY'); }}
                 className={`action-button ${signalFilter === 'RECENT_BUY' ? 'active-purple' : ''}`}
-                style={signalFilter === 'RECENT_BUY' ? {} : { color: '#b388ff', borderColor: 'rgba(179, 136, 255, 0.3)' }}
               >
-                [YENİ AL]
+                Yeni AL
               </button>
               <button 
                 onClick={() => setOnlyFavorites(!onlyFavorites)}
                 className={`action-button ${onlyFavorites ? 'active-warning' : ''}`}
-                style={onlyFavorites ? {} : { color: 'var(--color-warning)', borderColor: 'rgba(255, 170, 0, 0.3)' }}
               >
-                [FAVORİLER]
+                Favoriler
               </button>
               <button 
                 onClick={() => setIndexFilter(indexFilter === 'BIST30' ? 'ALL' : 'BIST30')}
                 className={`action-button ${indexFilter === 'BIST30' ? 'active' : ''}`}
               >
-                [BIST 30]
+                BIST 30
               </button>
               <button 
                 onClick={() => setIndexFilter(indexFilter === 'BIST100' ? 'ALL' : 'BIST100')}
                 className={`action-button ${indexFilter === 'BIST100' ? 'active' : ''}`}
               >
-                [BIST 100]
+                BIST 100
               </button>
             </div>
 
@@ -423,7 +419,7 @@ export default function TechnicalScreener() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-tertiary)' }}>
                       Kriterlere uygun hisse bulunamadı.
                     </td>
                   </tr>

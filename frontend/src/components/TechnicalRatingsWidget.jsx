@@ -44,7 +44,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
 
     const renderActionBadge = (action) => {
         const bg = action === 'BUY' ? 'var(--color-up)' : action === 'SELL' ? 'var(--color-down)' : 'transparent';
-        const color = action === 'NEUTRAL' || action === 'NÖTR' ? 'var(--text-muted)' : '#fff';
+        const color = action === 'NEUTRAL' || action === 'NÖTR' ? 'var(--text-muted)' : 'var(--text-primary)';
         const text = action === 'BUY' ? 'AL' : action === 'SELL' ? 'SAT' : 'NÖTR';
         return (
             <span style={{
@@ -137,7 +137,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                     <path
                         d="M 28.04 92.49 A 72 72 0 0 1 40.31 54.74"
                         fill="none"
-                        stroke="#ef4444"
+                        stroke="var(--negative)"
                         strokeWidth={overallRec === "STRONG_SELL" ? 13 : 9}
                         strokeLinecap="round"
                         opacity={overallRec === "STRONG_SELL" ? 1.0 : 0.45}
@@ -148,7 +148,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                     <path
                         d="M 43.26 50.67 A 72 72 0 0 1 75.37 27.34"
                         fill="none"
-                        stroke="#f87171"
+                        stroke="var(--negative)"
                         strokeWidth={overallRec === "SELL" ? 13 : 9}
                         strokeLinecap="round"
                         opacity={overallRec === "SELL" ? 1.0 : 0.45}
@@ -159,7 +159,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                     <path
                         d="M 80.15 25.79 A 72 72 0 0 1 119.85 25.79"
                         fill="none"
-                        stroke="#64748b"
+                        stroke="var(--text-tertiary)"
                         strokeWidth={overallRec === "NEUTRAL" ? 13 : 9}
                         strokeLinecap="round"
                         opacity={overallRec === "NEUTRAL" ? 1.0 : 0.45}
@@ -170,7 +170,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                     <path
                         d="M 124.63 27.34 A 72 72 0 0 1 156.74 50.67"
                         fill="none"
-                        stroke="#4ade80"
+                        stroke="var(--positive)"
                         strokeWidth={overallRec === "BUY" ? 13 : 9}
                         strokeLinecap="round"
                         opacity={overallRec === "BUY" ? 1.0 : 0.45}
@@ -181,7 +181,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                     <path
                         d="M 159.69 54.74 A 72 72 0 0 1 171.96 92.49"
                         fill="none"
-                        stroke="#22c55e"
+                        stroke="var(--positive)"
                         strokeWidth={overallRec === "STRONG_BUY" ? 13 : 9}
                         strokeLinecap="round"
                         opacity={overallRec === "STRONG_BUY" ? 1.0 : 0.45}
@@ -189,11 +189,11 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                     />
 
                     {/* Labels around gauge */}
-                    <text x="18" y="108" fill={overallRec === "STRONG_SELL" ? "#ef4444" : "#64748b"} fontSize="8" fontWeight={overallRec === "STRONG_SELL" ? "bold" : "normal"} textAnchor="middle">Güçlü sat</text>
-                    <text x="48" y="34" fill={overallRec === "SELL" ? "#f87171" : "#64748b"} fontSize="8" fontWeight={overallRec === "SELL" ? "bold" : "normal"} textAnchor="middle">Sat</text>
-                    <text x="100" y="14" fill={overallRec === "NEUTRAL" ? "#94a3b8" : "#64748b"} fontSize="8" fontWeight={overallRec === "NEUTRAL" ? "bold" : "normal"} textAnchor="middle">Nötr</text>
-                    <text x="152" y="34" fill={overallRec === "BUY" ? "#4ade80" : "#64748b"} fontSize="8" fontWeight={overallRec === "BUY" ? "bold" : "normal"} textAnchor="middle">Al</text>
-                    <text x="182" y="108" fill={overallRec === "STRONG_BUY" ? "#22c55e" : "#64748b"} fontSize="8" fontWeight={overallRec === "STRONG_BUY" ? "bold" : "normal"} textAnchor="middle">Güçlü al</text>
+                    <text x="18" y="108" fill={overallRec === "STRONG_SELL" ? "var(--negative)" : "var(--text-tertiary)"} fontSize="8" fontWeight={overallRec === "STRONG_SELL" ? "bold" : "normal"} textAnchor="middle">Güçlü sat</text>
+                    <text x="48" y="34" fill={overallRec === "SELL" ? "var(--negative)" : "var(--text-tertiary)"} fontSize="8" fontWeight={overallRec === "SELL" ? "bold" : "normal"} textAnchor="middle">Sat</text>
+                    <text x="100" y="14" fill={overallRec === "NEUTRAL" ? "var(--text-tertiary)" : "var(--text-tertiary)"} fontSize="8" fontWeight={overallRec === "NEUTRAL" ? "bold" : "normal"} textAnchor="middle">Nötr</text>
+                    <text x="152" y="34" fill={overallRec === "BUY" ? "var(--positive)" : "var(--text-tertiary)"} fontSize="8" fontWeight={overallRec === "BUY" ? "bold" : "normal"} textAnchor="middle">Al</text>
+                    <text x="182" y="108" fill={overallRec === "STRONG_BUY" ? "var(--positive)" : "var(--text-tertiary)"} fontSize="8" fontWeight={overallRec === "STRONG_BUY" ? "bold" : "normal"} textAnchor="middle">Güçlü al</text>
 
                     {/* Needle with pivot */}
                     <g style={{
@@ -201,9 +201,9 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                         transformOrigin: '100px 95px',
                         transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
                     }}>
-                        <polygon points="98.5,95 99.5,35 100.5,35 101.5,95" fill="#ffffff" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))" />
-                        <circle cx="100" cy="95" r="5" fill="#ffffff" stroke="#14171c" strokeWidth="2" />
-                        <circle cx="100" cy="95" r="2" fill="#14171c" />
+                        <polygon points="98.5,95 99.5,35 100.5,35 101.5,95" fill="var(--text-primary)" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))" />
+                        <circle cx="100" cy="95" r="5" fill="var(--text-primary)" stroke="var(--bg-raised)" strokeWidth="2" />
+                        <circle cx="100" cy="95" r="2" fill="var(--bg-raised)" />
                     </g>
                 </svg>
 
@@ -214,9 +214,9 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
 
                 {/* Signal count badges */}
                 <div style={{ display: 'flex', gap: '14px', fontSize: '10px', marginTop: '4px', fontWeight: 'bold' }}>
-                    <span style={{ color: '#ef4444' }}>Sat: {counts.sell}</span>
-                    <span style={{ color: '#9da7b3' }}>Nötr: {counts.neutral}</span>
-                    <span style={{ color: '#22c55e' }}>Al: {counts.buy}</span>
+                    <span style={{ color: 'var(--negative)' }}>Sat: {counts.sell}</span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Nötr: {counts.neutral}</span>
+                    <span style={{ color: 'var(--positive)' }}>Al: {counts.buy}</span>
                 </div>
             </div>
 
@@ -243,7 +243,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', background: idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent', padding: '3px 2px', borderRadius: '3px' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>{osc.name}</span>
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center', width: '80px', justifyContent: 'flex-end' }}>
-                                    <span style={{ color: '#fff', fontFamily: 'var(--font-mono)', width: '35px', textAlign: 'right', fontSize: '9px' }}>{val !== undefined && val !== null ? val.toFixed(2) : '-'}</span>
+                                    <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', width: '35px', textAlign: 'right', fontSize: '9px' }}>{val !== undefined && val !== null ? val.toFixed(2) : '-'}</span>
                                     {renderActionBadge(act)}
                                 </div>
                             </div>
@@ -276,11 +276,11 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                                 <span style={{ color: 'var(--text-muted)', width: '35px', fontWeight: 'bold' }}>{len}</span>
                                 <div style={{ display: 'flex', gap: '5px', flex: 1, justifyContent: 'flex-end' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', width: '80px', justifyContent: 'space-between' }}>
-                                        <span style={{ color: '#fff', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>{sma ? sma.toFixed(2) : '-'}</span>
+                                        <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>{sma ? sma.toFixed(2) : '-'}</span>
                                         {renderActionBadge(getMaAction(sma))}
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', width: '80px', justifyContent: 'space-between' }}>
-                                        <span style={{ color: '#fff', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>{ema ? ema.toFixed(2) : '-'}</span>
+                                        <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '9px' }}>{ema ? ema.toFixed(2) : '-'}</span>
                                         {renderActionBadge(getMaAction(ema))}
                                     </div>
                                 </div>
@@ -304,7 +304,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                                 <th style={{ padding: '3px' }}>S3</th>
                                 <th style={{ padding: '3px' }}>S2</th>
                                 <th style={{ padding: '3px' }}>S1</th>
-                                <th style={{ padding: '3px', color: '#fff' }}>Pivot</th>
+                                <th style={{ padding: '3px', color: 'var(--text-primary)' }}>Pivot</th>
                                 <th style={{ padding: '3px' }}>R1</th>
                                 <th style={{ padding: '3px' }}>R2</th>
                                 <th style={{ padding: '3px' }}>R3</th>
@@ -319,7 +319,7 @@ const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
                                         <td style={{ padding: '3px', fontFamily: 'var(--font-mono)' }}>{p.S3 ? p.S3.toFixed(2) : '-'}</td>
                                         <td style={{ padding: '3px', fontFamily: 'var(--font-mono)' }}>{p.S2 ? p.S2.toFixed(2) : '-'}</td>
                                         <td style={{ padding: '3px', fontFamily: 'var(--font-mono)' }}>{p.S1 ? p.S1.toFixed(2) : '-'}</td>
-                                        <td style={{ padding: '3px', fontFamily: 'var(--font-mono)', color: '#fff', fontWeight: 'bold' }}>{p.Pivot ? p.Pivot.toFixed(2) : '-'}</td>
+                                        <td style={{ padding: '3px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 'bold' }}>{p.Pivot ? p.Pivot.toFixed(2) : '-'}</td>
                                         <td style={{ padding: '3px', fontFamily: 'var(--font-mono)' }}>{p.R1 ? p.R1.toFixed(2) : '-'}</td>
                                         <td style={{ padding: '3px', fontFamily: 'var(--font-mono)' }}>{p.R2 ? p.R2.toFixed(2) : '-'}</td>
                                         <td style={{ padding: '3px', fontFamily: 'var(--font-mono)' }}>{p.R3 ? p.R3.toFixed(2) : '-'}</td>

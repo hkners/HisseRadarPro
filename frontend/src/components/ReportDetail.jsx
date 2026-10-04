@@ -41,7 +41,7 @@ export default function ReportDetail({ r }) {
               {r.report_title || `${r.ticker || r.category} - Şirket Raporu`}
             </div>
             <div style={{ marginBottom: '8px' }}>
-              <strong style={{ color: '#00e5ff' }}>Özet:</strong> {r.summary || ((!r.full_text || r.full_text === "Metin bulunamadı.") && !r.pdf_url ? 'Bu veri Fintables hedef fiyat & model portföy tablolarından entegre edilmiştir. Rapor özeti bulunmamaktadır.' : 'Özet bulunmuyor.')}
+              <strong style={{ color: 'var(--gold)' }}>Özet:</strong> {r.summary || ((!r.full_text || r.full_text === "Metin bulunamadı.") && !r.pdf_url ? 'Bu veri Fintables hedef fiyat & model portföy tablolarından entegre edilmiştir. Rapor özeti bulunmamaktadır.' : 'Özet bulunmuyor.')}
             </div>
             {r.catalysts && (
               <div style={{ marginBottom: '8px' }}>
@@ -49,12 +49,12 @@ export default function ReportDetail({ r }) {
               </div>
             )}
             {((r.full_text || r.metin) && r.full_text !== "Metin bulunamadı.") ? (
-              <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', borderTop: '1px dashed #333', paddingTop: '8px' }}>
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-tertiary)', borderTop: '1px dashed var(--border-default)', paddingTop: '8px' }}>
                 <strong>Metin Çıktısı:</strong>
                 <p style={{ marginTop: '4px' }}>{r.full_text || r.metin}</p>
               </div>
             ) : (!r.pdf_url && (!r.full_text || r.full_text === "Metin bulunamadı.")) ? (
-              <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', borderTop: '1px dashed #333', paddingTop: '8px', fontStyle: 'italic' }}>
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-tertiary)', borderTop: '1px dashed var(--border-default)', paddingTop: '8px', fontStyle: 'italic' }}>
                 <strong>Bilgi:</strong>
                 <p style={{ marginTop: '4px' }}>Bu veri Fintables üzerinden aracı kurumun hedef fiyat ve model portföy tablolarından otomatik olarak entegre edilmiştir. Aracı kurumun detaylı PDF rapor metnine ulaşılamamaktadır.</p>
               </div>
@@ -81,14 +81,14 @@ export default function ReportDetail({ r }) {
                         netIncome: fundamentals.quarterly_financials.net_income[i],
                         revenue: fundamentals.quarterly_financials.revenue[i]
                       }))}>
-                        <XAxis dataKey="date" tick={{ fill: '#888', fontSize: 10 }} />
+                        <XAxis dataKey="date" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} />
                         <Tooltip 
-                          contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontSize: '11px' }}
+                          contentStyle={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-default)', fontSize: '11px' }}
                           formatter={(val) => [(val / 1e6).toFixed(0) + 'M ₺']}
                         />
                         <Legend wrapperStyle={{ fontSize: '10px' }} />
-                        <Bar dataKey="revenue" fill="#3b82f6" name="Gelir" />
-                        <Bar dataKey="netIncome" fill="#10b981" name="Net Kar" />
+                        <Bar dataKey="revenue" fill="var(--gold)" name="Gelir" />
+                        <Bar dataKey="netIncome" fill="var(--positive)" name="Net Kar" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -99,11 +99,11 @@ export default function ReportDetail({ r }) {
                         <XAxis dataKey="date" hide />
                         <YAxis domain={['auto', 'auto']} hide />
                         <Tooltip 
-                          contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }}
-                          itemStyle={{ color: '#00e5ff' }}
-                          labelStyle={{ color: '#aaa' }}
+                          contentStyle={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-default)' }}
+                          itemStyle={{ color: 'var(--gold)' }}
+                          labelStyle={{ color: 'var(--text-secondary)' }}
                         />
-                        <Line type="monotone" dataKey="close" stroke="#00e5ff" dot={false} strokeWidth={2} />
+                        <Line type="monotone" dataKey="close" stroke="var(--gold)" dot={false} strokeWidth={2} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -115,7 +115,7 @@ export default function ReportDetail({ r }) {
                   <div style={{ marginTop: '15px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '11px' }}>
                     <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
                       <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>SEKTÖR</div>
-                      <div style={{ color: '#fff', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={fundamentals.sector || 'N/A'}>{fundamentals.sector || 'N/A'}</div>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={fundamentals.sector || 'N/A'}>{fundamentals.sector || 'N/A'}</div>
                     </div>
                     <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
                       <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>F/K</div>
@@ -131,11 +131,11 @@ export default function ReportDetail({ r }) {
                     </div>
                     <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
                       <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>PİYASA DEĞERİ</div>
-                      <div style={{ color: '#fff', fontWeight: 'bold' }}>{fundamentals.marketCap ? (fundamentals.marketCap / 1e9).toFixed(2) + 'B ₺' : 'N/A'}</div>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{fundamentals.marketCap ? (fundamentals.marketCap / 1e9).toFixed(2) + 'B ₺' : 'N/A'}</div>
                     </div>
                     <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 4px', borderRadius: '6px', textAlign: 'center' }}>
                       <div style={{ color: 'var(--text-muted)', marginBottom: '4px', fontSize: '10px' }}>ÖZSERMAYE KARL.</div>
-                      <div style={{ color: '#fff', fontWeight: 'bold' }}>{fundamentals.returnOnEquity ? (fundamentals.returnOnEquity * 100).toFixed(2) + '%' : 'N/A'}</div>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{fundamentals.returnOnEquity ? (fundamentals.returnOnEquity * 100).toFixed(2) + '%' : 'N/A'}</div>
                     </div>
                   </div>
                 )}

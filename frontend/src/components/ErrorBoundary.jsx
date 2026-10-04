@@ -20,7 +20,7 @@ export default class ErrorBoundary extends React.Component {
       return (
         <div className="panel" style={{ margin: '40px auto', maxWidth: '600px' }}>
           <div className="panel-header" style={{ color: 'var(--color-red)' }}>
-            [SİSTEM HATASI]
+            Sistem hatası
           </div>
           <div className="panel-content" style={{ textAlign: 'center', padding: '30px' }}>
             <h3 style={{ color: 'var(--text-highlight)', marginBottom: '15px' }}>
@@ -30,7 +30,7 @@ export default class ErrorBoundary extends React.Component {
               Beklenmeyen bir hata meydana geldi. Sayfa yeniden yüklenerek sorunu çözebilirsiniz.
             </p>
             <div style={{ 
-              background: 'rgba(255,0,85,0.1)', 
+              background: 'rgba(192, 82, 78, 0.1)', 
               border: '1px solid var(--color-red)', 
               padding: '12px', 
               borderRadius: '4px',
@@ -48,7 +48,7 @@ export default class ErrorBoundary extends React.Component {
               onClick={() => window.location.reload()}
               style={{
                 background: 'var(--color-red)',
-                color: '#fff',
+                color: 'var(--text-primary)',
                 border: 'none',
                 padding: '10px 24px',
                 fontFamily: 'var(--font-mono)',
@@ -58,7 +58,7 @@ export default class ErrorBoundary extends React.Component {
                 fontSize: '13px',
               }}
             >
-              [ SAYFAYI YENİDEN YÜKLE ]
+              Sayfayı yeniden yükle
             </button>
           </div>
         </div>

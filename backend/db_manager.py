@@ -227,6 +227,12 @@ class ReportDBManager:
                 if "price_momentum_percentile" not in existing_cols:
                     conn.execute("ALTER TABLE score_history ADD COLUMN price_momentum_percentile REAL")
 
+                # Migration guard: paper vs real money accounts on portfolio transactions
+                cursor.execute("PRAGMA table_info(portfolio_transactions)")
+                tx_cols = {row["name"] for row in cursor.fetchall()}
+                if "account" not in tx_cols:
+                    conn.execute("ALTER TABLE portfolio_transactions ADD COLUMN account TEXT NOT NULL DEFAULT 'real'")
+
                 # Migration guard: check if sector column exists in company_info
                 cursor.execute("PRAGMA table_info(company_info)")
                 company_info_cols = {row["name"] for row in cursor.fetchall()}
@@ -822,85 +828,105 @@ class ReportDBManager:
             return dict(row) if row else None
 
     # --- User Portfolio Methods ---
-    def get_user_portfolio(self) -> List[Dict[str, Any]]:
-        # Calculate current portfolio based on transactions
-        transactions = self.get_portfolio_transactions()
-        
-        portfolio = {}
+    PORTFOLIO_ACCOUNTS = ("real", "paper")
+
+    def get_user_portfolio(self, account: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Open positions derived from transactions, one row per (ticker, account).
+        account: 'real' | 'paper' | None (both)."""
+        transactions = self.get_portfolio_transactions(account)
+
+        portfolio: Dict[tuple, Dict[str, float]] = {}
         for tx in transactions:
-            t = tx['ticker']
-            if t not in portfolio:
-                portfolio[t] = {'quantity': 0, 'total_cost': 0}
-            
+            key = (tx['ticker'], tx.get('account') or 'real')
+            if key not in portfolio:
+                portfolio[key] = {'quantity': 0, 'total_cost': 0}
+
             qty = float(tx['quantity'])
             price = float(tx['price'])
-            
+
             if tx['tx_type'] == 'BUY':
-                portfolio[t]['quantity'] += qty
-                portfolio[t]['total_cost'] += (qty * price)
+                portfolio[key]['quantity'] += qty
+                portfolio[key]['total_cost'] += (qty * price)
             elif tx['tx_type'] == 'SELL':
-                if portfolio[t]['quantity'] > 0:
-                    avg_cost = portfolio[t]['total_cost'] / portfolio[t]['quantity']
-                    portfolio[t]['quantity'] -= qty
-                    portfolio[t]['total_cost'] -= (qty * avg_cost)
-        
+                if portfolio[key]['quantity'] > 0:
+                    avg_cost = portfolio[key]['total_cost'] / portfolio[key]['quantity']
+                    portfolio[key]['quantity'] -= qty
+                    portfolio[key]['total_cost'] -= (qty * avg_cost)
+
         # Filter out closed positions and calculate average cost
         result = []
-        for t, data in portfolio.items():
-            if data['quantity'] > 0:
+        for (t, acc), data in portfolio.items():
+            if data['quantity'] > 1e-9:
                 result.append({
                     'ticker': t,
+                    'account': acc,
                     'quantity': data['quantity'],
                     'cost': data['total_cost'] / data['quantity']
                 })
-        
+
         return result
 
-    def get_portfolio_transactions(self) -> List[Dict[str, Any]]:
+    def get_portfolio_transactions(self, account: Optional[str] = None) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM portfolio_transactions ORDER BY tx_date ASC")
+            if account:
+                cursor.execute("SELECT * FROM portfolio_transactions WHERE account = ? ORDER BY tx_date ASC, id ASC", (account,))
+            else:
+                cursor.execute("SELECT * FROM portfolio_transactions ORDER BY tx_date ASC, id ASC")
             return [dict(r) for r in cursor.fetchall()]
 
-    def add_portfolio_transaction(self, ticker: str, tx_type: str, quantity: float, price: float, tx_date: str) -> None:
+    def add_portfolio_transaction(self, ticker: str, tx_type: str, quantity: float, price: float, tx_date: str, account: str = "real") -> None:
         with self._lock:
             with self._get_connection() as conn:
                 conn.execute("""
-                    INSERT INTO portfolio_transactions (ticker, tx_type, quantity, price, tx_date)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (ticker.upper(), tx_type.upper(), quantity, price, tx_date))
+                    INSERT INTO portfolio_transactions (ticker, tx_type, quantity, price, tx_date, account)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (ticker.upper(), tx_type.upper(), quantity, price, tx_date, account))
                 conn.commit()
 
-    def add_portfolio_transactions_batch(self, transactions: List[Dict[str, Any]]) -> None:
-        """Batch insert multiple portfolio transactions in a single transaction."""
+    def add_portfolio_transactions_batch(self, transactions: List[Dict[str, Any]], account: str = "real") -> int:
+        """Batch insert multiple portfolio transactions in a single transaction. Returns rows inserted."""
         import datetime
         if not transactions:
-            return
+            return 0
         records = [
             (
                 tx["ticker"].upper().strip(),
                 tx.get("tx_type", "BUY").upper(),
                 float(tx["quantity"]),
                 float(tx["price"]),
-                tx.get("tx_date") or datetime.date.today().isoformat()
+                tx.get("tx_date") or datetime.date.today().isoformat(),
+                tx.get("account") or account,
             )
             for tx in transactions
             if float(tx.get("quantity", 0)) > 0 and float(tx.get("price", 0)) > 0
         ]
         if not records:
-            return
+            return 0
         with self._lock:
             with self._get_connection() as conn:
                 conn.executemany("""
-                    INSERT INTO portfolio_transactions (ticker, tx_type, quantity, price, tx_date)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO portfolio_transactions (ticker, tx_type, quantity, price, tx_date, account)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """, records)
                 conn.commit()
+        return len(records)
 
-    def add_to_portfolio(self, ticker: str, quantity: float, cost: float) -> None:
+    def add_to_portfolio(self, ticker: str, quantity: float, cost: float, account: str = "real") -> None:
         # Legacy method fallback: Just add a BUY transaction for today if we're adding via the old UI
         import datetime
-        self.add_portfolio_transaction(ticker, 'BUY', quantity, cost, datetime.date.today().isoformat())
+        self.add_portfolio_transaction(ticker, 'BUY', quantity, cost, datetime.date.today().isoformat(), account)
+
+    def remove_from_portfolio(self, ticker: str, account: Optional[str] = None) -> int:
+        """Deletes every transaction of a ticker (optionally only in one account). Returns rows removed."""
+        with self._lock:
+            with self._get_connection() as conn:
+                if account:
+                    cur = conn.execute("DELETE FROM portfolio_transactions WHERE ticker = ? AND account = ?", (ticker.upper(), account))
+                else:
+                    cur = conn.execute("DELETE FROM portfolio_transactions WHERE ticker = ?", (ticker.upper(),))
+                conn.commit()
+                return cur.rowcount
 
     def log_target_revision(self, ticker: str, broker: str, old_target: float, new_target: float, revision_pct: float, report_date: str) -> int:
         """Insert a detected target price revision into target_revision_log."""

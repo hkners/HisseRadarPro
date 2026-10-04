@@ -44,7 +44,7 @@ export default function MiniChart({ ticker }) {
               </defs>
               <YAxis domain={['auto', 'auto']} hide />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#000', border: '1px solid var(--border-color)', fontSize: '11px', fontFamily: 'monospace' }} 
+                contentStyle={{ backgroundColor: '#000', border: '1px solid var(--border-color)', fontSize: '11px', fontFamily: 'var(--font-mono)' }} 
                 itemStyle={{ color: 'var(--color-cyan)' }}
                 labelStyle={{ color: 'var(--text-muted)' }}
               />

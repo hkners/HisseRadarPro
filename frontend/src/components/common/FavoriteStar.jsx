@@ -38,7 +38,7 @@ export default function FavoriteStar({ ticker, size = 14, style = {}, className 
                 minWidth: '22px',
                 minHeight: '22px',
                 padding: 0,
-                background: isHovered ? 'rgba(255, 171, 0, 0.16)' : 'transparent',
+                background: isHovered ? 'rgba(201, 136, 58, 0.16)' : 'transparent',
                 border: 'none',
                 outline: 'none',
                 borderRadius: '4px',
@@ -55,15 +55,15 @@ export default function FavoriteStar({ ticker, size = 14, style = {}, className 
                 width={size}
                 height={size}
                 viewBox="0 0 24 24"
-                fill={isFavorite ? '#ffab00' : 'none'}
-                stroke={isFavorite ? '#ffab00' : isHovered ? '#ffab00' : 'rgba(255,255,255,0.35)'}
+                fill={isFavorite ? 'var(--warning)' : 'none'}
+                stroke={isFavorite ? 'var(--warning)' : isHovered ? 'var(--warning)' : 'rgba(255,255,255,0.35)'}
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 style={{
                     pointerEvents: 'none',
                     display: 'block',
-                    filter: isFavorite ? 'drop-shadow(0 0 3px rgba(255, 171, 0, 0.6))' : 'none'
+                    filter: isFavorite ? 'drop-shadow(0 0 3px rgba(201, 136, 58, 0.6))' : 'none'
                 }}
             >
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />

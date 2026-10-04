@@ -208,7 +208,7 @@ class MarketRegimeService:
         if regime == "RISK_OFF":
             exposure_multiplier = 0.5
             strong_buy_threshold = 83  # 75 + 8 points shift
-            color = "#ff3366"  # Red
+            color = "#C0524E"
             badge_title = "AYI / DEFANSİF PİYASA"
             description = (
                 f"Piyasa zayıf (Düşen: {breadth['down']}, Yükselen: {breadth['up']}) "
@@ -218,7 +218,7 @@ class MarketRegimeService:
         elif regime == "RISK_ON":
             exposure_multiplier = 1.0
             strong_buy_threshold = 75  # Standard threshold
-            color = "#00e676"  # Neon Green
+            color = "#3F8A6B"
             badge_title = "BOĞA / POZİTİF PİYASA"
             description = (
                 f"Piyasa alıcılı (Yükselen: {breadth['up']}, Düşen: {breadth['down']}) "
@@ -228,7 +228,7 @@ class MarketRegimeService:
         else:  # NEUTRAL
             exposure_multiplier = 1.0
             strong_buy_threshold = 75  # Standard threshold
-            color = "#ffab00"  # Amber / Yellow
+            color = "#C9883A"
             badge_title = "YATAY / SEÇİCİ PİYASA"
             description = (
                 f"Kararsız piyasa görünümü (Yükselen: {breadth['up']}, Düşen: {breadth['down']}). "

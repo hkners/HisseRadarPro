@@ -3,8 +3,10 @@ Stocks Router
 Handles /api/stocks, /api/stocks/{ticker}, /api/stocks/{ticker}/fundamentals, /api/stocks/{ticker}/history
 """
 from fastapi import APIRouter, HTTPException
+import logging
 import time
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["stocks"])
 
 
@@ -16,6 +18,26 @@ def _get_deps():
     return get_cached_recommendations, price_service, BIST_TICKERS, match_ticker, report_repo
 
 _stocks_cache = {"timestamp": 0, "data": None}
+_company_names = None
+
+
+def _get_company_names():
+    """Ticker -> legal name map from company_names.json (loaded once)."""
+    global _company_names
+    if _company_names is None:
+        import json
+        import os
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "company_names.json")
+        try:
+            with open(path, encoding="utf-8") as fh:
+                raw = json.load(fh)
+            # Entries that only repeat the ticker carry no information.
+            _company_names = {t: n for t, n in raw.items() if n and n != t}
+        except Exception as e:
+            logger.warning(f"company_names.json could not be loaded: {e}")
+            _company_names = {}
+    return _company_names
+
 
 @router.get("/stocks")
 def get_all_stocks():
@@ -61,6 +83,7 @@ def get_all_stocks():
             recs_grouped[ticker]["brokers"].add(broker)
 
     all_prices = price_service.prices
+    names = _get_company_names()
     stocks = []
     for t, p_data in all_prices.items():
         if p_data:
@@ -73,7 +96,7 @@ def get_all_stocks():
 
             stocks.append({
                 "ticker": t,
-                "name": f"{t} A.Ş.",
+                "name": names.get(t, f"{t} A.Ş."),
                 "price": live_price,
                 "change_pct": p_data.get("change_pct"),
                 "volume": p_data.get("volume"),
@@ -128,6 +151,52 @@ def get_stock_fundamentals(ticker: str):
     if not info:
         raise HTTPException(status_code=404, detail=f"Fundamentals for {ticker} not found in cache. Run yf_cacher.")
     return info
+
+
+@router.get("/stocks/{ticker}/valuation")
+def get_stock_valuation(ticker: str):
+    """
+    Football-field inputs: sector-peer implied price ranges (P/E, P/B),
+    the 52-week band and the composite valuation score. Broker targets come from /recommendations.
+    """
+    from services.valuation_service import compute_peer_implied_values, compute_valuation_score
+    _, price_service, _, _, report_repo = _get_deps()
+    clean = ticker.replace(".IS", "").upper()
+
+    info = report_repo.get_company_info(clean)
+    if not info:
+        raise HTTPException(status_code=404, detail=f"Fundamentals for {clean} not found in cache.")
+
+    price = (price_service.prices.get(clean) or {}).get("price")
+    f = info.get("fundamentals") or {}
+
+    # Close on the day fundamentals were fetched: the price yfinance's P/B was computed against.
+    book_price = None
+    fund_date = str(info.get("last_updated") or "")[:10]
+    if fund_date:
+        try:
+            with report_repo._get_connection() as conn:
+                row = conn.execute(
+                    "SELECT close FROM historical_prices WHERE ticker = ? AND date <= ? ORDER BY date DESC LIMIT 1",
+                    (clean, fund_date),
+                ).fetchone()
+                book_price = row[0] if row else None
+        except Exception as e:
+            logger.warning(f"Book-price lookup failed for {clean}: {e}")
+
+    result = compute_peer_implied_values(clean, price, repo=report_repo, book_price=book_price)
+    result["price"] = price
+    result["fundamentals_updated"] = info.get("last_updated")
+
+    low, high = f.get("fiftyTwoWeekLow"), f.get("fiftyTwoWeekHigh")
+    result["week52"] = {"low": low, "high": high} if low and high else None
+
+    try:
+        result["score"] = compute_valuation_score(clean, repo=report_repo, return_details=True)
+    except Exception as e:
+        logger.warning(f"Valuation score failed for {clean}: {e}")
+        result["score"] = None
+    return result
 
 
 @router.get("/stocks/{ticker}/history")
@@ -283,7 +352,7 @@ def get_stock_score_breakdown(ticker: str):
             "raw_score": float(conv_score),
             "decision": "BEKLE / İZLE",
             "decision_badge": "HOLD",
-            "color": "#ffab00",
+            "color": "#C9883A",
             "institutional_pillar": history_row.get("consensus_component", 0.0) if history_row else 0.0,
             "valuation_pillar": history_row.get("fundamental_component", 0.0) if history_row else 0.0,
             "technical_pillar": history_row.get("technical_component", 0.0) if history_row else 0.0,
@@ -380,11 +449,11 @@ def get_stock_score_breakdown(ticker: str):
         alpha_sgn = alpha_info.get("signal", "-") if alpha_info else "-"
         if (c_cat == "AL" and a_cat == "SAT") or (c_cat == "SAT" and a_cat == "AL"):
             disagreement_level = "STRONG"
-            disagreement_badge = "⚠ İki motor zıt görüşte"
+            disagreement_badge = "İki motor zıt görüşte"
             disagreement_reason = f"Karar Motoru: {setup.get('score')}p ({setup.get('decision')}) vs Alpha Motoru: {alpha_scr}p ({alpha_sgn})"
         else:
             disagreement_level = "MILD"
-            disagreement_badge = "⚠ İki motor farklı görüşte"
+            disagreement_badge = "İki motor farklı görüşte"
             disagreement_reason = f"Karar Motoru: {setup.get('score')}p ({setup.get('decision')}) vs Alpha Motoru: {alpha_scr}p ({alpha_sgn})"
 
     return {

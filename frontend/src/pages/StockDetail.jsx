@@ -13,6 +13,20 @@ import TabMultiples from '../components/TabMultiples';
 import AiAnalysisTab from '../components/AiAnalysisTab';
 import TechnicalRatingsWidget from '../components/TechnicalRatingsWidget';
 import ScoreBreakdownWidget from '../components/ScoreBreakdownWidget';
+import ValuationStrip from '../components/valuation/ValuationStrip';
+import ValuationTab from '../components/valuation/ValuationTab';
+import { brokerTargets, buildValuationRows } from '../components/valuation/valuationModel';
+import { PillTabs } from '../components/ui';
+
+const DETAIL_TABS = [
+  { id: 'ozet', label: 'Özet & Kokpit' },
+  { id: 'degerleme', label: 'Değerleme' },
+  { id: 'skor_dokumu', label: 'Karar Skoru Dökümü' },
+  { id: 'ai_analiz', label: 'Yapay Zeka Analizi' },
+  { id: 'finansallar', label: 'Finansal Tablolar' },
+  { id: 'carpanlar', label: 'Çarpanlar & Rasyolar' },
+  { id: 'temettu', label: 'Temettü & Sermaye' },
+];
 
 export default function StockDetail() {
   const { ticker } = useParams();
@@ -28,6 +42,7 @@ export default function StockDetail() {
   const [loading, setLoading] = useState(true);
   const [priceHistory, setPriceHistory] = useState([]);
   const [taSummary, setTaSummary] = useState(null);
+  const [valuation, setValuation] = useState(null);
   const [isPortfolioModalOpen, setIsPortfolioModalOpen] = useState(false);
 
   const handleToggleLayoutMode = () => {
@@ -91,7 +106,14 @@ export default function StockDetail() {
       })
       .catch(() => setLoading(false));
 
-    // 6. Fetch price history for chart
+    // 6. Fetch peer valuation ranges (football field)
+    setValuation(null);
+    fetch(`${import.meta.env.VITE_API_URL}/stocks/${ticker}/valuation`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setValuation(data))
+      .catch(() => setValuation(null));
+
+    // 7. Fetch price history for chart
     fetch(`${import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://127.0.0.1:8015'}/api/stocks/${ticker}/history`)
       .then(res => res.ok ? res.json() : [])
       .then(data => setPriceHistory(data || []))
@@ -147,6 +169,12 @@ export default function StockDetail() {
 
     return { avgTarget, avgPotential, minTarget, maxTarget, ratings, count: groupedRecs.unique.length };
   }, [groupedRecs.unique, stock]);
+
+  const valuationRows = useMemo(
+    () => buildValuationRows({ targets: brokerTargets(groupedRecs.unique), valuation }),
+    [groupedRecs.unique, valuation]
+  );
+  const livePrice = stock?.price ?? valuation?.price ?? null;
 
   // Ensure live price is appended to the chart data for current session
   const chartData = useMemo(() => {
@@ -235,9 +263,9 @@ export default function StockDetail() {
           onClick={() => setLeftPanelTab('fundamentals')}
           style={{
             flex: 1,
-            background: leftPanelTab === 'fundamentals' ? 'rgba(0, 229, 255, 0.15)' : 'transparent',
+            background: leftPanelTab === 'fundamentals' ? 'rgba(200, 162, 74, 0.15)' : 'transparent',
             color: leftPanelTab === 'fundamentals' ? 'var(--color-cyan)' : 'var(--text-muted)',
-            border: `1px solid ${leftPanelTab === 'fundamentals' ? 'rgba(0, 229, 255, 0.3)' : 'transparent'}`,
+            border: `1px solid ${leftPanelTab === 'fundamentals' ? 'rgba(200, 162, 74, 0.3)' : 'transparent'}`,
             borderRadius: '3px',
             padding: '4px 0',
             fontSize: '9.5px',
@@ -251,9 +279,9 @@ export default function StockDetail() {
           onClick={() => setLeftPanelTab('technicals')}
           style={{
             flex: 1,
-            background: leftPanelTab === 'technicals' ? 'rgba(0, 229, 255, 0.15)' : 'transparent',
+            background: leftPanelTab === 'technicals' ? 'rgba(200, 162, 74, 0.15)' : 'transparent',
             color: leftPanelTab === 'technicals' ? 'var(--color-cyan)' : 'var(--text-muted)',
-            border: `1px solid ${leftPanelTab === 'technicals' ? 'rgba(0, 229, 255, 0.3)' : 'transparent'}`,
+            border: `1px solid ${leftPanelTab === 'technicals' ? 'rgba(200, 162, 74, 0.3)' : 'transparent'}`,
             borderRadius: '3px',
             padding: '4px 0',
             fontSize: '9.5px',
@@ -267,9 +295,9 @@ export default function StockDetail() {
           onClick={() => setLeftPanelTab('breakdown')}
           style={{
             flex: 1,
-            background: leftPanelTab === 'breakdown' ? 'rgba(0, 229, 255, 0.15)' : 'transparent',
+            background: leftPanelTab === 'breakdown' ? 'rgba(200, 162, 74, 0.15)' : 'transparent',
             color: leftPanelTab === 'breakdown' ? 'var(--color-cyan)' : 'var(--text-muted)',
-            border: `1px solid ${leftPanelTab === 'breakdown' ? 'rgba(0, 229, 255, 0.3)' : 'transparent'}`,
+            border: `1px solid ${leftPanelTab === 'breakdown' ? 'rgba(200, 162, 74, 0.3)' : 'transparent'}`,
             borderRadius: '3px',
             padding: '4px 0',
             fontSize: '9.5px',
@@ -304,7 +332,7 @@ export default function StockDetail() {
                   ].map((m, i) => (
                     <div key={i} style={{ background: 'var(--bg-secondary)', padding: '3px 2px', borderRadius: '3px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
                       <div style={{ color: 'var(--text-muted)', fontSize: '8px', marginBottom: '1px', textTransform: 'uppercase', fontWeight: '600' }}>{m.label}</div>
-                      <div style={{ color: m.color || '#fff', fontWeight: 'bold', fontSize: '10px', fontVariantNumeric: 'tabular-nums' }}>{m.value}</div>
+                      <div style={{ color: m.color || 'var(--text-primary)', fontWeight: 'bold', fontSize: '10px', fontVariantNumeric: 'tabular-nums' }}>{m.value}</div>
                     </div>
                   ))}
                 </div>
@@ -319,7 +347,7 @@ export default function StockDetail() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', fontSize: '10px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Ort. Hedef:</span>
-                <span style={{ fontWeight: 'bold', color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontWeight: 'bold', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                   {typeof consensus.avgTarget === 'number' ? consensus.avgTarget.toFixed(2) + ' TL' : '-'}
                 </span>
               </div>
@@ -360,14 +388,14 @@ export default function StockDetail() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)', marginBottom: '3px', fontVariantNumeric: 'tabular-nums' }}>
                   <span>{fundamentals.fiftyTwoWeekLow.toFixed(1)} TL</span>
-                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{stock.price.toFixed(2)} TL</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{stock.price.toFixed(2)} TL</span>
                   <span>{fundamentals.fiftyTwoWeekHigh.toFixed(1)} TL</span>
                 </div>
-                <div style={{ position: 'relative', width: '100%', height: '4px', background: '#222', borderRadius: '2px' }}>
+                <div style={{ position: 'relative', width: '100%', height: '4px', background: 'var(--bg-elevated)', borderRadius: '2px' }}>
                   <div style={{
                     position: 'absolute', top: 0, bottom: 0, left: 0,
                     width: `${Math.min(100, Math.max(0, ((stock.price - fundamentals.fiftyTwoWeekLow) / (fundamentals.fiftyTwoWeekHigh - fundamentals.fiftyTwoWeekLow)) * 100))}%`,
-                    background: 'linear-gradient(90deg, rgba(0, 229, 255, 0.3), var(--color-cyan))',
+                    background: 'linear-gradient(90deg, rgba(200, 162, 74, 0.3), var(--color-cyan))',
                     borderRadius: '2px'
                   }} />
                   <div style={{
@@ -393,10 +421,10 @@ export default function StockDetail() {
 
               return (
                 <div style={{
-                  background: hasModel ? 'linear-gradient(145deg, rgba(255, 171, 0, 0.08) 0%, rgba(18, 22, 31, 0.95) 100%)' : 'var(--bg-secondary)',
+                  background: hasModel ? 'linear-gradient(145deg, rgba(201, 136, 58, 0.08) 0%, rgba(18, 18, 20, 0.95) 100%)' : 'var(--bg-secondary)',
                   padding: '6px 8px',
                   borderRadius: '5px',
-                  border: `1px solid ${hasModel ? 'rgba(255, 171, 0, 0.35)' : 'var(--border-color)'}`,
+                  border: `1px solid ${hasModel ? 'rgba(201, 136, 58, 0.35)' : 'var(--border-color)'}`,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '5px'
@@ -406,15 +434,15 @@ export default function StockDetail() {
                       <span style={{ fontWeight: 'bold', color: 'var(--text-highlight)', fontSize: '9px', letterSpacing: '0.4px' }}>
                         MODEL PORTFÖY
                       </span>
-                      <span style={{ fontSize: '9px', color: '#ffb300', fontWeight: 'bold' }}>
+                      <span style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: 'bold' }}>
                         ({hasModel ? `${modelBrokersList.length} Kurum` : '0'})
                       </span>
                     </div>
                     {hasModel ? (
                       <span style={{
-                        background: 'rgba(255, 171, 0, 0.18)',
-                        color: '#ffab00',
-                        border: '1px solid rgba(255, 171, 0, 0.4)',
+                        background: 'rgba(201, 136, 58, 0.18)',
+                        color: 'var(--warning)',
+                        border: '1px solid rgba(201, 136, 58, 0.4)',
                         padding: '1px 6px',
                         borderRadius: '3px',
                         fontSize: '8px',
@@ -467,7 +495,7 @@ export default function StockDetail() {
                               height: '26px',
                               borderRadius: '50%',
                               background: '#fff',
-                              border: '1.5px solid rgba(255, 171, 0, 0.45)',
+                              border: '1.5px solid rgba(201, 136, 58, 0.45)',
                               boxShadow: '0 2px 5px rgba(0,0,0,0.4)',
                               padding: '2px',
                               cursor: 'pointer',
@@ -477,13 +505,13 @@ export default function StockDetail() {
                             }}
                             onMouseEnter={e => {
                               e.currentTarget.style.transform = 'scale(1.22)';
-                              e.currentTarget.style.borderColor = '#ffab00';
-                              e.currentTarget.style.boxShadow = '0 0 8px rgba(255, 171, 0, 0.6)';
+                              e.currentTarget.style.borderColor = 'var(--warning)';
+                              e.currentTarget.style.boxShadow = '0 0 8px rgba(201, 136, 58, 0.6)';
                               e.currentTarget.style.zIndex = '5';
                             }}
                             onMouseLeave={e => {
                               e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.borderColor = 'rgba(255, 171, 0, 0.45)';
+                              e.currentTarget.style.borderColor = 'rgba(201, 136, 58, 0.45)';
                               e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.4)';
                               e.currentTarget.style.zIndex = '1';
                             }}
@@ -543,43 +571,18 @@ export default function StockDetail() {
         onOpenBreakdown={() => setLeftPanelTab('breakdown')}
       />
 
-      {/* ─── 2. SLIM NAVIGATION TABS (24px) ─── */}
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        marginBottom: '6px',
-        borderBottom: '1px solid var(--border-color)',
-        paddingBottom: '5px',
-        flexShrink: 0,
-        overflowX: 'auto'
-      }}>
-        {[
-          { id: 'ozet', label: 'Özet & Kokpit' },
-          { id: 'skor_dokumu', label: 'Karar Skoru Dökümü' },
-          { id: 'ai_analiz', label: 'Yapay Zeka Analizi' },
-          { id: 'finansallar', label: 'Finansal Tablolar' },
-          { id: 'carpanlar', label: 'Çarpanlar & Rasyolar' },
-          { id: 'temettu', label: 'Temettü & Sermaye' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              background: activeTab === tab.id ? 'var(--color-cyan)' : 'rgba(255,255,255,0.03)',
-              color: activeTab === tab.id ? '#000' : 'var(--text-muted)',
-              border: `1px solid ${activeTab === tab.id ? 'var(--color-cyan)' : 'var(--border-color)'}`,
-              borderRadius: '4px',
-              padding: '3px 10px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '11px',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* ─── 2. VALUATION STRIP ─── */}
+      <ValuationStrip
+        price={livePrice}
+        rows={valuationRows}
+        score={valuation?.score}
+        peerGroup={valuation?.peer_group_name}
+        onOpenDetail={() => setActiveTab('degerleme')}
+      />
+
+      {/* ─── 3. NAVIGATION TABS ─── */}
+      <div style={{ marginBottom: '8px', flexShrink: 0, overflowX: 'auto' }}>
+        <PillTabs tabs={DETAIL_TABS} value={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* ─── 3. TAB 1: ÖZET & KOKPİT ─── */}
@@ -649,6 +652,13 @@ export default function StockDetail() {
             </div>
           )}
         </>
+      )}
+
+      {/* ─── TAB: DEĞERLEME ─── */}
+      {activeTab === 'degerleme' && (
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingBottom: 12 }}>
+          <ValuationTab price={livePrice} rows={valuationRows} valuation={valuation} consensus={consensus} />
+        </div>
       )}
 
       {/* ─── 4. TAB 2: AI ANALİZ ─── */}

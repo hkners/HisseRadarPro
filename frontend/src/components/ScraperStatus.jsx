@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Server } from 'lucide-react';
 
 export default function ScraperStatus() {
     const [status, setStatus] = useState('idle');
     const [logs, setLogs] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+    const rootRef = useRef(null);
 
     const fetchStatus = () => {
         fetch(`${import.meta.env.VITE_API_URL}/admin/scrapers/status`)
@@ -23,6 +25,14 @@ export default function ScraperStatus() {
         }
     }, [isOpen]);
 
+    // Close the dropdown on outside click.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setIsOpen(false); };
+        document.addEventListener('mousedown', onDown);
+        return () => document.removeEventListener('mousedown', onDown);
+    }, [isOpen]);
+
     const runScrapers = () => {
         fetch(`${import.meta.env.VITE_API_URL}/admin/scrapers/run`, { method: 'POST' })
             .then(() => fetchStatus())
@@ -32,69 +42,38 @@ export default function ScraperStatus() {
     const isRunning = status === 'running';
 
     return (
-        <div style={{ position: 'relative', display: 'inline-block' }}>
+        <div ref={rootRef} style={{ position: 'relative', display: 'inline-block' }}>
             <button
+                type="button"
+                className={`btn btn-sm${isRunning ? ' btn-outline-gold' : ''}`}
                 onClick={() => setIsOpen(!isOpen)}
-                style={{
-                    background: 'rgba(0,0,0,0.85)',
-                    color: isRunning ? 'var(--color-warning)' : 'var(--color-cyan)',
-                    border: `1px solid ${isRunning ? 'var(--color-warning)' : '#333'}`,
-                    padding: '6px 14px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    letterSpacing: '0.5px',
-                    transition: 'all 0.2s ease'
-                }}
+                title="Scraper motoru durumu"
             >
-                {isRunning ? '[...] SCRAPERS RUNNING' : '[SYS] SCRAPER'}
+                <Server size={13} />
+                <span className="hide-sm">{isRunning ? 'Scraper çalışıyor' : 'Scraper'}</span>
             </button>
 
             {isOpen && (
                 <div style={{
                     position: 'absolute',
-                    bottom: '40px',
-                    right: '0',
-                    width: '550px',
-                    background: '#0a0a0a',
-                    border: '1px solid #333',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    width: 'min(550px, calc(100vw - 32px))',
+                    background: 'var(--bg-raised)',
+                    border: '1px solid var(--border-strong)',
+                    borderRadius: 'var(--radius)',
                     padding: '12px',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.7)',
-                    color: '#fff',
-                    fontFamily: 'var(--font-mono)'
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.7)',
+                    zIndex: 100
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', borderBottom: '1px solid #222', paddingBottom: '8px' }}>
-                        <span style={{ color: 'var(--color-cyan)', fontSize: '12px', fontWeight: 'bold' }}>SCRAPER ENGINE STATUS</span>
-                        <button
-                            onClick={runScrapers}
-                            disabled={isRunning}
-                            style={{
-                                background: 'transparent',
-                                color: isRunning ? '#555' : 'var(--color-up)',
-                                border: `1px solid ${isRunning ? '#333' : 'var(--color-up)'}`,
-                                padding: '4px 12px',
-                                fontFamily: 'var(--font-mono)',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: isRunning ? 'not-allowed' : 'pointer'
-                            }}
-                        >
-                            {isRunning ? 'RUNNING...' : 'FORCE RUN ALL'}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <span className="eyebrow">Scraper motoru · <span style={{ color: isRunning ? 'var(--warning)' : 'var(--positive)' }}>{isRunning ? 'ÇALIŞIYOR' : 'HAZIR'}</span></span>
+                        <button type="button" className="btn btn-sm btn-primary" onClick={runScrapers} disabled={isRunning}>
+                            {isRunning ? 'Çalışıyor…' : 'Tümünü şimdi çalıştır'}
                         </button>
                     </div>
-
-                    <div style={{
-                        background: '#000',
-                        padding: '8px',
-                        height: '250px',
-                        overflowY: 'auto',
-                        fontSize: '10px',
-                        color: 'var(--color-neutral)',
-                        border: '1px solid #1a1a1a',
-                        whiteSpace: 'pre-wrap'
-                    }}>
-                        {logs || "No logs available."}
+                    <div className="sync-log" style={{ height: '250px', flex: 'none' }}>
+                        {logs || 'Kayıt yok.'}
                     </div>
                 </div>
             )}

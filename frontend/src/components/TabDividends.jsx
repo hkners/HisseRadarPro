@@ -17,7 +17,7 @@ export default function TabDividends({ fundamentals }) {
           <h4 style={{ color: 'var(--color-cyan)', margin: 0 }}>{title}</h4>
           <span 
             title={desc}
-            style={{ cursor: 'help', color: 'var(--color-cyan)', fontSize: '12px', background: 'rgba(0, 229, 255, 0.1)', padding: '2px 6px', borderRadius: '4px', marginLeft: '10px' }}
+            style={{ cursor: 'help', color: 'var(--color-cyan)', fontSize: '12px', background: 'rgba(200, 162, 74, 0.1)', padding: '2px 6px', borderRadius: '4px', marginLeft: '10px' }}
           >
             ?
           </span>

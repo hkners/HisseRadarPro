@@ -401,27 +401,27 @@ export default function Models() {
 
   return (
     <PageContainer
-      title="MODEL PORTFÖYLER"
+      title="Model Portföyler"
       badge={{
         label: `${cleanModels.length} ARACI KURUM`,
-        background: 'rgba(210, 153, 34, 0.15)',
+        background: 'rgba(201, 136, 58, 0.15)',
         color: 'var(--color-warning)',
-        borderColor: 'rgba(210, 153, 34, 0.35)'
+        borderColor: 'rgba(201, 136, 58, 0.35)'
       }}
-      subtitle="Kurumların Resmi Model Portföyleri & Ortak Süper Konsensüs Seçkisi"
+      subtitle="Kurumların model portföyleri ve birden fazla kurumun ortak seçtiği hisseler."
       statusDot="var(--color-warning)"
       headerRight={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ 
             fontSize: '11px', 
-            background: 'rgba(57, 197, 207, 0.12)', 
+            background: 'rgba(200, 162, 74, 0.12)', 
             color: 'var(--color-cyan)', 
-            border: '1px solid rgba(57, 197, 207, 0.3)', 
+            border: '1px solid rgba(200, 162, 74, 0.3)', 
             padding: '2px 8px', 
             borderRadius: '4px', 
             fontWeight: 'bold' 
           }}>
-            ⭐ {superPortfolio.length} Konsensüs Hisse
+            {superPortfolio.length} Konsensüs Hisse
           </span>
           <span style={{ 
             fontSize: '11px', 
@@ -448,23 +448,20 @@ export default function Models() {
               <button 
                 onClick={() => { setActiveTab('CONSENSUS'); setCurrentPage(1); }}
                 className={`action-button ${activeTab === 'CONSENSUS' ? 'active-green' : ''}`}
-                style={activeTab === 'CONSENSUS' ? {} : { color: 'var(--color-up)', borderColor: 'rgba(0, 230, 118, 0.3)' }}
               >
-                [⭐ SÜPER KONSENSÜS ({superPortfolio.length})]
+                Süper konsensüs ({superPortfolio.length})
               </button>
               <button 
                 onClick={() => { setActiveTab('BY_BROKER'); setCurrentPage(1); }}
                 className={`action-button ${activeTab === 'BY_BROKER' ? 'active-cyan' : ''}`}
-                style={activeTab === 'BY_BROKER' ? {} : { color: 'var(--color-cyan)', borderColor: 'rgba(0, 229, 255, 0.3)' }}
               >
-                [🏛️ KURUMLAR ({cleanModels.length})]
+                Kurumlar ({cleanModels.length})
               </button>
               <button 
                 onClick={() => { setActiveTab('ALL_POSITIONS'); setCurrentPage(1); }}
                 className={`action-button ${activeTab === 'ALL_POSITIONS' ? 'active-purple' : ''}`}
-                style={activeTab === 'ALL_POSITIONS' ? {} : { color: '#b388ff', borderColor: 'rgba(179, 136, 255, 0.3)' }}
               >
-                [📋 TÜM POZİSYONLAR ({allPositions.length})]
+                Tüm pozisyonlar ({allPositions.length})
               </button>
 
               <span style={{ color: 'var(--border-color)', margin: '0 2px' }}>|</span>
@@ -481,7 +478,7 @@ export default function Models() {
                   padding: '3px 10px',
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border-color)',
-                  color: '#fff',
+                  color: 'var(--text-primary)',
                   borderRadius: '4px',
                   fontSize: '11px',
                   outline: 'none'
@@ -493,27 +490,25 @@ export default function Models() {
                 onClick={() => { setFilter('ALL'); setSearch(''); setSelectedBroker('ALL'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'ALL' && !search && selectedBroker === 'ALL' ? 'active' : ''}`}
               >
-                [TÜMÜ]
+                Tümü
               </button>
               <button 
                 onClick={() => { setFilter('FAVORITES'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'FAVORITES' ? 'active-warning' : ''}`}
-                style={filter === 'FAVORITES' ? {} : { color: 'var(--color-warning)', borderColor: 'rgba(255, 170, 0, 0.3)' }}
               >
-                [⭐ FAVORİLER{favorites.length > 0 ? ` (${favorites.length})` : ''}]
+                Favoriler{favorites.length > 0 ? ` (${favorites.length})` : ''}
               </button>
               <button 
                 onClick={() => { setFilter('HIGH_POT'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'HIGH_POT' ? 'active-purple' : ''}`}
-                style={filter === 'HIGH_POT' ? {} : { color: '#b388ff', borderColor: 'rgba(179, 136, 255, 0.3)' }}
               >
-                [YÜKSEK POTANSİYEL (%40+)]
+                Yüksek potansiyel (%40+)
               </button>
               <button 
                 onClick={() => { setFilter('BIST30'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'BIST30' ? 'active' : ''}`}
               >
-                [BIST 30]
+                BIST 30
               </button>
 
               {/* Reset */}
@@ -521,9 +516,8 @@ export default function Models() {
                 <button 
                   onClick={() => { setFilter('ALL'); setSearch(''); setSelectedBroker('ALL'); setCurrentPage(1); }}
                   className="action-button"
-                  style={{ color: 'var(--text-muted)' }}
                 >
-                  [SIFIRLA]
+                  Sıfırla
                 </button>
               )}
             </div>
@@ -540,7 +534,7 @@ export default function Models() {
                     padding: '2px 8px',
                     background: 'var(--bg-secondary)',
                     border: '1px solid var(--border-color)',
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                     borderRadius: '4px',
                     fontSize: '11px',
                     outline: 'none',
@@ -643,7 +637,7 @@ export default function Models() {
                                   {BIST30.includes(item.ticker) && (
                                     <span className="badge badge-subtle" style={{ fontSize: '9px', padding: '1px 3px' }}>B30</span>
                                   )}
-                                  <span style={{ fontSize: '9px', color: '#ffab00', fontWeight: 'bold', background: 'rgba(255, 171, 0, 0.15)', padding: '1px 4px', borderRadius: '3px', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: 'bold', background: 'rgba(201, 136, 58, 0.15)', padding: '1px 4px', borderRadius: '3px', flexShrink: 0 }}>
                                     MOD
                                   </span>
                                 </div>
@@ -684,8 +678,8 @@ export default function Models() {
                                     style={{
                                       fontSize: '10.5px',
                                       color: 'var(--color-cyan)',
-                                      background: 'rgba(57, 197, 207, 0.1)',
-                                      border: '1px solid rgba(57, 197, 207, 0.25)',
+                                      background: 'rgba(200, 162, 74, 0.1)',
+                                      border: '1px solid rgba(200, 162, 74, 0.25)',
                                       padding: '1px 5px',
                                       borderRadius: '3px',
                                       whiteSpace: 'nowrap'
@@ -715,7 +709,7 @@ export default function Models() {
                                 <span style={{ color: 'var(--text-muted)' }}>-</span>
                               )}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: '#fff' }}>
+                            <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
                               {item.avgTarget ? item.avgTarget.toFixed(2) : '-'}
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
@@ -785,7 +779,7 @@ export default function Models() {
                         flexShrink: 0,
                         border: '1px solid var(--border-color)', 
                         borderRadius: '5px', 
-                        background: 'rgba(20, 24, 33, 0.4)',
+                        background: 'rgba(18, 18, 20, 0.4)',
                         overflow: 'hidden'
                       }}
                     >
@@ -843,7 +837,7 @@ export default function Models() {
                           style={{ padding: '2px 6px', fontSize: '10px' }}
                           onClick={(e) => { e.stopPropagation(); toggleBroker(m.kurum); }}
                         >
-                          {isExpanded ? '[DARALT]' : '[GENİŞLET]'}
+                          {isExpanded ? 'Daralt' : 'Genişlet'}
                         </button>
                       </div>
                     </div>
@@ -893,7 +887,7 @@ export default function Models() {
                                     )}
                                   </div>
                                 </td>
-                                <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: '#fff' }}>
+                                <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
                                   {stock.targetPrice ? `${stock.targetPrice.toFixed(2)} TL` : '-'}
                                 </td>
                                 <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
@@ -925,7 +919,7 @@ export default function Models() {
                                 </td>
                                 <td style={{ textAlign: 'center' }}>
                                   <Link to={`/hisse/${stock.ticker}`} className="action-button" style={{ padding: '3px 8px', fontSize: '10.5px' }}>
-                                    [KOKPİT]
+                                    Kokpit
                                   </Link>
                                 </td>
                               </tr>
@@ -1077,7 +1071,7 @@ export default function Models() {
                                 <span style={{ color: 'var(--text-muted)' }}>-</span>
                               )}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: '#fff' }}>
+                            <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
                               {pos.targetPrice ? pos.targetPrice.toFixed(2) : '-'}
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>
@@ -1091,7 +1085,7 @@ export default function Models() {
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               <Link to={`/hisse/${pos.ticker}`} className="action-button" style={{ padding: '3px 8px', fontSize: '10.5px' }}>
-                                [KOKPİT]
+                                Kokpit
                               </Link>
                             </td>
                           </tr>

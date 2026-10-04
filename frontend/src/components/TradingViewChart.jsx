@@ -237,7 +237,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                 if (val !== null) macdSig.push({ time: formattedData[i].time, value: val });
             });
             macdResult.histogram.forEach((val, i) => {
-                if (val !== null) macdHist.push({ time: formattedData[i].time, value: val, color: val >= 0 ? 'rgba(38, 166, 154, 0.8)' : 'rgba(239, 83, 80, 0.8)' });
+                if (val !== null) macdHist.push({ time: formattedData[i].time, value: val, color: val >= 0 ? 'rgba(63, 138, 107, 0.8)' : 'rgba(192, 82, 78, 0.8)' });
             });
         }
 
@@ -364,12 +364,12 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
         };
 
         const chart = createChart(chartContainerRef.current, {
-            layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#d1d4dc' },
-            grid: { vertLines: { color: 'rgba(42, 46, 57, 0.2)' }, horzLines: { color: 'rgba(42, 46, 57, 0.2)' } },
+            layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#9A978F', fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 11 },
+            grid: { vertLines: { color: 'rgba(255, 255, 255, 0.05)' }, horzLines: { color: 'rgba(255, 255, 255, 0.05)' } },
             crosshair: { mode: CrosshairMode.Normal },
-            rightPriceScale: { borderColor: 'rgba(197, 203, 206, 0.8)' },
-            timeScale: { borderColor: 'rgba(197, 203, 206, 0.8)', timeVisible: false },
-            watermark: { color: 'rgba(38, 166, 154, 0.08)', visible: !!ticker, text: ticker || '', fontSize: 120, horzAlign: 'center', vertAlign: 'center' },
+            rightPriceScale: { borderColor: 'rgba(154, 151, 143, 0.6)' },
+            timeScale: { borderColor: 'rgba(154, 151, 143, 0.6)', timeVisible: false },
+            watermark: { color: 'rgba(63, 138, 107, 0.08)', visible: !!ticker, text: ticker || '', fontSize: 120, horzAlign: 'center', vertAlign: 'center' },
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight || (isFullscreen ? window.innerHeight - 80 : 400),
         });
@@ -379,13 +379,13 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
         let mainSeries;
         if (chartType === 'candle') {
             mainSeries = chart.addSeries(CandlestickSeries, {
-                upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+                upColor: '#3F8A6B', downColor: '#C0524E', borderVisible: false, wickUpColor: '#3F8A6B', wickDownColor: '#C0524E',
             });
         } else {
             mainSeries = chart.addSeries(AreaSeries, {
-                lineColor: '#2962ff',
-                topColor: 'rgba(41, 98, 255, 0.28)',
-                bottomColor: 'rgba(41, 98, 255, 0.0)',
+                lineColor: '#C8A24A',
+                topColor: 'rgba(200, 162, 74, 0.28)',
+                bottomColor: 'rgba(200, 162, 74, 0.0)',
                 lineWidth: 2
             });
         }
@@ -393,30 +393,30 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
         mainSeriesRef.current = mainSeries;
 
         // SMAs
-        const sma20 = chart.addSeries(LineSeries, { color: '#ffc107', lineWidth: 1.5, title: 'SMA 20', visible: showSMA20, crosshairMarkerVisible: false });
+        const sma20 = chart.addSeries(LineSeries, { color: '#C9883A', lineWidth: 1.5, title: 'SMA 20', visible: showSMA20, crosshairMarkerVisible: false });
         sma20.setData(sma20Data);
         sma20Ref.current = sma20;
 
-        const sma50 = chart.addSeries(LineSeries, { color: '#00e5ff', lineWidth: 1.5, title: 'SMA 50', visible: showSMA50, crosshairMarkerVisible: false });
+        const sma50 = chart.addSeries(LineSeries, { color: '#C8A24A', lineWidth: 1.5, title: 'SMA 50', visible: showSMA50, crosshairMarkerVisible: false });
         sma50.setData(sma50Data);
         sma50Ref.current = sma50;
 
-        const sma200 = chart.addSeries(LineSeries, { color: '#ef5350', lineWidth: 2, title: 'SMA 200', visible: showSMA200, crosshairMarkerVisible: false });
+        const sma200 = chart.addSeries(LineSeries, { color: '#C0524E', lineWidth: 2, title: 'SMA 200', visible: showSMA200, crosshairMarkerVisible: false });
         sma200.setData(sma200Data);
         sma200Ref.current = sma200;
 
         // Volume
-        const volumeSeries = chart.addSeries(HistogramSeries, { color: '#26a69a', priceFormat: { type: 'volume' }, priceScaleId: '' });
+        const volumeSeries = chart.addSeries(HistogramSeries, { color: '#3F8A6B', priceFormat: { type: 'volume' }, priceScaleId: '' });
         volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-        volumeSeries.setData(formattedData.map(d => ({ time: d.time, value: d.volume, color: d.close >= d.open ? 'rgba(38, 166, 154, 0.3)' : 'rgba(239, 83, 80, 0.3)' })));
+        volumeSeries.setData(formattedData.map(d => ({ time: d.time, value: d.volume, color: d.close >= d.open ? 'rgba(63, 138, 107, 0.3)' : 'rgba(192, 82, 78, 0.3)' })));
         volumeSeriesRef.current = volumeSeries;
 
         // Technical Analysis Sub-panes (MACD, RSI)
-        const macdLineSeries = chart.addSeries(LineSeries, { color: '#2962FF', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
-        const macdSignalSeries = chart.addSeries(LineSeries, { color: '#FF6D00', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
+        const macdLineSeries = chart.addSeries(LineSeries, { color: '#C8A24A', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
+        const macdSignalSeries = chart.addSeries(LineSeries, { color: '#C9883A', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
         const macdHistSeries = chart.addSeries(HistogramSeries, { priceScaleId: 'ta', visible: false });
 
-        const rsiLineSeries = chart.addSeries(LineSeries, { color: '#9C27B0', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
+        const rsiLineSeries = chart.addSeries(LineSeries, { color: '#E8CD8F', lineWidth: 2, priceScaleId: 'ta', visible: false, crosshairMarkerVisible: false });
 
         chart.priceScale('ta').applyOptions({
             scaleMargins: { top: 0.8, bottom: 0 },
@@ -599,7 +599,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                     // In compact 'pin' mode, use clean pin without long company names blocking candlesticks
                     text = dayReports.length > 1 ? `${dayReports.length}` : '';
                 }
-                markersMap.set(date, { time: date, position: 'aboveBar', color: '#38bdf8', shape: 'arrowDown', text, size: 1 });
+                markersMap.set(date, { time: date, position: 'aboveBar', color: '#E8CD8F', shape: 'arrowDown', text, size: 1 });
             });
         }
 
@@ -609,7 +609,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                 const existing = markersMap.get(sig.time);
                 const text = sig.signal === 'BUY' ? 'AL' : 'SAT';
                 const position = sig.signal === 'BUY' ? 'belowBar' : 'aboveBar';
-                const color = sig.signal === 'BUY' ? '#00e676' : '#ff5252';
+                const color = sig.signal === 'BUY' ? '#3F8A6B' : '#C0524E';
                 const shape = sig.signal === 'BUY' ? 'arrowUp' : 'arrowDown';
 
                 if (existing) {
@@ -660,21 +660,21 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                 position: 'absolute',
                 left: leftPos,
                 top: Math.max(10, activeTooltip.y - 100),
-                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                backgroundColor: 'rgba(18, 18, 20, 0.96)',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '8px',
                 padding: '10px',
                 zIndex: 200,
-                color: '#fff',
+                color: '#F4F2ED',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
                 backdropFilter: 'blur(4px)',
                 pointerEvents: 'none',
                 minWidth: '150px'
             }}>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', borderBottom: '1px solid #333', paddingBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '11px', color: '#9A978F', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.11)', paddingBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
                     <span>{date}</span>
                     {dataPoint && (
-                        <span style={{ color: dataPoint.close >= dataPoint.open ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
+                        <span style={{ color: dataPoint.close >= dataPoint.open ? '#3F8A6B' : '#C0524E', fontWeight: 'bold' }}>
                             {dataPoint.close.toFixed(2)} TRY
                         </span>
                     )}
@@ -682,21 +682,21 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
 
                 {dataPoint && (
                     <div style={{ fontSize: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: reports.length > 0 ? '8px' : '0' }}>
-                        <div><span style={{ color: '#888' }}>Açılış:</span> {dataPoint.open.toFixed(2)}</div>
-                        <div><span style={{ color: '#888' }}>Kapanış:</span> {dataPoint.close.toFixed(2)}</div>
-                        <div><span style={{ color: '#888' }}>Yüksek:</span> {dataPoint.high.toFixed(2)}</div>
-                        <div><span style={{ color: '#888' }}>Düşük:</span> {dataPoint.low.toFixed(2)}</div>
+                        <div><span style={{ color: '#9A978F' }}>Açılış:</span> {dataPoint.open.toFixed(2)}</div>
+                        <div><span style={{ color: '#9A978F' }}>Kapanış:</span> {dataPoint.close.toFixed(2)}</div>
+                        <div><span style={{ color: '#9A978F' }}>Yüksek:</span> {dataPoint.high.toFixed(2)}</div>
+                        <div><span style={{ color: '#9A978F' }}>Düşük:</span> {dataPoint.low.toFixed(2)}</div>
                     </div>
                 )}
 
                 {reports && reports.length > 0 && (
                     <>
-                        <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px', borderTop: '1px solid #333', paddingTop: '6px' }}>Kurum Raporları</div>
+                        <div style={{ fontSize: '10px', color: '#9A978F', marginBottom: '4px', borderTop: '1px solid rgba(255,255,255,0.11)', paddingTop: '6px' }}>Kurum Raporları</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             {reports.map((r, i) => (
                                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', gap: '20px' }}>
                                     <span style={{ fontWeight: 'bold', color: 'var(--text-highlight)' }}>{r.kurum}</span>
-                                    <span style={{ color: '#fff', fontWeight: 'bold' }}>{r.hedefFiyat}</span>
+                                    <span style={{ color: '#F4F2ED', fontWeight: 'bold' }}>{r.hedefFiyat}</span>
                                 </div>
                             ))}
                         </div>
@@ -705,14 +705,14 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
 
                 {signals && signals.length > 0 && (
                     <>
-                        <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px', borderTop: '1px solid #333', paddingTop: '6px' }}>Teknik Sinyaller</div>
+                        <div style={{ fontSize: '10px', color: '#9A978F', marginBottom: '4px', borderTop: '1px solid rgba(255,255,255,0.11)', paddingTop: '6px' }}>Teknik Sinyaller</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             {signals.map((s, i) => (
                                 <div key={i} style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', gap: '2px' }}>
-                                    <span style={{ fontWeight: 'bold', color: s.signal === 'BUY' ? '#00e676' : '#ff5252' }}>
+                                    <span style={{ fontWeight: 'bold', color: s.signal === 'BUY' ? '#3F8A6B' : '#C0524E' }}>
                                         {s.signal === 'BUY' ? 'AL' : 'SAT'} SİNYALİ
                                     </span>
-                                    <span style={{ color: '#ccc', fontSize: '10px', whiteSpace: 'normal', lineHeight: '1.2' }}>{s.reason}</span>
+                                    <span style={{ color: '#C9C7C0', fontSize: '10px', whiteSpace: 'normal', lineHeight: '1.2' }}>{s.reason}</span>
                                 </div>
                             ))}
                         </div>
@@ -739,14 +739,14 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
         return (
             <div style={{
                 position: 'absolute', left, top, width, height,
-                backgroundColor: isUp ? 'rgba(38, 166, 154, 0.2)' : 'rgba(239, 83, 80, 0.2)',
-                border: `1px solid ${isUp ? '#26a69a' : '#ef5350'}`,
+                backgroundColor: isUp ? 'rgba(63, 138, 107, 0.2)' : 'rgba(192, 82, 78, 0.2)',
+                border: `1px solid ${isUp ? '#3F8A6B' : '#C0524E'}`,
                 pointerEvents: 'none', zIndex: 100,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
                 <div style={{
-                    backgroundColor: isUp ? '#26a69a' : '#ef5350',
-                    color: '#fff', padding: '4px 8px', borderRadius: '4px',
+                    backgroundColor: isUp ? '#3F8A6B' : '#C0524E',
+                    color: '#F4F2ED', padding: '4px 8px', borderRadius: '4px',
                     fontSize: '12px', fontWeight: 'bold',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.5)', whiteSpace: 'nowrap'
                 }}>
@@ -766,36 +766,36 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
     // ────────────────────────────── RENDER ──────────────────────────────
     return (
         <div ref={containerRef} style={{
-            position: 'relative', background: isFullscreen ? '#0a0e17' : 'transparent', padding: isFullscreen ? '20px' : '0',
+            position: 'relative', background: isFullscreen ? '#000000' : 'transparent', padding: isFullscreen ? '20px' : '0',
             width: '100%', height: isFullscreen ? '100vh' : (fillContainer ? '100%' : 'auto'), flex: fillContainer ? 1 : 'none', display: 'flex', flexDirection: 'column', minHeight: 0
         }}>
             {/* ─── TOP BAR: Interval | Chart Type | Measure | SMAs | Fullscreen ─── */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     {/* Interval Selector (D / W / M) */}
-                    <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', overflow: 'hidden', border: '1px solid #333' }}>
+                    <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.11)' }}>
                         {INTERVALS.map(iv => (
                             <button key={iv.key} onClick={() => setActiveInterval(iv.key)} style={{
                                 background: activeInterval === iv.key ? 'var(--color-cyan)' : 'transparent',
-                                color: activeInterval === iv.key ? '#000' : '#aaa',
+                                color: activeInterval === iv.key ? '#000' : '#C9C7C0',
                                 border: 'none', padding: '4px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s'
                             }}>{iv.label}</button>
                         ))}
                     </div>
 
                     {/* Chart Type Toggle */}
-                    <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', overflow: 'hidden', border: '1px solid #333' }}>
+                    <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.11)' }}>
                         <button onClick={() => setChartType('candle')} style={{
-                            background: chartType === 'candle' ? '#555' : 'transparent',
-                            color: chartType === 'candle' ? '#fff' : '#aaa',
+                            background: chartType === 'candle' ? '#9A978F' : 'transparent',
+                            color: chartType === 'candle' ? '#F4F2ED' : '#C9C7C0',
                             border: 'none', padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', gap: '4px', fontWeight: chartType === 'candle' ? 'bold' : 'normal'
                         }}>
                             Mum
                         </button>
                         <button onClick={() => setChartType('line')} style={{
-                            background: chartType === 'line' ? '#555' : 'transparent',
-                            color: chartType === 'line' ? '#fff' : '#aaa',
+                            background: chartType === 'line' ? '#9A978F' : 'transparent',
+                            color: chartType === 'line' ? '#F4F2ED' : '#C9C7C0',
                             border: 'none', padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', gap: '4px', fontWeight: chartType === 'line' ? 'bold' : 'normal'
                         }}>
@@ -810,8 +810,8 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                             onChange={(e) => setActiveSignal(e.target.value)}
                             style={{
                                 background: 'rgba(0,0,0,0.4)',
-                                color: activeSignal ? '#00e5ff' : '#aaa',
-                                border: `1px solid ${activeSignal ? '#00e5ff' : '#333'}`,
+                                color: activeSignal ? '#C8A24A' : '#C9C7C0',
+                                border: `1px solid ${activeSignal ? '#C8A24A' : '#18181B'}`,
                                 borderRadius: '6px', padding: '4px 8px', fontSize: '11px',
                                 outline: 'none', cursor: 'pointer', fontWeight: 'bold'
                             }}
@@ -831,8 +831,8 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                         }}
                         style={{
                             background: isMeasureMode ? 'var(--color-neutral)' : 'rgba(0,0,0,0.4)',
-                            color: isMeasureMode ? '#fff' : '#aaa',
-                            border: `1px solid ${isMeasureMode ? 'var(--color-neutral)' : '#333'}`,
+                            color: isMeasureMode ? '#F4F2ED' : '#C9C7C0',
+                            border: `1px solid ${isMeasureMode ? 'var(--color-neutral)' : '#18181B'}`,
                             padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', gap: '4px'
                         }}
@@ -840,7 +840,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                         Ölçüm
                     </button>
                     {measureStart && !isMeasureMode && (
-                        <button onClick={clearMeasure} style={{ background: 'transparent', border: '1px solid #444', color: '#ff4444', cursor: 'pointer', fontSize: '11px', padding: '4px 8px', borderRadius: '4px' }}>✕</button>
+                        <button onClick={clearMeasure} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.18)', color: '#C0524E', cursor: 'pointer', fontSize: '11px', padding: '4px 8px', borderRadius: '4px' }}>✕</button>
                     )}
 
                     {/* Report Marker Mode Toggle */}
@@ -850,9 +850,9 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                         }}
                         title="Grafik üzerindeki kurum rapor imlerini değiştir (Nokta / Etiket / Gizle)"
                         style={{
-                            background: reportMarkerMode !== 'none' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0,0,0,0.4)',
-                            color: reportMarkerMode !== 'none' ? '#38bdf8' : '#777',
-                            border: `1px solid ${reportMarkerMode !== 'none' ? 'rgba(56, 189, 248, 0.4)' : '#333'}`,
+                            background: reportMarkerMode !== 'none' ? 'rgba(200, 162, 74, 0.15)' : 'rgba(0,0,0,0.4)',
+                            color: reportMarkerMode !== 'none' ? '#C8A24A' : '#9A978F',
+                            border: `1px solid ${reportMarkerMode !== 'none' ? 'rgba(200, 162, 74, 0.4)' : '#18181B'}`,
                             padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
                             whiteSpace: 'nowrap'
                         }}
@@ -873,8 +873,8 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                             title="Grafik dikey yüksekliğini ayarla (Kompakt: 340px, Standart: 440px, Geniş: 580px)"
                             style={{
                                 background: 'rgba(0,0,0,0.4)',
-                                color: '#fff',
-                                border: '1px solid #444',
+                                color: '#F4F2ED',
+                                border: '1px solid rgba(255,255,255,0.18)',
                                 borderRadius: '6px',
                                 padding: '4px 8px',
                                 fontSize: '11px',
@@ -887,9 +887,9 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                         </button>
                     )}
 
-                    <button onClick={() => setShowSMA20(!showSMA20)} style={getToggleStyle(showSMA20, '#ffc107')}>SMA 20</button>
-                    <button onClick={() => setShowSMA50(!showSMA50)} style={getToggleStyle(showSMA50, '#00e5ff')}>SMA 50</button>
-                    <button onClick={() => setShowSMA200(!showSMA200)} style={getToggleStyle(showSMA200, '#ef5350')}>SMA 200</button>
+                    <button onClick={() => setShowSMA20(!showSMA20)} style={getToggleStyle(showSMA20, '#C9883A')}>SMA 20</button>
+                    <button onClick={() => setShowSMA50(!showSMA50)} style={getToggleStyle(showSMA50, '#C8A24A')}>SMA 50</button>
+                    <button onClick={() => setShowSMA200(!showSMA200)} style={getToggleStyle(showSMA200, '#C0524E')}>SMA 200</button>
                     <button onClick={() => {
                         if (!document.fullscreenElement) {
                             containerRef.current.requestFullscreen && containerRef.current.requestFullscreen();
@@ -898,7 +898,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                             document.exitFullscreen && document.exitFullscreen();
                             setIsFullscreen(false);
                         }
-                    }} style={{ background: 'transparent', border: '1px solid #444', color: '#fff', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '11px' }}>{isFullscreen ? '⊖' : '⊕'}</button>
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.18)', color: '#F4F2ED', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '11px' }}>{isFullscreen ? '⊖' : '⊕'}</button>
                 </div>
             </div>
 
@@ -928,7 +928,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                 {performanceBadges.map((tf, idx) => {
                     const isActive = activeTimeframe === tf.key;
                     const isPositive = tf.change !== null && tf.change >= 0;
-                    const changeColor = tf.change === null ? '#555' : isPositive ? '#22c55e' : '#ef4444';
+                    const changeColor = tf.change === null ? '#9A978F' : isPositive ? '#3F8A6B' : '#C0524E';
                     const changeStr = tf.change !== null ? `${isPositive ? '+' : ''}${tf.change.toFixed(1)}%` : '-';
 
                     return (
@@ -943,19 +943,19 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                                     transform: 'translateX(-50%)',
                                     marginBottom: '8px',
                                     padding: '6px 10px',
-                                    background: '#1e222d',
-                                    border: '1px solid #434651',
+                                    background: '#18181B',
+                                    border: '1px solid #2A2A2E',
                                     borderRadius: '4px',
-                                    color: '#d1d4dc',
+                                    color: '#C9C7C0',
                                     fontSize: '11px',
                                     whiteSpace: 'nowrap',
                                     zIndex: 50,
                                     boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
                                     pointerEvents: 'none'
                                 }}>
-                                    <div style={{ color: '#888', marginBottom: '2px' }}>Başlangıç Değeri</div>
-                                    <div><span style={{ color: '#888' }}>Tarih:</span> {tf.priceDate}</div>
-                                    <div><span style={{ color: '#888' }}>Fiyat:</span> <span style={{ color: '#fff' }}>{tf.startPrice?.toFixed(2)} TRY</span></div>
+                                    <div style={{ color: '#9A978F', marginBottom: '2px' }}>Başlangıç Değeri</div>
+                                    <div><span style={{ color: '#9A978F' }}>Tarih:</span> {tf.priceDate}</div>
+                                    <div><span style={{ color: '#9A978F' }}>Fiyat:</span> <span style={{ color: '#F4F2ED' }}>{tf.startPrice?.toFixed(2)} TRY</span></div>
                                     {/* Little triangle arrow */}
                                     <div style={{
                                         position: 'absolute',
@@ -964,7 +964,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                                         transform: 'translateX(-50%)',
                                         borderWidth: '5px 5px 0',
                                         borderStyle: 'solid',
-                                        borderColor: '#434651 transparent transparent transparent',
+                                        borderColor: '#2A2A2E transparent transparent transparent',
                                     }}></div>
                                 </div>
                             )}
@@ -974,7 +974,7 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                                     width: '100%',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                     padding: '5px 2px',
-                                    background: isActive ? 'rgba(41, 98, 255, 0.15)' : 'transparent',
+                                    background: isActive ? 'rgba(200, 162, 74, 0.15)' : 'transparent',
                                     border: 'none',
                                     borderRight: idx < performanceBadges.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                                     borderTopLeftRadius: idx === 0 ? '6px' : '0',
@@ -983,12 +983,12 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
                                     borderBottomRightRadius: idx === performanceBadges.length - 1 ? '6px' : '0',
                                     cursor: 'pointer',
                                     transition: 'background 0.2s',
-                                    borderBottom: isActive ? '2px solid #2962ff' : '2px solid transparent',
+                                    borderBottom: isActive ? '2px solid #C8A24A' : '2px solid transparent',
                                 }}
                                 onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
                                 onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                             >
-                                <span style={{ fontSize: '10px', fontWeight: 'bold', color: isActive ? '#fff' : '#888', marginBottom: '1px', whiteSpace: 'nowrap' }}>{tf.label}</span>
+                                <span style={{ fontSize: '10px', fontWeight: 'bold', color: isActive ? '#F4F2ED' : '#9A978F', marginBottom: '1px', whiteSpace: 'nowrap' }}>{tf.label}</span>
                                 <span style={{ fontSize: '10.5px', fontWeight: 'bold', color: changeColor, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{changeStr}</span>
                             </button>
                         </div>
@@ -1002,8 +1002,8 @@ export default function TradingViewChart({ data, reports, ticker, currentPrice, 
 function getToggleStyle(isActive, color) {
     return {
         background: isActive ? `${color}33` : 'rgba(0,0,0,0.5)',
-        border: `1px solid ${isActive ? color : '#444'}`,
-        color: isActive ? color : '#888', padding: '4px 8px', borderRadius: '4px',
+        border: `1px solid ${isActive ? color : '#18181B'}`,
+        color: isActive ? color : '#9A978F', padding: '4px 8px', borderRadius: '4px',
         fontSize: '11px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s'
     };
 }

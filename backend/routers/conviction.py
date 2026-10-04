@@ -71,7 +71,7 @@ def _enrich_setup_with_alpha(setup: Dict[str, Any], ticker: str) -> Dict[str, An
             setup["alpha_score"] = round(a_score, 1)
             setup["alpha_signal"] = a_sig
             setup["is_disagreeing"] = is_disagreeing
-            setup["disagreement_badge"] = "⚠ Ayrışma" if is_disagreeing else None
+            setup["disagreement_badge"] = "Ayrışma" if is_disagreeing else None
             setup["disagreement_reason"] = reason
     except Exception:
         pass
@@ -126,7 +126,7 @@ def get_conviction_stock_setup(ticker: str):
         "decision": "BEKLE / İZLE",
         "decision_badge": "HOLD",
         "score": 50.0,
-        "color": "#ffab00",
+        "color": "#C9883A",
         "drivers": ["Yeterli aracı kurum konsensüsü bekleniyor."],
         "risk_statement": "Veri yetersizliğinden dolayı temkinli olunmalı.",
         "entry_zone": {"low": round(p * 0.98, 2), "high": round(p * 1.01, 2)},
@@ -163,7 +163,7 @@ def get_all_conviction_stocks():
 
                 if (c_cat == "AL" and a_cat in ("NOTR", "SAT")) or (a_cat == "AL" and c_cat in ("NOTR", "SAT")):
                     item["is_disagreeing"] = True
-                    item["disagreement_badge"] = "⚠ İki motor farklı görüşte"
+                    item["disagreement_badge"] = "İki motor farklı görüşte"
                     item["disagreement_reason"] = f"Karar Motoru: {item.get('score')}p ({item.get('decision')}) vs Alpha Motoru: {a_score}p ({a_signal})"
                 else:
                     item["is_disagreeing"] = False

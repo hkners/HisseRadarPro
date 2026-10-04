@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FavoriteStar from './common/FavoriteStar';
+import { tintStyle } from '../utils/format';
 
 export default function ConvictionBuyCard({ stock, onOpenDetail }) {
   if (!stock) return null;
@@ -53,11 +54,11 @@ export default function ConvictionBuyCard({ stock, onOpenDetail }) {
               size={22}
               style={{ width: '22px', height: '22px', borderRadius: '3px', background: '#fff', objectFit: 'contain', padding: '1px', flexShrink: 0 }}
             />
-            <Link to={`/hisse/${ticker}`} style={{ fontSize: '14px', fontWeight: '800', color: '#fff', textDecoration: 'none', flexShrink: 0 }}>
+            <Link to={`/hisse/${ticker}`} style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)', textDecoration: 'none', flexShrink: 0 }}>
               {ticker}
             </Link>
             {model_count > 0 && (
-              <span style={{ fontSize: '9px', background: 'rgba(210, 153, 34, 0.15)', color: 'var(--color-warning)', border: '1px solid rgba(210, 153, 34, 0.3)', padding: '0 4px', borderRadius: '3px', fontWeight: 'bold', flexShrink: 0 }}>
+              <span style={{ fontSize: '9px', background: 'rgba(201, 136, 58, 0.15)', color: 'var(--color-warning)', border: '1px solid rgba(201, 136, 58, 0.3)', padding: '0 4px', borderRadius: '3px', fontWeight: 'bold', flexShrink: 0 }}>
                 M({model_count})
               </span>
             )}
@@ -69,8 +70,7 @@ export default function ConvictionBuyCard({ stock, onOpenDetail }) {
           {/* Decision & Score Badge & Quick Detail Button */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
             <span style={{ 
-              background: color || 'var(--color-up)', 
-              color: ['#ff3366', '#ef4444', '#dc2626', '#f85149'].includes(color) ? '#ffffff' : '#000000', 
+              ...tintStyle(color || 'var(--color-up)'),
               fontSize: '9.5px', 
               fontWeight: '800', 
               padding: '1px 5px', 
@@ -80,13 +80,13 @@ export default function ConvictionBuyCard({ stock, onOpenDetail }) {
               {decision}
             </span>
             <span style={{ fontSize: '9.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-              <strong style={{ color: '#fff' }}>{Math.round(score)}</strong>p
+              <strong style={{ color: 'var(--text-primary)' }}>{Math.round(score)}</strong>p
             </span>
             <button
               onClick={() => onOpenDetail?.(stock)}
               style={{
-                background: 'rgba(57, 197, 207, 0.15)',
-                border: '1px solid rgba(57, 197, 207, 0.35)',
+                background: 'rgba(200, 162, 74, 0.15)',
+                border: '1px solid rgba(200, 162, 74, 0.35)',
                 color: 'var(--color-cyan)',
                 fontSize: '9px',
                 fontWeight: 'bold',
@@ -97,7 +97,7 @@ export default function ConvictionBuyCard({ stock, onOpenDetail }) {
               }}
               title="Tüm gerekçeleri ve risk detayını göster"
             >
-              🔍 Detay
+              Detay
             </button>
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function ConvictionBuyCard({ stock, onOpenDetail }) {
         }}>
           <div>
             <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: '600' }}>FİYAT</div>
-            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
               {price ? price.toFixed(2) : '-'}
             </div>
             <div style={{ fontSize: '10px', color: change_pct >= 0 ? 'var(--color-up)' : 'var(--color-down)', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
@@ -147,10 +147,10 @@ export default function ConvictionBuyCard({ stock, onOpenDetail }) {
           </div>
 
           <div>
-            <div style={{ fontSize: '9px', color: (stock.high_conviction_anomaly) ? '#00ff88' : ((risk_reward > 10.0 && !stock.high_conviction_anomaly) || stock.is_excessive_rr) ? '#ffab00' : 'var(--text-muted)', fontWeight: '600' }}>
-              {(stock.high_conviction_anomaly) ? '✅ ONAYLI R:R' : ((risk_reward > 10.0 && !stock.high_conviction_anomaly) || stock.is_excessive_rr) ? '⚠️ R:R UYARI' : 'R:R / ALIM'}
+            <div style={{ fontSize: '9px', color: (stock.high_conviction_anomaly) ? 'var(--positive)' : ((risk_reward > 10.0 && !stock.high_conviction_anomaly) || stock.is_excessive_rr) ? 'var(--warning)' : 'var(--text-muted)', fontWeight: '600' }}>
+              {(stock.high_conviction_anomaly) ? 'ONAYLI R:R' : ((risk_reward > 10.0 && !stock.high_conviction_anomaly) || stock.is_excessive_rr) ? 'R:R UYARI' : 'R:R / ALIM'}
             </div>
-            <div style={{ fontSize: '11px', fontWeight: 'bold', color: (stock.high_conviction_anomaly) ? '#00ff88' : ((risk_reward > 10.0 && !stock.high_conviction_anomaly) || stock.is_excessive_rr) ? '#ffab00' : 'var(--color-cyan)', fontVariantNumeric: 'tabular-nums' }} title={(stock.high_conviction_anomaly) ? "Yüksek Potansiyel - Çoklu Kurum Onaylı" : ((risk_reward > 10.0 && !stock.high_conviction_anomaly) || stock.is_excessive_rr) ? "Aşırı yüksek R:R - hedef fiyat doğrulaması gerekebilir" : ""}>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', color: (stock.high_conviction_anomaly) ? 'var(--positive)' : ((risk_reward > 10.0 && !stock.high_conviction_anomaly) || stock.is_excessive_rr) ? 'var(--warning)' : 'var(--color-cyan)', fontVariantNumeric: 'tabular-nums' }} title={(stock.high_conviction_anomaly) ? "Yüksek Potansiyel - Çoklu Kurum Onaylı" : ((risk_reward > 10.0 && !stock.high_conviction_anomaly) || stock.is_excessive_rr) ? "Aşırı yüksek R:R - hedef fiyat doğrulaması gerekebilir" : ""}>
               1:{risk_reward}
             </div>
             <div style={{ fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
@@ -200,15 +200,15 @@ export default function ConvictionBuyCard({ stock, onOpenDetail }) {
         gap: '4px'
       }}>
         <span style={{ color: 'var(--text-muted)', flexShrink: 0, fontSize: '9.5px' }}>
-          👥 {broker_count} Kurum
+          {broker_count} Kurum
         </span>
         {stop_loss && (
           <span 
             onClick={() => onOpenDetail?.(stock)}
             style={{ 
               color: 'var(--color-red)', 
-              background: 'rgba(248, 81, 73, 0.1)',
-              border: '1px solid rgba(248, 81, 73, 0.25)',
+              background: 'rgba(192, 82, 78, 0.1)',
+              border: '1px solid rgba(192, 82, 78, 0.25)',
               padding: '1px 6px',
               borderRadius: '3px',
               fontSize: '9px',
@@ -224,7 +224,7 @@ export default function ConvictionBuyCard({ stock, onOpenDetail }) {
             }} 
             title={risk_statement || `Önerilen zarar kes seviyesi: ${stop_loss} TL`}
           >
-            ⚠ Stop: {stop_loss.toFixed(1)} TL
+            Stop: {stop_loss.toFixed(1)} TL
           </span>
         )}
         <Link 

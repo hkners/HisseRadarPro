@@ -29,7 +29,7 @@ def get_alpha_screener():
 
                 if (c_cat == "AL" and a_cat in ("NOTR", "SAT")) or (a_cat == "AL" and c_cat in ("NOTR", "SAT")):
                     item["is_disagreeing"] = True
-                    item["disagreement_badge"] = "⚠ İki motor farklı görüşte"
+                    item["disagreement_badge"] = "İki motor farklı görüşte"
                     item["disagreement_reason"] = f"Alpha Motoru: {round(float(item.get('alpha_score', 0)), 1)}p ({item.get('signal')}) vs Karar Motoru: {c_score}p ({c_decision})"
                 else:
                     item["is_disagreeing"] = False

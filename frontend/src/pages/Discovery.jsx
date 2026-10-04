@@ -41,9 +41,9 @@ export default function Discovery() {
 
     return (
         <PageContainer
-            title="HİSSE KEŞİF RADARI"
+            title="Hisse Keşif"
             badge={{ label: `${activeList.length} EŞLEŞEN` }}
-            subtitle="Çok Boyutlu Potansiyel, Kurum Sayısı ve Model Portföy Filtreleme"
+            subtitle="Potansiyeli, kurum sayısını ve model portföy üyeliğini birlikte filtrele."
         >
             <div className="flex-row" style={{ flex: 1, minHeight: 0, gap: '10px' }}>
                 {/* Left Panel: Filter Controls */}
@@ -127,7 +127,7 @@ export default function Discovery() {
                         ) : (
                             <div style={{ padding: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', textAlign: 'center' }}>
                                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px' }}>FİLTREYE UYGUN</div>
-                                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>{activeList.length} HİSSE</div>
+                                <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{activeList.length} HİSSE</div>
                             </div>
                         )}
                     </div>
@@ -188,9 +188,9 @@ export default function Discovery() {
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                                        {row.ratings?.AL > 0 && <span style={{ background: 'rgba(0, 255, 136, 0.15)', color: '#00ff88', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 'bold', border: '1px solid rgba(0, 255, 136, 0.3)' }}>{row.ratings.AL} AL</span>}
-                                                        {row.ratings?.TUT > 0 && <span style={{ background: 'rgba(255, 171, 0, 0.15)', color: '#ffab00', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 'bold', border: '1px solid rgba(255, 171, 0, 0.3)' }}>{row.ratings.TUT} TUT</span>}
-                                                        {row.ratings?.SAT > 0 && <span style={{ background: 'rgba(255, 51, 102, 0.15)', color: '#ff3366', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 'bold', border: '1px solid rgba(255, 51, 102, 0.3)' }}>{row.ratings.SAT} SAT</span>}
+                                                        {row.ratings?.AL > 0 && <span style={{ background: 'rgba(63, 138, 107, 0.15)', color: 'var(--positive)', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 'bold', border: '1px solid rgba(63, 138, 107, 0.3)' }}>{row.ratings.AL} AL</span>}
+                                                        {row.ratings?.TUT > 0 && <span style={{ background: 'rgba(201, 136, 58, 0.15)', color: 'var(--warning)', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 'bold', border: '1px solid rgba(201, 136, 58, 0.3)' }}>{row.ratings.TUT} TUT</span>}
+                                                        {row.ratings?.SAT > 0 && <span style={{ background: 'rgba(192, 82, 78, 0.15)', color: 'var(--negative)', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 'bold', border: '1px solid rgba(192, 82, 78, 0.3)' }}>{row.ratings.SAT} SAT</span>}
                                                     </div>
                                                 </td>
                                                 <td style={{ textAlign: 'center', color: row.is_model ? 'var(--color-up)' : 'var(--text-muted)', fontWeight: 'bold', fontSize: '10px' }}>

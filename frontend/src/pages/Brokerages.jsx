@@ -95,19 +95,19 @@ export default function Brokerages() {
 
   return (
     <PageContainer
-      title="ARACI KURUMLAR DİZİNİ"
+      title="Kurumlar"
       badge={{
         label: `${sortedStats.length} KURUM`,
-        background: 'rgba(57, 197, 207, 0.15)',
+        background: 'rgba(200, 162, 74, 0.15)',
         color: 'var(--color-cyan)',
-        borderColor: 'rgba(57, 197, 207, 0.35)'
+        borderColor: 'rgba(200, 162, 74, 0.35)'
       }}
-      subtitle="BIST Araştırma ve Model Portföy Yayımlayan Kurumların Kapsam & Başarı Analizi"
+      subtitle="Araştırma ve model portföy yayımlayan kurumlar: kapsam, görüş dağılımı ve ortalama potansiyel."
       statusDot="var(--color-cyan)"
       headerRight={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
           <span style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', padding: '2px 8px', borderRadius: '4px' }}>
-            Toplam: <strong style={{ color: '#fff' }}>{totalReports}</strong> Rapor
+            Toplam: <strong style={{ color: 'var(--text-primary)' }}>{totalReports}</strong> Rapor
           </span>
           <span style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', padding: '2px 8px', borderRadius: '4px' }}>
             Ort. Potansiyel: <strong style={{ color: 'var(--color-up)' }}>%{avgOverallPotential}</strong>
@@ -132,7 +132,7 @@ export default function Brokerages() {
                   padding: '3px 10px',
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border-color)',
-                  color: '#fff',
+                  color: 'var(--text-primary)',
                   borderRadius: '4px',
                   fontSize: '11px',
                   outline: 'none'
@@ -142,35 +142,31 @@ export default function Brokerages() {
                 onClick={() => { setFilter('ALL'); setSearch(''); setCurrentPage(1); }}
                 className={`action-button ${filter === 'ALL' && !search ? 'active' : ''}`}
               >
-                [TÜMÜ]
+                Tümü
               </button>
               <button 
                 onClick={() => { setFilter('COVERAGE_30'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'COVERAGE_30' ? 'active-green' : ''}`}
-                style={filter === 'COVERAGE_30' ? {} : { color: 'var(--color-up)', borderColor: 'rgba(0, 230, 118, 0.3)' }}
               >
-                [GENİŞ KAPSAM (30+)]
+                Geniş kapsam (30+)
               </button>
               <button 
                 onClick={() => { setFilter('HIGH_POTENTIAL'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'HIGH_POTENTIAL' ? 'active-purple' : ''}`}
-                style={filter === 'HIGH_POTENTIAL' ? {} : { color: '#b388ff', borderColor: 'rgba(179, 136, 255, 0.3)' }}
               >
-                [YÜKSEK POTANSİYEL (%50+)]
+                Yüksek potansiyel (%50+)
               </button>
               <button 
                 onClick={() => { setFilter('BUY_HEAVY'); setCurrentPage(1); }}
                 className={`action-button ${filter === 'BUY_HEAVY' ? 'active-warning' : ''}`}
-                style={filter === 'BUY_HEAVY' ? {} : { color: 'var(--color-warning)', borderColor: 'rgba(255, 170, 0, 0.3)' }}
               >
-                [AL AĞIRLIKLI]
+                AL ağırlıklı
               </button>
               <button 
                 onClick={() => { setFilter('ALL'); setSearch(''); setCurrentPage(1); }}
                 className="action-button"
-                style={{ color: 'var(--text-muted)' }}
               >
-                [SIFIRLA]
+                Sıfırla
               </button>
             </div>
           </div>
@@ -287,7 +283,7 @@ export default function Brokerages() {
                             className="action-button" 
                             style={{ padding: '3px 8px', fontSize: '10.5px' }}
                           >
-                            [RAPORLAR]
+                            Raporlar
                           </Link>
                         </td>
                       </tr>

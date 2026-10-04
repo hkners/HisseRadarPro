@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis } from 'recharts';
+import { Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis } from 'recharts';
+import { Upload } from 'lucide-react';
+import { WeightBar, TickerCell, PillTabs, Chip } from '../components/ui';
+import ImportCsvModal from '../components/ImportCsvModal';
+
+const ACCOUNT_KEY = 'hr.portfolio.account';
+const ACCOUNT_TABS = [{ id: 'all', label: 'Tümü' }, { id: 'real', label: 'Gerçek' }, { id: 'paper', label: 'Kâğıt' }];
+const ACCOUNT_LABEL = { real: 'Gerçek', paper: 'Kâğıt' };
+const readAccount = () => { try { return localStorage.getItem(ACCOUNT_KEY) || 'all'; } catch { return 'all'; } };
 import ImageWithFallback from '../components/ImageWithFallback';
 import { getCachedData, fetchWithCache } from '../utils/apiCache';
 import PageContainer from '../components/common/PageContainer';
 
-const COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 
 export default function Portfolio() {
   const stocksUrl = `${import.meta.env.VITE_API_URL}/stocks`;
@@ -20,6 +27,14 @@ export default function Portfolio() {
     return map;
   }, []);
 
+  const [account, setAccountState] = useState(readAccount);
+  const setAccount = (a) => { setAccountState(a); try { localStorage.setItem(ACCOUNT_KEY, a); } catch { /* storage unavailable */ } };
+  // Where new positions go: the open tab, or the real account when viewing both.
+  const writeAccount = account === 'all' ? 'real' : account;
+  const [newAccount, setNewAccount] = useState(writeAccount);
+  const [showImport, setShowImport] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [notice, setNotice] = useState('');
   const [holdings, setHoldings] = useState([]);
   const [livePrices, setLivePrices] = useState(initialLivePrices);
   const [loading, setLoading] = useState(Object.keys(initialLivePrices).length === 0);
@@ -127,7 +142,7 @@ export default function Portfolio() {
     fetch(`${import.meta.env.VITE_API_URL}/portfolio/batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transactions })
+      body: JSON.stringify({ transactions, account: account === 'all' ? 'paper' : account })
     })
       .then(res => {
         if (!res.ok) throw new Error('Hisseler portföye eklenirken hata oluştu.');
@@ -135,7 +150,7 @@ export default function Portfolio() {
       })
       .then(data => {
         setBatchAdding(false);
-        setBuilderSuccess(`Tebrikler! ${data.count || toAdd.length} hisse başarıyla portföyünüze eklendi.`);
+        setBuilderSuccess(`${data.count || toAdd.length} hisse ${account === 'real' ? 'gerçek' : 'kâğıt'} hesaba eklendi.`);
         fetchPortfolio();
       })
       .catch(err => {
@@ -164,11 +179,13 @@ export default function Portfolio() {
   };
 
   const fetchPortfolio = useCallback(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/portfolio`)
+    const q = account === 'all' ? '' : `?account=${account}`;
+    fetch(`${import.meta.env.VITE_API_URL}/portfolio${q}`)
       .then(res => res.json())
       .then(data => {
         const mapped = data.map(item => ({
           ticker: item.ticker,
+          account: item.account || 'real',
           quantity: item.quantity,
           avgCost: item.cost,
         }));
@@ -176,17 +193,19 @@ export default function Portfolio() {
       })
       .catch(console.error);
       
-    fetch(`${import.meta.env.VITE_API_URL}/portfolio/equity-curve?days=30`)
+    fetch(`${import.meta.env.VITE_API_URL}/portfolio/equity-curve?days=30${account === 'all' ? '' : `&account=${account}`}`)
       .then(res => res.json())
       .then(data => {
         if(data && Array.isArray(data)) setEquityCurve(data);
       })
       .catch(console.error);
-  }, []);
+  }, [account]);
 
   useEffect(() => {
     fetchPortfolio();
-  }, [fetchPortfolio]);
+    setNewAccount(account === 'all' ? 'real' : account);
+    setPendingDelete(null);
+  }, [fetchPortfolio, account]);
 
   // Fetch live prices with cache
   useEffect(() => {
@@ -217,7 +236,7 @@ export default function Portfolio() {
     fetch(`${import.meta.env.VITE_API_URL}/portfolio/transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticker, tx_type: txType, quantity: qty, price: cost, tx_date: newDate })
+      body: JSON.stringify({ ticker, tx_type: txType, quantity: qty, price: cost, tx_date: newDate, account: newAccount })
     })
     .then(res => res.json())
     .then(() => {
@@ -230,11 +249,12 @@ export default function Portfolio() {
     .catch(console.error);
   };
 
-  const removeHolding = (ticker) => {
-    fetch(`${import.meta.env.VITE_API_URL}/portfolio/${ticker}`, {
+  // Deleting removes every transaction of the ticker in that account, so it needs a second click.
+  const removeHolding = (ticker, acc) => {
+    fetch(`${import.meta.env.VITE_API_URL}/portfolio/${ticker}?account=${acc}`, {
       method: 'DELETE'
     })
-    .then(() => fetchPortfolio())
+    .then(() => { setPendingDelete(null); fetchPortfolio(); })
     .catch(console.error);
   };
 
@@ -282,6 +302,8 @@ export default function Portfolio() {
       .map(r => ({ name: r.ticker, value: parseFloat(r.weight.toFixed(1)) }));
   }, [portfolioData]);
 
+  const maxWeight = useMemo(() => Math.max(1, ...portfolioData.rows.map(r => r.weight || 0)), [portfolioData]);
+
   const formatCurrency = (val) => {
     if (val === null || val === undefined || isNaN(val)) return 'N/A';
     return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
@@ -289,61 +311,53 @@ export default function Portfolio() {
 
   return (
     <PageContainer
-      title="PORTFÖY YÖNETİCİSİ"
-      badge={{
-        label: `${holdings.length} POZİSYON`,
-        background: 'rgba(57, 197, 207, 0.15)',
-        color: 'var(--color-cyan)',
-        borderColor: 'rgba(57, 197, 207, 0.35)'
-      }}
-      subtitle="Kişisel Varlık Takibi, Portföy Ağırlıkları ve AI Risk Denetimi"
+      title="Portföyüm"
+      badge={`${holdings.length} pozisyon`}
+      subtitle="Pozisyonların, ağırlıkları ve yapay zekâ risk denetimi."
       statusDot="var(--color-cyan)"
       headerRight={
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <PillTabs tabs={ACCOUNT_TABS} value={account} onChange={setAccount} />
+          <button className="btn" onClick={() => setShowImport(true)}>
+            <Upload size={13} /> CSV içe aktar
+          </button>
           <button
             onClick={() => {
               setShowBuilder(!showBuilder);
               if (showAddForm) setShowAddForm(false);
             }}
-            className="action-button"
-            style={{
-              background: showBuilder ? 'rgba(0, 229, 255, 0.25)' : 'rgba(0, 229, 255, 0.12)',
-              color: 'var(--color-cyan)',
-              borderColor: 'var(--color-cyan)',
-              fontWeight: 'bold',
-              fontSize: '10.5px'
-            }}
+            className="btn btn-outline-gold"
           >
-            {showBuilder ? '[ KAPAT ]' : '[ ⚡ ÖNERİLEN PORTFÖY OLUŞTUR ]'}
+            {showBuilder ? 'Kapat' : 'Önerilen portföy oluştur'}
           </button>
           <button
             onClick={() => {
               setShowAddForm(!showAddForm);
               if (showBuilder) setShowBuilder(false);
             }}
-            className="action-button"
-            style={{
-              background: showAddForm ? 'rgba(248, 81, 73, 0.15)' : 'rgba(0, 230, 118, 0.15)',
-              color: showAddForm ? 'var(--color-red)' : 'var(--color-up)',
-              borderColor: showAddForm ? 'var(--color-red)' : 'var(--color-up)',
-              fontWeight: 'bold',
-              fontSize: '10.5px'
-            }}
+            className={showAddForm ? 'btn' : 'btn btn-primary'}
           >
-            {showAddForm ? '[ İPTAL ]' : '[ + HİSSE EKLE ]'}
+            {showAddForm ? 'İptal' : '+ Hisse ekle'}
           </button>
         </div>
       }
       scrollable={true}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+
+      {notice && (
+        <div className="notice" style={{ marginBottom: 12 }}>
+          <span>{notice}</span>
+          <button className="btn btn-sm btn-ghost" onClick={() => setNotice('')}>Kapat</button>
+        </div>
+      )}
 
       {/* Suggested Portfolio Builder Panel */}
       {showBuilder && (
-        <div className="panel" style={{ marginBottom: '15px', border: '1px solid rgba(0, 229, 255, 0.3)', background: 'linear-gradient(180deg, rgba(0, 229, 255, 0.04) 0%, rgba(13, 20, 30, 0.95) 100%)' }}>
+        <div className="panel" style={{ marginBottom: '15px', border: '1px solid rgba(200, 162, 74, 0.3)', background: 'linear-gradient(180deg, rgba(200, 162, 74, 0.04) 0%, rgba(18, 18, 20, 0.95) 100%)' }}>
           <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--color-cyan)' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>⚡</span> OTOMATİK PORTFÖY İNŞASI & ÇEŞİTLENDİRME MOTORU
+              OTOMATİK PORTFÖY İNŞASI & ÇEŞİTLENDİRME MOTORU
             </span>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               Korelasyon (&lt;0.70) • Sektör Tavanı (%30) • ADV Likidite Kısıtı (%10)
@@ -428,26 +442,26 @@ export default function Portfolio() {
                 style={{
                   padding: '7px 20px',
                   fontSize: '12px',
-                  background: builderLoading ? 'rgba(0, 229, 255, 0.3)' : 'var(--color-cyan)',
+                  background: builderLoading ? 'rgba(200, 162, 74, 0.3)' : 'var(--color-cyan)',
                   color: '#000',
                   border: 'none',
                   fontWeight: 'bold',
                   cursor: builderLoading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 0 12px rgba(0, 229, 255, 0.4)'
+                  boxShadow: '0 0 12px rgba(200, 162, 74, 0.4)'
                 }}
               >
-                {builderLoading ? 'HESAPLANIYOR...' : 'PORTFÖY ÜRET ⚡'}
+                {builderLoading ? 'HESAPLANIYOR...' : 'PORTFÖY ÜRET '}
               </button>
             </div>
 
             {builderError && (
-              <div style={{ padding: '8px 12px', background: 'rgba(248, 81, 73, 0.15)', border: '1px solid var(--color-red)', color: 'var(--color-red)', borderRadius: '4px', fontSize: '12px', marginBottom: '12px' }}>
+              <div style={{ padding: '8px 12px', background: 'rgba(192, 82, 78, 0.15)', border: '1px solid var(--color-red)', color: 'var(--color-red)', borderRadius: '4px', fontSize: '12px', marginBottom: '12px' }}>
                 {builderError}
               </div>
             )}
 
             {builderSuccess && (
-              <div style={{ padding: '8px 12px', background: 'rgba(0, 230, 118, 0.15)', border: '1px solid var(--color-up)', color: 'var(--color-up)', borderRadius: '4px', fontSize: '12px', marginBottom: '12px' }}>
+              <div style={{ padding: '8px 12px', background: 'rgba(63, 138, 107, 0.15)', border: '1px solid var(--color-up)', color: 'var(--color-up)', borderRadius: '4px', fontSize: '12px', marginBottom: '12px' }}>
                 {builderSuccess}
               </div>
             )}
@@ -459,17 +473,17 @@ export default function Portfolio() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '15px' }}>
                   <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '10px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>TOPLAM BÜTÇE</div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{formatCurrency(suggestedResult.summary.total_budget)} ₺</div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{formatCurrency(suggestedResult.summary.total_budget)} ₺</div>
                   </div>
-                  <div style={{ background: 'rgba(0, 230, 118, 0.06)', padding: '10px', borderRadius: '4px', border: '1px solid rgba(0, 230, 118, 0.2)' }}>
+                  <div style={{ background: 'rgba(63, 138, 107, 0.06)', padding: '10px', borderRadius: '4px', border: '1px solid rgba(63, 138, 107, 0.2)' }}>
                     <div style={{ fontSize: '10px', color: 'var(--color-up)' }}>YATIRILAN TUTAR</div>
                     <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-up)' }}>{formatCurrency(suggestedResult.summary.invested_amount)} ₺</div>
                   </div>
-                  <div style={{ background: 'rgba(255, 171, 0, 0.06)', padding: '10px', borderRadius: '4px', border: '1px solid rgba(255, 171, 0, 0.2)' }}>
-                    <div style={{ fontSize: '10px', color: '#ffab00' }}>KALAN BOŞTA NAKİT</div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#ffab00' }}>{formatCurrency(suggestedResult.summary.remaining_cash)} ₺</div>
+                  <div style={{ background: 'rgba(201, 136, 58, 0.06)', padding: '10px', borderRadius: '4px', border: '1px solid rgba(201, 136, 58, 0.2)' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--warning)' }}>KALAN BOŞTA NAKİT</div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--warning)' }}>{formatCurrency(suggestedResult.summary.remaining_cash)} ₺</div>
                   </div>
-                  <div style={{ background: 'rgba(0, 229, 255, 0.06)', padding: '10px', borderRadius: '4px', border: '1px solid rgba(0, 229, 255, 0.2)' }}>
+                  <div style={{ background: 'rgba(200, 162, 74, 0.06)', padding: '10px', borderRadius: '4px', border: '1px solid rgba(200, 162, 74, 0.2)' }}>
                     <div style={{ fontSize: '10px', color: 'var(--color-cyan)' }}>SEÇİLİ HİSSE SAYISI</div>
                     <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-cyan)' }}>
                       {suggestedResult.portfolio.filter(p => selectedTickers.has(p.ticker)).length} / {suggestedResult.portfolio.length}
@@ -519,7 +533,7 @@ export default function Portfolio() {
                             key={item.ticker}
                             style={{
                               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                              background: isSelected ? 'rgba(0, 229, 255, 0.03)' : 'transparent',
+                              background: isSelected ? 'rgba(200, 162, 74, 0.03)' : 'transparent',
                               opacity: item.lots === 0 ? 0.4 : 1
                             }}
                           >
@@ -533,7 +547,7 @@ export default function Portfolio() {
                               />
                             </td>
                             <td style={{ padding: '8px', fontWeight: 'bold' }}>
-                              <Link to={`/stock/${item.ticker}`} style={{ color: '#fff', textDecoration: 'none' }}>
+                              <Link to={`/stock/${item.ticker}`} style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>
                                 {item.ticker}
                               </Link>
                               <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>{item.company_name}</span>
@@ -545,7 +559,7 @@ export default function Portfolio() {
                                 borderRadius: '3px',
                                 fontSize: '11px',
                                 fontWeight: 'bold',
-                                background: item.score >= 70 ? 'rgba(0, 230, 118, 0.15)' : 'rgba(0, 229, 255, 0.15)',
+                                background: item.score >= 70 ? 'rgba(63, 138, 107, 0.15)' : 'rgba(200, 162, 74, 0.15)',
                                 color: item.score >= 70 ? 'var(--color-up)' : 'var(--color-cyan)'
                               }}>
                                 {item.score}
@@ -573,12 +587,12 @@ export default function Portfolio() {
                     style={{
                       padding: '8px 24px',
                       fontSize: '12px',
-                      background: batchAdding || selectedTickers.size === 0 ? 'rgba(0, 230, 118, 0.2)' : 'var(--color-up)',
+                      background: batchAdding || selectedTickers.size === 0 ? 'rgba(63, 138, 107, 0.2)' : 'var(--color-up)',
                       color: '#000',
                       border: 'none',
                       fontWeight: 'bold',
                       cursor: batchAdding || selectedTickers.size === 0 ? 'not-allowed' : 'pointer',
-                      boxShadow: '0 0 15px rgba(0, 230, 118, 0.4)'
+                      boxShadow: '0 0 15px rgba(63, 138, 107, 0.4)'
                     }}
                   >
                     {batchAdding ? 'EKLENİYOR...' : `[ SEÇİLEN ${suggestedResult.portfolio.filter(p => selectedTickers.has(p.ticker)).length} HİSSEYİ PORTFÖYÜME EKLE ]`}
@@ -593,9 +607,16 @@ export default function Portfolio() {
       {/* Add Form */}
       {showAddForm && (
         <div className="panel" style={{ marginBottom: '15px' }}>
-          <div className="panel-header" style={{ color: 'var(--color-up)' }}>YENİ İŞLEM EKLE</div>
+          <div className="panel-header">Yeni işlem ekle</div>
           <div className="panel-content">
             <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div>
+                <label className="text-muted" style={{ fontSize: '10px', display: 'block', marginBottom: '4px' }}>HESAP</label>
+                <select className="search-box" value={newAccount} onChange={e => setNewAccount(e.target.value)} style={{ width: '110px', padding: '4px 8px' }}>
+                  <option value="real">Gerçek</option>
+                  <option value="paper">Kâğıt</option>
+                </select>
+              </div>
               <div>
                 <label className="text-muted" style={{ fontSize: '10px', display: 'block', marginBottom: '4px' }}>İŞLEM</label>
                 <select 
@@ -652,13 +673,7 @@ export default function Portfolio() {
                   style={{ width: '130px' }}
                 />
               </div>
-              <button
-                onClick={addHolding}
-                className="btn-read"
-                style={{ padding: '5px 16px', fontSize: '12px', background: 'var(--color-up)', color: '#000', border: 'none', fontWeight: 'bold' }}
-              >
-                KAYDET
-              </button>
+              <button onClick={addHolding} className="btn btn-primary">Kaydet</button>
             </div>
           </div>
         </div>
@@ -668,7 +683,7 @@ export default function Portfolio() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '15px' }}>
         <div className="panel">
           <div className="panel-header text-muted">TOPLAM MALİYET</div>
-          <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff' }}>
+          <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
             {formatCurrency(portfolioData.totalCostBasis)} ₺
           </div>
         </div>
@@ -700,40 +715,24 @@ export default function Portfolio() {
 
       {/* AI Portfolio Doctor & Action Radar */}
       <div 
-        className="panel-neon" 
-        style={{ 
-          marginBottom: '20px', 
-          padding: '14px 18px', 
-          borderRadius: '8px',
-          border: '1px solid #00e5ff',
-          background: 'linear-gradient(90deg, rgba(0,229,255,0.06) 0%, rgba(20,24,33,0.95) 100%)'
-        }}
+        className="card"
+        style={{ marginBottom: '12px', borderColor: 'var(--gold-border)' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#00e5ff' }}>
-              [AI DENETİMİ] PORTFÖY VE RİSK DENETİM RAPORU
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              Aracı kurum hedeflerine ve teknik stop seviyelerine göre portföyünüzün beklenen getirisi ve risk analizi
+            <div className="card-eyebrow">Yapay zekâ denetimi</div>
+            <div className="card-title">Portföy ve risk denetim raporu</div>
+            <div className="card-body">
+              Kurum hedeflerine ve teknik stop seviyelerine göre portföyünün beklenen getirisi ve riskleri.
             </div>
           </div>
 
           <button
             onClick={runPortfolioAudit}
             disabled={auditLoading || holdings.length === 0}
-            className="action-button"
-            style={{
-              background: '#00e5ff',
-              color: '#000',
-              fontWeight: '900',
-              padding: '6px 14px',
-              fontSize: '11px',
-              border: 'none',
-              cursor: holdings.length === 0 ? 'not-allowed' : 'pointer'
-            }}
+            className="btn btn-primary"
           >
-            {auditLoading ? 'DENETLENİYOR...' : 'PORTFÖYÜ ANALİZ ET'}
+            {auditLoading ? 'Denetleniyor…' : 'Portföyü analiz et'}
           </button>
         </div>
 
@@ -751,7 +750,7 @@ export default function Portfolio() {
               )}
               {auditResult.risk_holdings?.length > 0 && (
                 <span style={{ color: 'var(--color-red)' }}>
-                  [DİKKAT] Riskli / Düşüştekiler: {auditResult.risk_holdings.join(', ')}
+                  Dikkat, riskli / düşüştekiler: {auditResult.risk_holdings.join(', ')}
                 </span>
               )}
             </div>
@@ -773,16 +772,16 @@ export default function Portfolio() {
           <div className="panel-content">
             {holdings.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '10px', color: 'var(--text-muted)' }}>[ PORTFÖYÜNÜZ BOŞ ]</div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '10px', color: 'var(--text-muted)' }}>Portföyünüz boş</div>
                 <p>Kayıtlı hisse senedi bulunamadı.</p>
-                <p style={{ fontSize: '11px', marginTop: '10px' }}>Yukarıdaki "[ + HİSSE EKLE ]" butonuna tıklayarak ilk hissenizi ekleyin.</p>
+                <p style={{ fontSize: '11px', marginTop: '10px' }}>Yukarıdaki "+ Hisse ekle" butonuna tıklayarak ilk hissenizi ekleyin.</p>
               </div>
             ) : (
               <table className="data-table">
                 <thead>
                   <tr>
                     <th></th>
-                    <th>TICKER</th>
+                    <th style={{ textAlign: 'left' }}>Hisse</th>
                     <th>ADET</th>
                     <th>MALİYET</th>
                     <th>GÜNCEL FİYAT</th>
@@ -794,7 +793,7 @@ export default function Portfolio() {
                 </thead>
                 <tbody>
                   {portfolioData.rows.map(r => (
-                    <tr key={r.ticker} className="row-hoverable">
+                    <tr key={`${r.ticker}-${r.account}`} className="row-hoverable">
                       <td style={{ textAlign: 'center' }}>
                         <ImageWithFallback
                           src={`${import.meta.env.VITE_API_URL.replace(/\/api$/, '')}/logos/${r.ticker}.png`}
@@ -804,9 +803,11 @@ export default function Portfolio() {
                           style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fff', objectFit: 'contain' }}
                         />
                       </td>
-                      <td style={{ fontWeight: 'bold' }}>
-                        <Link to={`/hisse/${r.ticker}`} className="ticker-link text-highlight" style={{ fontSize: '13px' }}>{r.ticker}</Link>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>{r.name}</div>
+                      <td style={{ textAlign: 'left', maxWidth: 240 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <TickerCell ticker={r.ticker} name={r.name} />
+                          {account === 'all' && <Chip tone={r.account === 'paper' ? 'default' : 'gold'}>{ACCOUNT_LABEL[r.account]}</Chip>}
+                        </div>
                       </td>
                       <td style={{ fontWeight: 'bold', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{r.quantity.toLocaleString('tr-TR')}</td>
                       <td style={{ fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(r.avgCost)}</td>
@@ -821,7 +822,7 @@ export default function Portfolio() {
                           </span>
                         )}
                       </td>
-                      <td style={{ fontWeight: 'bold', color: 'var(--color-cyan)', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(r.marketValue)}</td>
+                      <td style={{ color: 'var(--text-primary)', fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(r.marketValue)}</td>
                       <td style={{
                         fontWeight: 'bold',
                         color: r.pnl >= 0 ? 'var(--color-up)' : 'var(--color-red)',
@@ -833,17 +834,21 @@ export default function Portfolio() {
                           ({r.pnlPct >= 0 ? '+' : ''}{r.pnlPct.toFixed(2)}%)
                         </div>
                       </td>
-                      <td style={{ color: 'var(--color-warning)', fontWeight: 'bold', fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>
-                        {r.weight.toFixed(1)}%
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <WeightBar value={r.weight} max={maxWeight} /> <span style={{ marginLeft: 6 }}>{r.weight.toFixed(1)}%</span>
                       </td>
                       <td>
-                        <button
-                          onClick={() => removeHolding(r.ticker)}
-                          className="btn-read"
-                          style={{ color: 'var(--color-red)', borderColor: 'var(--color-red)', fontSize: '11px', padding: '3px 8px' }}
-                        >
-                          [SİL]
-                        </button>
+                        {pendingDelete === `${r.ticker}-${r.account}` ? (
+                          <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap' }}>
+                            <span className="text-muted" style={{ fontSize: 11 }}>Tüm işlemler silinsin mi?</span>
+                            <button className="btn btn-sm" style={{ color: 'var(--negative)', borderColor: 'var(--negative)' }} onClick={() => removeHolding(r.ticker, r.account)}>Sil</button>
+                            <button className="btn btn-sm btn-ghost" onClick={() => setPendingDelete(null)}>Vazgeç</button>
+                          </span>
+                        ) : (
+                          <button className="btn btn-sm btn-ghost" style={{ color: 'var(--negative)' }} onClick={() => setPendingDelete(`${r.ticker}-${r.account}`)}>
+                            Sil
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -857,50 +862,25 @@ export default function Portfolio() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           {pieData.length > 0 && (
             <div className="panel">
-              <div className="panel-header" style={{ color: 'var(--color-warning)' }}>AĞIRLIK DAĞILIMI</div>
-              <div className="panel-content">
-                <div style={{ width: '100%', height: '220px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        innerRadius={40}
-                        dataKey="value"
-                        paddingAngle={2}
-                        label={({ name, value }) => `${name} ${value}%`}
-                        labelLine={false}
-                      >
-                        {pieData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
-                        itemStyle={{ color: '#fff' }}
-                        formatter={(value) => [`${value}%`, 'Ağırlık']}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                {/* Legend */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px', fontSize: '11px' }}>
-                  {pieData.map((item, index) => (
-                    <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: COLORS[index % COLORS.length] }}></div>
-                      <span className="text-muted">{item.name}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="panel-header">Ağırlık dağılımı</div>
+              <div className="panel-content" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[...pieData].sort((a, b) => b.value - a.value).map(item => (
+                  <div key={item.name} style={{ display: 'grid', gridTemplateColumns: '58px 1fr 46px', alignItems: 'center', gap: 8 }}>
+                    <Link to={`/hisse/${item.name}`} className="ticker-link" style={{ fontSize: 12 }}>{item.name}</Link>
+                    <span style={{ height: 6, background: 'var(--border-default)', borderRadius: 3, overflow: 'hidden' }}>
+                      <span style={{ display: 'block', height: '100%', width: `${(item.value / maxWeight) * 100}%`, background: 'var(--gold)', borderRadius: 3 }} />
+                    </span>
+                    <span className="num" style={{ fontSize: 12, textAlign: 'right', color: 'var(--text-primary)' }}>{item.value.toFixed(1)}%</span>
+                  </div>
+                ))}
+                <div className="text-muted" style={{ fontSize: 10.5, marginTop: 2 }}>Çubuklar en büyük pozisyona göre ölçeklenir.</div>
               </div>
             </div>
           )}
 
           {equityCurve.length > 0 && (
             <div className="panel">
-              <div className="panel-header" style={{ color: 'var(--color-cyan)' }}>PORTFOLIO TREND (30D GERÇEK ZAMANLI)</div>
+              <div className="panel-header">Portföy değeri · son 30 gün</div>
               <div className="panel-content">
                 <div style={{ width: '100%', height: '200px' }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -908,7 +888,7 @@ export default function Portfolio() {
                       <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} />
                       <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} domain={['auto', 'auto']} tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#111', border: '1px solid var(--border-color)', borderRadius: '4px' }}
+                        contentStyle={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-color)', borderRadius: '4px' }}
                         itemStyle={{ color: 'var(--color-cyan)', fontWeight: 'bold' }}
                         formatter={(val) => [`${val.toLocaleString('tr-TR')} ₺`, 'Değer']}
                       />
@@ -931,6 +911,12 @@ export default function Portfolio() {
         </div>
       )}
       </div>
+      <ImportCsvModal
+        isOpen={showImport}
+        onClose={() => setShowImport(false)}
+        defaultAccount={writeAccount}
+        onImported={(count, acc) => { setNotice(`${count} işlem ${acc === 'paper' ? 'kâğıt' : 'gerçek'} hesaba aktarıldı.`); fetchPortfolio(); }}
+      />
     </PageContainer>
   );
 }

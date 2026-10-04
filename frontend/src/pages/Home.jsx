@@ -8,6 +8,8 @@ import FreshSignalsWidget from '../components/FreshSignalsWidget';
 import ConvictionBuyCard from '../components/ConvictionBuyCard';
 import CockpitDetailModal from '../components/CockpitDetailModal';
 import { getCachedData, setCachedData } from '../utils/apiCache';
+import { tintStyle } from '../utils/format';
+import { AlertTriangle } from 'lucide-react';
 
 export default function Home() {
   const dashboardUrl = `${import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://127.0.0.1:8015'}/api/dashboard`;
@@ -124,7 +126,7 @@ export default function Home() {
               padding: '6px 12px', 
               marginBottom: '8px',
               border: `1px solid ${regime?.color || 'var(--color-neutral)'}`,
-              background: 'linear-gradient(90deg, rgba(20,24,33,0.95) 0%, rgba(13,16,23,0.95) 100%)',
+              background: 'linear-gradient(90deg, rgba(18, 18, 20, 0.95) 0%, rgba(18, 18, 20, 0.95) 100%)',
               borderRadius: '6px',
               minHeight: '36px'
             }}
@@ -141,14 +143,14 @@ export default function Home() {
                   borderRadius: '3px', 
                   fontSize: '9.5px', 
                   fontWeight: '900', 
-                  background: regime?.status === 'BULL' ? 'rgba(0, 230, 118, 0.15)' : regime?.status === 'BEAR' ? 'rgba(255, 82, 82, 0.15)' : 'rgba(255, 171, 0, 0.15)',
+                  background: regime?.status === 'BULL' ? 'rgba(63, 138, 107, 0.15)' : regime?.status === 'BEAR' ? 'rgba(192, 82, 78, 0.15)' : 'rgba(201, 136, 58, 0.15)',
                   color: regime?.status === 'BULL' ? 'var(--color-up)' : regime?.status === 'BEAR' ? 'var(--color-red)' : 'var(--color-neutral)',
                   border: `1px solid ${regime?.color || 'var(--color-neutral)'}`,
                   whiteSpace: 'nowrap'
                 }}>
                   {regime?.status === 'BULL' ? 'BOĞA' : regime?.status === 'BEAR' ? 'AYI PİYASASI' : 'YATAY'}
                 </span>
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: regime?.color || '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: regime?.color || 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {regime?.badge ? regime.badge.replace(/^AYI PİYASASI\s*\(?|\)?$/gi, '') : 'Satış Baskısı Var'}
                 </span>
               </div>
@@ -168,10 +170,10 @@ export default function Home() {
                     fontWeight: '900',
                     letterSpacing: '0.2px',
                     background: currentRegimeLabel === 'RISK_ON' 
-                      ? 'rgba(0, 230, 118, 0.15)' 
+                      ? 'rgba(63, 138, 107, 0.15)' 
                       : currentRegimeLabel === 'RISK_OFF' 
-                        ? 'rgba(255, 51, 102, 0.18)' 
-                        : 'rgba(255, 171, 0, 0.15)',
+                        ? 'rgba(192, 82, 78, 0.18)' 
+                        : 'rgba(201, 136, 58, 0.15)',
                     color: currentRegimeLabel === 'RISK_ON' 
                       ? 'var(--color-up)' 
                       : currentRegimeLabel === 'RISK_OFF' 
@@ -179,10 +181,10 @@ export default function Home() {
                         : 'var(--color-warning)',
                     border: `1px solid ${
                       currentRegimeLabel === 'RISK_ON' 
-                        ? 'rgba(0, 230, 118, 0.4)' 
+                        ? 'rgba(63, 138, 107, 0.4)' 
                         : currentRegimeLabel === 'RISK_OFF' 
-                          ? 'rgba(255, 51, 102, 0.4)' 
-                          : 'rgba(255, 171, 0, 0.4)'
+                          ? 'rgba(192, 82, 78, 0.4)' 
+                          : 'rgba(201, 136, 58, 0.4)'
                     }`,
                     whiteSpace: 'nowrap'
                   }}
@@ -195,13 +197,13 @@ export default function Home() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', fontSize: '10px', fontWeight: 'bold' }}>
-                  <span style={{ background: 'rgba(63, 185, 80, 0.12)', color: 'var(--color-up)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(63, 185, 80, 0.25)' }}>
+                  <span style={{ background: 'rgba(63, 138, 107, 0.12)', color: 'var(--color-up)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(63, 138, 107, 0.25)' }}>
                     ▲ Yükselen: {marketPulse.up} ({((marketPulse.up / Math.max(1, marketPulse.total)) * 100).toFixed(0)}%)
                   </span>
-                  <span style={{ background: 'rgba(88, 166, 255, 0.12)', color: 'var(--color-neutral)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(88, 166, 255, 0.25)' }}>
+                  <span style={{ background: 'rgba(200, 162, 74, 0.12)', color: 'var(--color-neutral)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(200, 162, 74, 0.25)' }}>
                     ► Yatay: {marketPulse.flat}
                   </span>
-                  <span style={{ background: 'rgba(248, 81, 73, 0.12)', color: 'var(--color-red)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(248, 81, 73, 0.25)' }}>
+                  <span style={{ background: 'rgba(192, 82, 78, 0.12)', color: 'var(--color-red)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(192, 82, 78, 0.25)' }}>
                     ▼ Düşen: {marketPulse.down} ({((marketPulse.down / Math.max(1, marketPulse.total)) * 100).toFixed(0)}%)
                   </span>
                 </div>
@@ -230,7 +232,7 @@ export default function Home() {
                     style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '1 1 auto', minWidth: 0 }}
                     title={regime?.advice}
                   >
-                    <strong style={{ color: 'var(--color-warning)' }}>🎯 Taktik: </strong>
+                    <strong style={{ color: 'var(--color-warning)' }}>Taktik: </strong>
                     <span style={{ color: 'var(--text-primary)' }}>{regime?.advice}</span>
                   </div>
                 )}
@@ -246,7 +248,7 @@ export default function Home() {
                       type: 'AI_PULSE'
                     })}
                     style={{ 
-                      color: '#00e5ff', 
+                      color: 'var(--gold)', 
                       overflow: 'hidden', 
                       textOverflow: 'ellipsis', 
                       whiteSpace: 'nowrap', 
@@ -260,9 +262,9 @@ export default function Home() {
                     title="BIST 100 Yapay Zeka Derin Piyasa Analizini Aç (Tıkla)"
                   >
                     <span style={{ 
-                      background: 'rgba(0, 229, 255, 0.15)', 
-                      color: '#00e5ff', 
-                      border: '1px solid rgba(0, 229, 255, 0.35)', 
+                      background: 'rgba(200, 162, 74, 0.15)', 
+                      color: 'var(--gold)', 
+                      border: '1px solid rgba(200, 162, 74, 0.35)', 
                       padding: '1px 5px', 
                       borderRadius: '3px', 
                       fontWeight: 'bold', 
@@ -304,9 +306,9 @@ export default function Home() {
                 <button 
                   onClick={() => handleTabChange('MOMENTUM')}
                   style={{
-                    background: strategyTab === 'MOMENTUM' ? '#00e5ff' : 'rgba(255,255,255,0.05)',
+                    background: strategyTab === 'MOMENTUM' ? 'var(--gold)' : 'rgba(255,255,255,0.05)',
                     color: strategyTab === 'MOMENTUM' ? '#000' : 'var(--text-primary)',
-                    border: `1px solid ${strategyTab === 'MOMENTUM' ? '#00e5ff' : 'rgba(255,255,255,0.1)'}`,
+                    border: `1px solid ${strategyTab === 'MOMENTUM' ? 'var(--gold)' : 'rgba(255,255,255,0.1)'}`,
                     padding: '3px 9px',
                     borderRadius: '4px',
                     fontSize: '10.5px',
@@ -320,9 +322,9 @@ export default function Home() {
                 <button 
                   onClick={() => handleTabChange('VALUE')}
                   style={{
-                    background: strategyTab === 'VALUE' ? '#ffab00' : 'rgba(255,255,255,0.05)',
+                    background: strategyTab === 'VALUE' ? 'var(--warning)' : 'rgba(255,255,255,0.05)',
                     color: strategyTab === 'VALUE' ? '#000' : 'var(--text-primary)',
-                    border: `1px solid ${strategyTab === 'VALUE' ? '#ffab00' : 'rgba(255,255,255,0.1)'}`,
+                    border: `1px solid ${strategyTab === 'VALUE' ? 'var(--warning)' : 'rgba(255,255,255,0.1)'}`,
                     padding: '3px 9px',
                     borderRadius: '4px',
                     fontSize: '10.5px',
@@ -336,9 +338,9 @@ export default function Home() {
                 <button 
                   onClick={() => handleTabChange('MODELS')}
                   style={{
-                    background: strategyTab === 'MODELS' ? '#b388ff' : 'rgba(255,255,255,0.05)',
+                    background: strategyTab === 'MODELS' ? 'var(--gold-soft)' : 'rgba(255,255,255,0.05)',
                     color: strategyTab === 'MODELS' ? '#000' : 'var(--text-primary)',
-                    border: `1px solid ${strategyTab === 'MODELS' ? '#b388ff' : 'rgba(255,255,255,0.1)'}`,
+                    border: `1px solid ${strategyTab === 'MODELS' ? 'var(--gold-soft)' : 'rgba(255,255,255,0.1)'}`,
                     padding: '3px 9px',
                     borderRadius: '4px',
                     fontSize: '10.5px',
@@ -357,8 +359,8 @@ export default function Home() {
                   <button
                     onClick={() => setViewMode('CARDS')}
                     style={{
-                      background: viewMode === 'CARDS' ? 'rgba(0, 229, 255, 0.2)' : 'transparent',
-                      color: viewMode === 'CARDS' ? '#00e5ff' : 'var(--text-muted)',
+                      background: viewMode === 'CARDS' ? 'rgba(200, 162, 74, 0.2)' : 'transparent',
+                      color: viewMode === 'CARDS' ? 'var(--gold)' : 'var(--text-muted)',
                       border: 'none',
                       padding: '2px 7px',
                       borderRadius: '3px',
@@ -368,13 +370,13 @@ export default function Home() {
                     }}
                     title="Kart Görünümü"
                   >
-                    🗂️ Kartlar
+                    Kartlar
                   </button>
                   <button
                     onClick={() => setViewMode('TABLE')}
                     style={{
-                      background: viewMode === 'TABLE' ? 'rgba(0, 229, 255, 0.2)' : 'transparent',
-                      color: viewMode === 'TABLE' ? '#00e5ff' : 'var(--text-muted)',
+                      background: viewMode === 'TABLE' ? 'rgba(200, 162, 74, 0.2)' : 'transparent',
+                      color: viewMode === 'TABLE' ? 'var(--gold)' : 'var(--text-muted)',
                       border: 'none',
                       padding: '2px 7px',
                       borderRadius: '3px',
@@ -384,7 +386,7 @@ export default function Home() {
                     }}
                     title="Kompakt Liste Tablosu"
                   >
-                    📊 Tablo ({totalCards})
+                    Tablo ({totalCards})
                   </button>
                 </div>
 
@@ -397,7 +399,7 @@ export default function Home() {
                       style={{
                         background: 'rgba(255,255,255,0.06)',
                         border: '1px solid rgba(255,255,255,0.15)',
-                        color: cardPage === 0 ? 'var(--text-muted)' : '#fff',
+                        color: cardPage === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
                         padding: '1px 6px',
                         borderRadius: '3px',
                         cursor: cardPage === 0 ? 'default' : 'pointer',
@@ -415,7 +417,7 @@ export default function Home() {
                       style={{
                         background: 'rgba(255,255,255,0.06)',
                         border: '1px solid rgba(255,255,255,0.15)',
-                        color: cardPage >= totalPages - 1 ? 'var(--text-muted)' : '#fff',
+                        color: cardPage >= totalPages - 1 ? 'var(--text-muted)' : 'var(--text-primary)',
                         padding: '1px 6px',
                         borderRadius: '3px',
                         cursor: cardPage >= totalPages - 1 ? 'default' : 'pointer',
@@ -445,7 +447,7 @@ export default function Home() {
                 ))}
 
                 {activeStrategyStocks.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '16px', color: 'var(--text-muted)', border: '1px dashed #333', borderRadius: '4px', fontSize: '11px' }}>
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '16px', color: 'var(--text-muted)', border: '1px dashed var(--border-default)', borderRadius: '4px', fontSize: '11px' }}>
                     Bu strateji için şu anda aktif kriterleri karşılayan hisse bulunmuyor.
                   </div>
                 )}
@@ -488,7 +490,7 @@ export default function Home() {
                               {stock.ticker}
                             </Link>
                             {stock.model_count > 0 && (
-                              <span style={{ fontSize: '9px', background: 'rgba(210, 153, 34, 0.15)', color: 'var(--color-warning)', padding: '0 3px', borderRadius: '2px', fontWeight: 'bold' }}>
+                              <span style={{ fontSize: '9px', background: 'rgba(201, 136, 58, 0.15)', color: 'var(--color-warning)', padding: '0 3px', borderRadius: '2px', fontWeight: 'bold' }}>
                                 M{stock.model_count}
                               </span>
                             )}
@@ -498,8 +500,7 @@ export default function Home() {
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <span style={{ 
-                              background: stock.color || 'var(--color-up)', 
-                              color: '#000', 
+                              ...tintStyle(stock.color || 'var(--color-up)'),
                               fontSize: '9px', 
                               fontWeight: 'bold', 
                               padding: '1px 5px', 
@@ -508,7 +509,7 @@ export default function Home() {
                             }}>
                               {stock.decision}
                             </span>
-                            <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#fff' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                               {stock.score}p
                             </span>
                           </td>
@@ -527,8 +528,8 @@ export default function Home() {
                           <td className="text-red" style={{ fontWeight: 'bold', fontSize: '10.5px' }}>
                             {stock.stop_loss ? stock.stop_loss.toFixed(1) : '-'} (-%{stock.stop_loss_pct ? stock.stop_loss_pct.toFixed(1) : '0.0'})
                           </td>
-                          <td style={{ fontWeight: 'bold', fontSize: '10.5px', color: (stock.risk_reward > 10.0 || stock.is_excessive_rr) ? '#ffab00' : 'var(--color-cyan)' }} title={(stock.risk_reward > 10.0 || stock.is_excessive_rr) ? "Aşırı yüksek R:R - hedef fiyat doğrulaması gerekebilir" : ""}>
-                            {(stock.risk_reward > 10.0 || stock.is_excessive_rr) ? '⚠️ 1:' : '1:'}{stock.risk_reward}
+                          <td style={{ fontWeight: 'bold', fontSize: '10.5px', color: (stock.risk_reward > 10.0 || stock.is_excessive_rr) ? 'var(--warning)' : 'var(--color-cyan)' }} title={(stock.risk_reward > 10.0 || stock.is_excessive_rr) ? "Aşırı yüksek R:R - hedef fiyat doğrulaması gerekebilir" : ""}>
+                            {(stock.risk_reward > 10.0 || stock.is_excessive_rr) ? '1:' : '1:'}{stock.risk_reward}
                           </td>
                           <td style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                             {stock.entry_zone?.low}-{stock.entry_zone?.high}
@@ -543,8 +544,8 @@ export default function Home() {
                             <button
                               onClick={() => setDetailModal({ isOpen: true, data: stock, type: 'STOCK' })}
                               style={{
-                                background: 'rgba(57, 197, 207, 0.15)',
-                                border: '1px solid rgba(57, 197, 207, 0.3)',
+                                background: 'rgba(200, 162, 74, 0.15)',
+                                border: '1px solid rgba(200, 162, 74, 0.3)',
                                 color: 'var(--color-cyan)',
                                 fontSize: '9.5px',
                                 fontWeight: 'bold',
@@ -573,20 +574,20 @@ export default function Home() {
           {/* 3. İKİNCİL PANELLER (4 Kolonlu Kompakt Grid: Konsensüs, Taze Sinyaller, Favoriler, Aracı Kurumlar) */}
           <div className="dashboard-4col-grid">
             {/* Panel 1: Top Consensus Targets */}
-            <div className={`panel-neon panel-flex ${error ? 'neon-down' : 'neon-up'}`} style={{ height: '100%', minHeight: '250px', display: 'flex', flexDirection: 'column' }}>
-              <div className="panel-header" style={{ color: 'var(--color-up)', display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '11px' }}>
-                <span>🎯 KONSENSÜS HEDEFLERİ</span>
-                <Link to="/screener" className="ticker-link text-neutral" style={{ fontSize: '9px' }}>[TÜMÜ]</Link>
+            <div className="panel panel-flex" style={{ height: '100%', minHeight: '250px', display: 'flex', flexDirection: 'column' }}>
+              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '11px' }}>
+                <span>KONSENSÜS HEDEFLERİ</span>
+                <Link to="/screener" className="ticker-link text-neutral" style={{ fontSize: '9px' }}>Tümü</Link>
               </div>
               <div className="panel-content panel-scrollable" style={{ padding: '6px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '9.5px', fontWeight: 'bold', paddingBottom: '3px', borderBottom: '1px solid #1a1a1a', textTransform: 'uppercase' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '9.5px', fontWeight: 'bold', paddingBottom: '3px', borderBottom: '1px solid var(--border-subtle)', textTransform: 'uppercase' }}>
                     <div style={{ width: '75px', textAlign: 'left' }}>HİSSE</div>
                     <div style={{ flex: 1, textAlign: 'center' }}>POTANSİYEL</div>
                     <div style={{ width: '35px', textAlign: 'right' }}>RAPOR</div>
                   </div>
                   {topStocks.slice(0, 10).map(stock => (
-                    <div key={stock.ticker} className="row-hoverable" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid #14171c' }}>
+                    <div key={stock.ticker} className="row-hoverable" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid var(--bg-raised)' }}>
                       <div style={{ width: '75px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <ImageWithFallback 
                           src={`${import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://127.0.0.1:8015'}/logos/${stock.ticker}.png`} 
@@ -599,9 +600,9 @@ export default function Home() {
                       </div>
                       <div style={{ flex: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                         {(stock.is_excessive_rr || (typeof stock.upside_potential === 'number' && stock.upside_potential > 150)) && (
-                          <span title="Aşırı yüksek potansiyel (eski rapor veya düşen bıçak olabilir)" style={{ fontSize: '10px', cursor: 'help' }}>⚠️</span>
+                          <span title="Aşırı yüksek potansiyel (eski rapor veya düşen bıçak olabilir)" style={{ fontSize: '10px', cursor: 'help' }}><AlertTriangle size={12} /></span>
                         )}
-                        <span className={(typeof stock.upside_potential === 'number' && stock.upside_potential > 0) ? ((stock.is_excessive_rr || stock.upside_potential > 150) ? "" : "text-up") : "text-neutral"} style={{ fontWeight: 'bold', fontSize: '11px', color: (stock.is_excessive_rr || (typeof stock.upside_potential === 'number' && stock.upside_potential > 150)) ? '#ffab00' : '' }}>
+                        <span className={(typeof stock.upside_potential === 'number' && stock.upside_potential > 0) ? ((stock.is_excessive_rr || stock.upside_potential > 150) ? "" : "text-up") : "text-neutral"} style={{ fontWeight: 'bold', fontSize: '11px', color: (stock.is_excessive_rr || (typeof stock.upside_potential === 'number' && stock.upside_potential > 150)) ? 'var(--warning)' : '' }}>
                           {(typeof stock.upside_potential === 'number' && stock.upside_potential > 0) ? '+' : ''}{typeof stock.upside_potential === 'number' ? stock.upside_potential.toFixed(1) + '%' : 'N/A'}
                         </span>
                       </div>
@@ -618,10 +619,10 @@ export default function Home() {
             <FreshSignalsWidget />
 
             {/* Panel 3: Favorites Watchlist */}
-            <div className={`panel-neon panel-flex ${error ? 'neon-down' : 'neon-warning'}`} style={{ height: '100%', minHeight: '250px', display: 'flex', flexDirection: 'column' }}>
-              <div className="panel-header" style={{ color: 'var(--color-warning)', display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '11px' }}>
-                <span>⭐ FAVORİ TAKİP LİSTESİ</span>
-                <Link to="/stocks" className="ticker-link text-neutral" style={{ fontSize: '9px' }}>[YÖNET]</Link>
+            <div className="panel panel-flex" style={{ height: '100%', minHeight: '250px', display: 'flex', flexDirection: 'column' }}>
+              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '11px' }}>
+                <span>FAVORİ TAKİP LİSTESİ</span>
+                <Link to="/stocks" className="ticker-link text-neutral" style={{ fontSize: '9px' }}>Yönet</Link>
               </div>
               <div className="panel-content panel-scrollable" style={{ padding: '6px' }}>
                 <table className="data-table compact">
@@ -662,10 +663,10 @@ export default function Home() {
             </div>
 
             {/* Panel 4: Brokerage Leaders */}
-            <div className={`panel-neon panel-flex ${error ? 'neon-down' : 'neon-warning'}`} style={{ height: '100%', minHeight: '250px', display: 'flex', flexDirection: 'column' }}>
-              <div className="panel-header" style={{ color: 'var(--color-warning)', display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '11px' }}>
-                <span>🏛️ ARACI KURUM LİDERLERİ</span>
-                <Link to="/brokerages" className="ticker-link text-neutral" style={{ fontSize: '9px' }}>[TÜMÜ]</Link>
+            <div className="panel panel-flex" style={{ height: '100%', minHeight: '250px', display: 'flex', flexDirection: 'column' }}>
+              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '11px' }}>
+                <span>ARACI KURUM LİDERLERİ</span>
+                <Link to="/brokerages" className="ticker-link text-neutral" style={{ fontSize: '9px' }}>Tümü</Link>
               </div>
               <div className="panel-content panel-scrollable" style={{ padding: '6px' }}>
                 <table className="data-table compact">
