@@ -51,3 +51,17 @@ backend/test_res.json
 .DS_Store
 Thumbs.db
 
+
+# Generated data, caches and agent notes (kept on disk, not in git)
+.agents/
+scraper_service/engine/downloads/
+scraper_service/engine/cache/
+scraper_service/engine/logs/
+scraper_service/engine/scraped_reports.json
+*.log
+*.pdf.tmp
+backend/fintables_test.*
+frontend/public/tv_test.html
+scripts/*_results.json
+scripts/*_output.csv
+backend/seed_test.db

@@ -1,8 +1,0 @@
-
-[2026-08-25T12:29:27.921060] --- STARTING SCRAPER JOB ---
->>> Starting Modular Synchronization Engine...
->>> No scraper plugins found in C:\Users\hakan\.gemini\antigravity\scratch\HisseRadarPro\backend\plugins.
->>> You can drop your custom scraper scripts (e.g. 02_hisseonerileri.py) into this folder.
-
->>> Synchronization completed successfully.
-[2026-08-25T12:29:28.281162] --- SCRAPER JOB FINISHED WITH CODE 0 ---
