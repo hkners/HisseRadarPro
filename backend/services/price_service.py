@@ -25,18 +25,33 @@ class PriceService:
         self._status: str = "INITIALIZING"
         
         if report_repo:
-            print("Preloading historical prices into PriceService cache...")
-            for ticker in self.bist_tickers:
-                hist = report_repo.get_historical_prices(ticker)
-                if hist and len(hist) > 0:
-                    last_day = hist[-1]
-                    prev_day = hist[-2] if len(hist) > 1 else last_day
-                    chg = ((last_day["close"] - prev_day["close"]) / prev_day["close"] * 100) if prev_day["close"] > 0 else 0
-                    self._prices[ticker] = {
-                        "price": self._safe_float(last_day["close"]),
-                        "change_pct": self._safe_float(chg),
-                        "volume": self._safe_float(last_day.get("volume", 0))
-                    }
+            # Last two closes per ticker in one query (reading every ticker's full history took ~8s).
+            try:
+                with report_repo._get_connection() as conn:
+                    rows = conn.execute(
+                        """SELECT ticker, close, volume, rn FROM (
+                               SELECT ticker, close, volume,
+                                      ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+                               FROM historical_prices) WHERE rn <= 2"""
+                    ).fetchall()
+            except Exception as e:
+                rows = []
+                print(f"Price preload failed: {e}")
+            last: dict = {}
+            prev: dict = {}
+            for t, close, volume, rn in rows:
+                (last if rn == 1 else prev)[t] = (close, volume)
+            wanted = set(self.bist_tickers)
+            for ticker, (close, volume) in last.items():
+                if ticker not in wanted:
+                    continue
+                prev_close = prev.get(ticker, (close, None))[0]
+                chg = ((close - prev_close) / prev_close * 100) if prev_close and prev_close > 0 else 0
+                self._prices[ticker] = {
+                    "price": self._safe_float(close),
+                    "change_pct": self._safe_float(chg),
+                    "volume": self._safe_float(volume or 0),
+                }
             if self._prices:
                 self._last_updated = "Preloaded (DB)"
                 self._status = "READY"
@@ -60,19 +75,6 @@ class PriceService:
     def get_price(self, ticker: str) -> dict:
         with self._lock:
             return self._prices.get(ticker, {})
-
-    def set_price(self, ticker: str, price: Optional[float], change_pct: Optional[float] = None, volume: Optional[float] = None):
-        """Thread-safe update of an individual ticker price."""
-        clean = ticker.replace(".IS", "").upper()
-        with self._lock:
-            entry = self._prices.get(clean, {})
-            if price is not None:
-                entry["price"] = self._safe_float(price)
-            if change_pct is not None:
-                entry["change_pct"] = self._safe_float(change_pct)
-            if volume is not None:
-                entry["volume"] = self._safe_float(volume)
-            self._prices[clean] = entry
 
     def get_priority_tickers(self) -> list:
         """Returns high-priority tickers (BIST 30 + stocks with research reports)."""

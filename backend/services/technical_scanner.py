@@ -28,14 +28,15 @@ class TechnicalScanner:
                 logger.info("TechnicalScanner: Background calculation finished.")
             except Exception as e:
                 logger.error(f"TechnicalScanner: Error in background refresh: {e}")
-            time.sleep(300) # Refresh every 5 minutes
+            time.sleep(900)  # every 15 minutes, in step with the TradingView sync it reads
 
     def get_technical_screener_data(self):
         """Returns the cached technical data instantly."""
         if not self._cached_data:
             logger.info("TechnicalScanner: Cache empty, waiting for background thread to finish...")
-            # Wait for background thread to populate cache instead of running it synchronously
-            while not self._cached_data:
+            # Wait for the background thread, but never forever (an empty database would hang the request).
+            deadline = time.time() + 90
+            while not self._cached_data and time.time() < deadline:
                 time.sleep(0.5)
         return self._cached_data
 
@@ -48,7 +49,9 @@ class TechnicalScanner:
 
         for ticker in BIST_TICKERS:
             try:
-                history = report_repo.get_historical_prices(ticker)
+                # 260 sessions cover SMA200 and let the MACD EMAs settle; full history (thousands of rows
+                # per ticker) made each refresh take ~30s of CPU.
+                history = report_repo.get_historical_prices(ticker, limit=260)
                 if not history or len(history) < 50:
                     continue
                 
@@ -179,9 +182,9 @@ class TechnicalScanner:
                 else:
                     macd_state = "SAT"
                     score -= 1
-                    if df['close'].iloc[-2] and not pd.isna(ta.trend.macd(close_series).iloc[-2]):
-                        prev_macd = ta.trend.macd(close_series).iloc[-2]
-                        prev_sig = ta.trend.macd_signal(close_series).iloc[-2]
+                    prev_macd = macd_series.iloc[-2]
+                    prev_sig = macd_signal_series.iloc[-2]
+                    if not pd.isna(prev_macd) and not pd.isna(prev_sig):
                         if prev_macd >= prev_sig:
                             reasons.append("MACD aşağı kesti (Death Cross)")
                             
@@ -200,9 +203,9 @@ class TechnicalScanner:
                 else:
                     sma_state = "SAT"
                     score -= 1
-                    if df['close'].iloc[-2] and not pd.isna(ta.trend.sma_indicator(close_series, window=20).iloc[-2]):
-                        prev_sma20 = ta.trend.sma_indicator(close_series, window=20).iloc[-2]
-                        prev_sma50 = ta.trend.sma_indicator(close_series, window=50).iloc[-2]
+                    prev_sma20 = sma20_series.iloc[-2]
+                    prev_sma50 = sma50_series.iloc[-2]
+                    if not pd.isna(prev_sma20) and not pd.isna(prev_sma50):
                         if prev_sma20 >= prev_sma50:
                             reasons.append("SMA20, SMA50'yi aşağı kesti")
                             

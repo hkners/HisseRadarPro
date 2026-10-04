@@ -88,9 +88,6 @@ def _generate_content_with_fallback(prompt: str, generation_config=None):
 
     raise last_err or RuntimeError("No Gemini models available")
 
-def _get_generative_model():
-    return genai.GenerativeModel(_active_model_name or 'gemini-flash-lite-latest')
-
 from collections import OrderedDict
 
 # In-memory caches with timestamp to avoid redundant API calls and save tokens

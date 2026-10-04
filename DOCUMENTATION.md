@@ -125,7 +125,7 @@ Mevcut fiyat ile Kurumsal Konsensüs Hedefi arasındaki potansiyel farkı (Upsid
 
 **Kalite Puanlaması (Rasyolar):**
 *   **ROE (Özkaynak Kârlılığı):** Hisse %35 ROE üzerindeyse tam puan (+4) alır. Eğer eksi ise (-4) ceza yer.
-*   **P/E (F/K Oranı):** Fiyat/Kazanç oranı 7'nin altındaysa "Ucuz" sayılır ve +3 puan eklenir. 45'in üzerindeyse "Balon" sayılır ve -3 puan düşürülür.
+*   **Değerleme skoru (`valuation_service.compute_valuation_score`, ±3 puan):** Hissenin F/K ve PD/DD çarpanlarının sektör medyanına oranından 0-100 arası skor (yüksek = ucuz). Sektör medyanının 0,2 katının altındaki veya 5 katının üzerindeki oranlar veri hatası sayılıp kullanılmaz. Eski "kendi geçmişine göre" bileşeni kaldırıldı: geçmiş fiyatları bugünkü hisse başı kâra böldüğü için yalnızca 3 yıllık fiyat yüzdeliğini ölçüyordu.
 
 ### 6.4 Teknik Analiz ve Düşen Bıçak Kuralı (Max 28 Puan)
 TradingView üzerinden çekilen `RECOMMENDATION_SCORE` (-1.0 ile 1.0 arası) sürekli bir denkleme oturtulmuştur:
@@ -279,16 +279,16 @@ Kullanıcının skor bazlı ve risk kontrollü portföy oluşturabilmesi için g
 
 ## 16. Piyasa Rejim Motoru (`market_regime_service.py`)
 
-BIST piyasa derinliği (breadth: yükselen/düşen oranı) ve XU100 endeksinin 50/200 günlük hareketli ortalamalarına göre konumunu birleştiren 3 kademeli kantitatif rejim motorudur.
+BIST piyasa genişliği (hisselerin kendi 50 günlük ortalamasının üzerindeki payı) ve XU100 endeksinin 200 günlük ortalamaya göre konumunu birleştiren 3 kademeli rejim motorudur. Tek günün yükselen/düşen oranı her gün değiştiği için karar artık bu orana değil trend genişliğine dayanır (veri yoksa günlük orana döner).
 
 ### 16.1 Rejim Sınıflandırma Mantığı
 * **`RISK_ON` (Risk İştahı Yüksek / Boğa):**
-  * Piyasa derinliği yükselen ağırlıklı (`up > down`) **VE** XU100 Kapanış $>$ MA200.
+  * Hisselerin en az %55'i 50 günlük ortalamasının üzerinde **VE** XU100 Kapanış $>$ MA200.
   * Pozisyon risk çarpanı: `1.0x` (Tam bütçe tahsisi).
   * "GÜÇLÜ AL" karar eşiği: Standart $\ge 75$ puan.
   * Renk: Neon Yeşil (`#00e676`).
 * **`RISK_OFF` (Riskten Kaçış / Defansif Ayı):**
-  * Piyasa derinliği düşen ağırlıklı (`down > up`) **VE** XU100 Kapanış $<$ MA200.
+  * Hisselerin en fazla %40'ı 50 günlük ortalamasının üzerinde **VE** XU100 Kapanış $<$ MA200.
   * Pozisyon risk çarpanı (`exposure_multiplier`): `0.5x` (Bütçenin yarısı otomatik olarak nakitte korunur).
   * "GÜÇLÜ AL" karar eşiği: $+8$ puan yukarı çekilerek $\ge 83$ puan yapılır (Kötü rejimde azami seçicilik).
   * Renk: Mercan Kırmızı (`#ff3366`).
@@ -308,32 +308,10 @@ BIST piyasa derinliği (breadth: yükselen/düşen oranı) ve XU100 endeksinin 5
 * **Dashboard Frontend (`Home.jsx`):**
   * Karar Kokpiti üst bandında, hisse breadth sayılarının hemen yanında `[ ● Piyasa Rejimi: RISK_ON / NEUTRAL / RISK_OFF ]` rozeti yer alır ve rejim durumuna göre yeşil/sarı/kırmızı olarak renk kodlanır.
 
-### 16.3 Tarihsel Geriye Dönük Test (`scripts/backtest_regime.py`)
-* Son 1 yıllık (252 işlem günü) `historical_prices` ve `XU100` verisi üzerinden rejim geçişlerini simüle eder.
-* Sonuçları `scripts/regime_backtest_output.csv` dosyasına tarih, endeks fiyatı, MA200, yükselen/düşen hisse sayıları ve rejim bazında kaydeder.
-
-## 17. Skorlama Motorları Karşılaştırma ve Entegrasyon Analizi (`scripts/compare_engines.py`)
-
-`conviction_engine.py` ve `alpha_engine.py` motorlarının öngörü güçlerini, korelasyonlarını ve birbirleriyle örtüşme derecelerini test etmek için geliştirilen kantitatif analiz aracıdır.
-
-### 17.1 Çalışma Prensibi ve Veri Güvenlik Bariyeri (Data Gate)
-* **Veri Yeterliliği Kontrolü:** `score_history` tablosunda en az 4-6 haftalık (`min_weeks=4`, varsayılan 28 gün) veri birikip birikmediğini kontrol eder. Yetersiz veri durumunda erken çalışmayı engelleyerek kullanıcıyı uyarır (istenirse `--force` ile atlanabilir).
-* **İleriye Dönük Getiri:** `backtest_service.py` modülündeki `compute_forward_returns` mantığını kullanarak 1 aylık (30 gün), 3 aylık (90 gün) ve 6 aylık (180 gün) gerçekleşen getirileri hesaplar.
-* **Spearman Rank Korelasyonu (IC):** Skorların hisseleri getiriye göre sıralama yeteneğini (Information Coefficient / IC) ve iki motor arasındaki karşılıklı korelasyonu ($\rho$) hesaplar.
-
-### 17.2 Üç Kademeli Otomatik Senaryo Sınıflandırması
-1. **Senaryo A (İkiz Motorlar — Konsolidasyon Önerisi):**
-   * Motorlar arası rank korelasyonu $\rho \ge 0.70$ ve ortalama IC farkı $< 0.05$ ise.
-   * **Öneri:** İki motorun tek bir 'Bileşik HisseRadar Skoru' altında birleştirilmesi.
-2. **Senaryo B (Farklı Ufuklarda Tamamlayıcı Güç — UI Ayrıştırma Önerisi):**
-   * Motorlardan biri kısa vadede (1 ay), diğeri orta/uzun vadede (3-6 ay) belirgin şekilde daha yüksek IC üretiyorsa.
-   * **Öneri:** Arayüzde net şekilde etiketleme ("Alpha: Kısa Vadeli Taktik Tarama", "Conviction: Orta/Uzun Vadeli Kurumsal Giriş").
-3. **Senaryo C (Asimetrik Üstünlük — Zayıf Olanı Ayıklama Önerisi):**
-   * Motorlardan biri tüm vadelerde diğerine açık fark atıyorsa (Ortalama $\Delta \text{IC} \ge 0.06$).
-   * **Öneri:** Zayıf kalan motorun kademeli olarak emekliye ayrılması ve en iyi alt bileşenlerinin kazanan motora aktarılması.
-
-### 17.3 Çıktı Raporu (`docs/engine_comparison_report.md`)
-* Yönetici özeti, IC tablosu, motorlar arası korelasyon ve alt faktör getiri analizini içeren profesyonel Markdown raporu üretir.
+## 17. Fiyat Geçmişi Senkronizasyonu (`price_history_sync.py`)
+* Backend açıkken arka planda çalışır; son kapanmış seans (hafta içi 18:30 sonrası) eksikse tüm hisselerin eksik günlerini tek toplu yfinance isteğiyle çeker.
+* Bölünme veya bedelsiz sonrası yfinance geçmişi yeniden ölçeklerse ilgili hissenin tüm geçmişi yeniden indirilir.
+* Durum: `GET /api/admin/price-history`, elle tetikleme: `POST /api/admin/price-history/sync` ("Senkronize et" düğmesi de tetikler).
 
 ---
 > **Dokümantasyonun Sonu.** Bu belge, HisseRadarPro v3.0 sisteminin sahip olduğu istisnasız tüm modülleri, sınıfları, değişken atamalarını ve iş mantıklarını (business logic) milimetrik olarak barındırmaktadır.

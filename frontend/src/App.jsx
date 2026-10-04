@@ -7,7 +7,7 @@ import CommandPalette from "./components/shell/CommandPalette";
 import Tour from "./components/shell/Tour";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { prefetchAllCoreData } from "./utils/apiCache";
-import { SOON_ITEMS, titleForPath } from "./navigation";
+import { titleForPath } from "./navigation";
 import './index.css';
 
 // Eagerly loaded core pages for instant, lag-free navigation
@@ -30,7 +30,6 @@ import Backtest from "./pages/Backtest";
 import Strategies from "./pages/Strategies";
 import Copilot from "./pages/Copilot";
 import Studio from "./pages/Studio";
-import ComingSoon from "./pages/ComingSoon";
 import NotFound from "./pages/NotFound";
 
 // Only dynamic parameter pages are lazily loaded
@@ -97,9 +96,6 @@ function Shell() {
                 <Route path="/studio" element={<Studio />} />
                 <Route path="/hisse/:ticker" element={<StockDetail />} />
                 <Route path="/kurum/:kurumName" element={<BrokerageDetail />} />
-                {SOON_ITEMS.map(item => (
-                  <Route key={item.to} path={item.to} element={<ComingSoon item={item} />} />
-                ))}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

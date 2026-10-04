@@ -156,6 +156,8 @@ class ReportDBManager:
                     )
                 """)
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_scraped_reports_potansiyel ON scraped_reports(potansiyel)")
+                # Cross-ticker date-range scans (momentum ranks, regime breadth, baskets) otherwise read all rows.
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_historical_prices_date ON historical_prices(date)")
                 
                 # Create table for personal portfolio
                 conn.execute("""
@@ -967,36 +969,5 @@ class ReportDBManager:
                     cur = conn.execute("DELETE FROM portfolio_transactions WHERE ticker = ?", (ticker.upper(),))
                 conn.commit()
                 return cur.rowcount
-
-    def log_target_revision(self, ticker: str, broker: str, old_target: float, new_target: float, revision_pct: float, report_date: str) -> int:
-        """Insert a detected target price revision into target_revision_log."""
-        import datetime
-        now_str = datetime.datetime.now().isoformat()
-        with self._lock:
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO target_revision_log (ticker, broker, old_target, new_target, revision_pct, report_date, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (ticker.upper().strip(), broker.strip(), old_target, new_target, revision_pct, report_date, now_str))
-                conn.commit()
-                return cursor.lastrowid
-
-    def get_target_revision_logs(self, ticker: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
-        """Fetch records from target_revision_log."""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            if ticker:
-                cursor.execute("SELECT * FROM target_revision_log WHERE ticker = ? ORDER BY id DESC LIMIT ?", (ticker.upper().strip(), limit))
-            else:
-                cursor.execute("SELECT * FROM target_revision_log ORDER BY id DESC LIMIT ?", (limit,))
-            return [dict(r) for r in cursor.fetchall()]
-
-    def count_target_revision_logs(self) -> int:
-        """Get total row count of target_revision_log."""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM target_revision_log")
-            return cursor.fetchone()[0]
 
 ReportRepository = ReportDBManager

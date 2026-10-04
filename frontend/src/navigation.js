@@ -48,7 +48,6 @@ export const NAV_GROUPS = [
 ];
 
 export const ALL_NAV_ITEMS = [...TOP_TABS, ...NAV_GROUPS.flatMap(g => g.items)];
-export const SOON_ITEMS = ALL_NAV_ITEMS.filter(i => i.soon);
 
 export function isNavActive(item, pathname) {
   if (item.exact || item.to === '/') return pathname === '/';

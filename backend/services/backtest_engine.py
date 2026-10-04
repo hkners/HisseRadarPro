@@ -133,10 +133,6 @@ def _rebalance_dates(index: pd.DatetimeIndex, freq: str) -> List[pd.Timestamp]:
     return list(s.groupby(key).first())
 
 
-def _passes(values: pd.Series, op: str, threshold: float) -> pd.Series:
-    return {">": values > threshold, ">=": values >= threshold, "<": values < threshold, "<=": values <= threshold}[op]
-
-
 def _metrics(daily: pd.Series, cash_rate: float) -> Dict[str, Any]:
     daily = daily.dropna()
     if daily.empty:

@@ -237,7 +237,8 @@ class AlphaEngine:
             logger.info("AlphaEngine: Cache empty, waiting for background thread to finish...")
             # Wait for background thread to populate cache instead of running it synchronously
             # to avoid duplicate heavy DB queries.
-            while not self._cached_screener:
+            deadline = time.time() + 90  # never block a request forever
+            while not self._cached_screener and time.time() < deadline:
                 time.sleep(0.5)
         return self._cached_screener
 
