@@ -97,53 +97,44 @@ Geceleri çalışan `identify_non_equity_instrument()` metodu, `company_info` ta
 
 ---
 
-## 6. Conviction Engine: Çok Boyutlu Alım Karar Motoru
+## 6. HisseRadar Skoru ve Teknik Analiz Laboratuvarı (`ta_lab.py`, `conviction_engine.py`)
 
-Sistemin "Beyni" olan `services/conviction_engine.py` dosyası, hisselere 0 ile 100 arasında bir `score` (İnanç Skoru) atayan ve risk-ödül analizi yapan yerdir. 
+Skora yalnızca örneklem dışında işe yaradığı gösterilen bilgi girer. Eski puan sistemi (kurumsal 26, değerleme 32, teknik 20 puan gibi elle ayarlanmış ağırlıklar) 2015-2026 BIST verisiyle test edildiğinde desteklenmedi ve kaldırıldı.
 
-### 6.1 Zaman Aşımı ve Ağırlıklandırılmış Kurumsal Hedef (Time-Decayed Consensus)
-Kurumların verdiği Hedef Fiyatlar, verildikleri güne göre ağırlıklandırılır (Weighting):
-*   `<= 30 Gün`: Ağırlık = 1.0 (Çok Taze)
-*   `<= 60 Gün`: Ağırlık = 0.85
-*   `<= 100 Gün`: Ağırlık = 0.60
-*   `<= 180 Gün`: Ağırlık = 0.25 (Eskimiş)
-*   `> 180 Gün`: Ağırlık = 0.05 (Çöp)
-Böylece, hisseye dün verilen 150 TL hedefi ile 8 ay önce verilmiş 80 TL hedefi eşit şekilde toplanmaz. Dünkü raporun ortalamaya etkisi 20 kat daha fazladır.
+### 6.1 Veri ve göstergeler
+* `historical_prices` OHLCV, ±%30 üzeri günlük hareketler (bölünme/bedelsiz) nötrlenerek düzeltilmiş tek bir fiyat bazına çevrilir; açılış/yüksek/düşük aynı bazla ölçeklenir. XU100 1997'den beri tam.
+* Hisse ve gün başına: SMA20/50/150/200 ve eğimleri, Wilder RSI(14) ve RSI(2), ATR(14), ADX/+DI/-DI, MACD, Bollinger genişliği ve sıkışma, 52 hafta aralığı, Donchian 55, IBD tarzı göreli güç notu (3-6-9-12 ay 40/20/20/20), XU100'e göre RS çizgisi, yükseliş/düşüş hacmi oranı, hacim artışı, cep pivotu.
+* **Weinstein evresi:** 150 günlük ortalamanın eğimi XU100'ün aynı dönemdeki eğiminden çıkarılır (enflasyon kaynaklı genel yükselişi ayıklamak için); 1 taban, 2 yükseliş, 3 tepe, 4 düşüş.
+* **Minervini trend şablonu:** 8 koşul (ortalama sıralaması, SMA200 eğimi, 52 hafta dibine/zirvesine uzaklık); göreli güç ayrıca kontrol edilir.
+* Likit evren: 20 günlük ortalama işlem hacmi en az 2 milyon TL, en az 200 seanslık geçmiş, fiyat en az 1 TL.
 
-### 6.2 Kurumsal Konsensüs Skoru (Max 26 Puan)
-Bir hissenin piyasa nezdindeki görünürlüğü ve saygınlığı değerlendirilir:
-*   Benzersiz 20 kurum rapor yazmışsa: +18 Puan.
-*   Eğer raporlardan 10 tanesi hisseyi doğrudan "Model Portföy"üne almışsa: +8 Puan daha. (Toplam 26).
+### 6.2 Sinyal karneleri
+* 31 klasik sinyal (evre geçişleri, altın/ölüm kesişimi, 52 hafta ve kanal kırılımları, sıkışma kırılımı, RS çizgisi, MACD, RSI aşırı alım/satım, geri çekilmeler, birikim/dağıtım, cep pivotu, hacimli boşluk).
+* Her sinyal için ertesi kapanıştan girişle 5/20/60 seanslık, likit eşit ağırlıklı evrene göre fazla getiri; isabet oranı; aylara göre kümelenmiş t değeri; pozitif yıl oranı; XU100'ün 200 günlük ortalamasının üstü/altı rejimlerinde ayrı sonuç.
+* Hüküm: t ≥ 3 ve yılların %60'ı pozitif ise güçlü olumlu; t ≥ 2 olumlu; simetrik olarak olumsuz; arası "kanıt yok". Klasik yorumu tersine çıkan sinyaller işaretlenir (ör. RSI 30 altı BIST'te olumsuz, RSI 70 üstü olumlu).
 
-### 6.3 Reel Getiri (Enflasyon Bariyeri) ve Değerleme Skoru (Max 32 Puan)
-Mevcut fiyat ile Kurumsal Konsensüs Hedefi arasındaki potansiyel farkı (Upside), **%35 Enflasyon Beklentisi** benchmark alınarak puanlanır:
-*   Eğer fiyat zaten hedef fiyatı geçmişse (Upside < 0): **Pahalıdır**, -15 puana kadar ceza yer.
-*   Potansiyel < %20 (Enflasyonun altında ezilen getiri): Sadece +2 ile +5 puan arası.
-*   Potansiyel %35 - %50 arası (Reel Getiri pozitif): +10 ile +16 puan.
-*   Potansiyel > %75 (Çok Yüksek Potansiyel): +25 puana kadar doğrusal enterpolasyon (`23.0 + ((upside - 75.0) / 50.0) * 2.0`).
-*   **Bonus:** Eğer tavsiye son 100 gün içinde verilmiş ve potansiyel > %45 ise sisteme **Taze Rapor Bonusu** olarak ekstra **+4 Puan** eklenir.
+### 6.3 Model
+* Gradyan artırmalı karar ağaçları (scikit-learn HistGradientBoosting): 15 göstergenin günlük kesitsel sırası + 31 sinyal bayrağı → sonraki 20 seansın fazla getirisi (her gün %2-%98 aralığına kırpılmış).
+* Sinyallere monoton kısıt: her eğitimde yalnızca o eğitim verisine bakılarak, anlamlı (|t| ≥ 2) sinyallerin skoru etkileyebileceği yön sabitlenir.
+* Yürüyen pencere: 2019'dan itibaren her yıl, yıl başından 90 gün öncesine kadarki veriyle eğitilen modelle tahmin edilir. Örneklem dışı sonuçlar (2019-2026): en iyi %10 her yıl evrenin üzerinde, en kötü %10 her yıl altında; dilimler sıralı; aylık dengelemeli en iyi %10 maliyet sonrası yıllık ~%62 (evren ~%55, en kötü %10 ~%5).
+* Doğrusal (IC ağırlıklı) birleşim denendi ve bırakıldı: sıralamayı iyi yapsa da en iyi dilimi evrenin üzerine taşıyamadı.
+* Yerel açıklama: her girdi nötr değere çekildiğinde tahminin değişimi; Trend, 52 hafta konumu, Göreli güç, Volatilite, Hacim, Osilatör gruplarında toplanır.
+* Seviyeler: son ~250 seansın 5 çubuklu tepe/diplerinden, en fazla 1 ATR genişliğinde kümeler. Stop: en yakın desteğin 0,5 ATR altı (1-3 ATR aralığındaysa), değilse 2,5 ATR.
+* Hesaplama ayrı bir alt süreçte yapılır (~35 sn, ~1,2 GB tepe bellek işletim sistemine geri döner), `backend/cache/ta_lab.pkl` dosyasına yazılır, her yeni seans verisiyle yenilenir.
 
-**Kalite Puanlaması (Rasyolar):**
-*   **ROE (Özkaynak Kârlılığı):** Hisse %35 ROE üzerindeyse tam puan (+4) alır. Eğer eksi ise (-4) ceza yer.
-*   **Değerleme skoru (`valuation_service.compute_valuation_score`, ±3 puan):** Hissenin F/K ve PD/DD çarpanlarının sektör medyanına oranından 0-100 arası skor (yüksek = ucuz). Sektör medyanının 0,2 katının altındaki veya 5 katının üzerindeki oranlar veri hatası sayılıp kullanılmaz. Eski "kendi geçmişine göre" bileşeni kaldırıldı: geçmiş fiyatları bugünkü hisse başı kâra böldüğü için yalnızca 3 yıllık fiyat yüzdeliğini ölçüyordu.
+### 6.4 HisseRadar skoru ve karar
+* Skor = modelin likit hisseler arasındaki yüzdelik sırası (0-100). Bantlar: 90+ GÜÇLÜ AL (4. evrede değilse), 70-90 KADEMELİ AL, 30-70 BEKLE / İZLE, 30 altı RİSKLİ / SAT. Likit olmayan hisseler en fazla KADEMELİ AL olabilir.
+* Kurum hedefi, potansiyel, kapsam, revizyonlar, sektöre göre değerleme ve model portföy bilgisi **skora girmez**, bağlam olarak gösterilir. 2026 raporlarıyla yapılan testte teknik modelin ötesinde bilgi taşımadılar (|t| < 2), yüksek potansiyel sonraki getiriyle ters yönlü çıktı. `score_evidence.py` bu testi her güncellemede tekrarlar ve Skor Karnesi'nde gösterir.
+* Günlük skorlar `score_history` tablosuna `model_version = 'v3'` ile yazılır; Skor Karnesi 20 seansı dolan kayıtları gerçekleşen getiriyle karşılaştırır.
 
-### 6.4 Teknik Analiz ve Düşen Bıçak Kuralı (Max 28 Puan)
-TradingView üzerinden çekilen `RECOMMENDATION_SCORE` (-1.0 ile 1.0 arası) sürekli bir denkleme oturtulmuştur:
-*   `1.0` (Tam Güçlü Al) -> +15 Puan
-*   `-1.0` (Tam Güçlü Sat) -> -30 Puan.
+### 6.5 Uç noktalar
+* `/api/ta/status`, `/api/ta/overview` (genişlik, evreler, sektör rotasyonu, model), `/api/ta/screener`, `/api/ta/signals`, `/api/ta/stock/{ticker}`, `/api/ta/scorecard`, `POST /api/ta/rebuild`.
+* `/api/stocks/{ticker}/score-breakdown`: skor, grup katkıları, sinyaller, işlem planı ve skora dahil olmayan bağlam.
 
-**Özel Hump (Tümsek) RSI Kuralı ve "Düşen Bıçak" Engellemesi:**
-1. Eğer RSI 35'in altındaysa ve aynı anda TradingView "SAT" diyorsa, bu hisse dip çalışması yapmıyor, dibi deliyor demektir. Sisteme **Devre Kesici (-8 Puan)** uygulanır.
-2. Eğer TradingView "SAT" diyor ama hissenin hedef fiyat potansiyeli %40'ın üzerinde görünüyorsa, bu hisse "Düşen Bıçak"tır (is_falling_knife). Temelleri iyi gözükse de teknik olarak çökmektedir, derhal **-20 Puan** ceza verilir.
-
-### 6.5 ATR Destekli Dinamik Zarar-Kes (Dynamic Stop-Loss) ve Risk-Ödül (R:R)
-Sistem kullanıcının zararını limitlemek için her hisseye özel destek noktası çizer.
-1.  **Teknik Destek:** Son 20 günün en düşük kapanış (Lows) değerinin %1 altı (`recent_low * 0.99`).
-2.  **Volatilite (ATR) Desteği:** Fiyat eksi 2 birim ATR (Average True Range). Yani hissenin olağan dalgalanma boyunun iki katı kadar aşağısı.
-3.  Zarar-Kes noktası bu ikisinin en yükseği (maksimumu) olarak seçilir. Fakat güvenlik gereği bu stop noktası her zaman mevcut fiyatın maksimum %9 altında, minimum %4 altında olacak şekilde clamp'lenir (kelepçelenir).
-*   **Risk / Reward (R:R) Oranı:** `(Hedef Fiyat - Güncel Fiyat) / (Güncel Fiyat - Stop Loss)`. Bir hissenin Dashboard'da "Top Buy (Güçlü Al)" olarak listelenmesi için bu R:R oranının en az **1.5** olması şarttır.
-
----
+### 6.6 Alarmlar (`alerts.py`)
+* Türler: fiyat üstü/altı, günlük değişim, skor eşiği, karar değişimi, teknik sinyal, portföy stop seviyesi. Kapsam: tek hisse, portföy veya tüm likit hisseler (türe göre).
+* Fiyat/skor/karar alarmları dakikada bir, sinyal alarmları her model güncellemesinde kontrol edilir. Tek seferlik alarmlar tetiklenince kapanır; tekrarlı ve çoklu hisse alarmları her hisse için günde en fazla bir kez tetiklenir.
+* Bildirimler `alert_events` tablosunda tutulur; üst bardaki zil ve (izin verilirse) tarayıcı bildirimi gösterir.
 
 ## 7. Alpha Engine (Yapay Zeka Destekli Momentum & Değer Skorları)
 

@@ -134,6 +134,18 @@ async def lifespan(app):
         start_price_history_worker()
     except Exception as e:
         logger.warning(f"Could not start price history worker: {e}")
+    # Technical analysis lab: loads its disk cache and rebuilds after each new session
+    try:
+        from services.ta_lab import start_worker as start_ta_lab
+        start_ta_lab()
+    except Exception as e:
+        logger.warning(f"Could not start TA lab worker: {e}")
+    # Alerts: live checks every minute (signal alerts run after each technical lab rebuild)
+    try:
+        from services.alerts import start_worker as start_alerts
+        start_alerts()
+    except Exception as e:
+        logger.warning(f"Could not start alert worker: {e}")
     # Pre-warm the recommendations cache
     get_cached_recommendations()
     # Pre-warm company info cache
@@ -186,7 +198,6 @@ from routers.scraped_reports import router as scraped_reports_router
 from routers.ingest import router as ingest_router
 from routers.portfolio import router as portfolio_router
 from routers.admin import router as admin_router
-from routers.technical_screener import router as technical_screener_router
 from routers.viop import router as viop_router
 from routers.alpha import router as alpha_router
 
@@ -196,7 +207,6 @@ app.include_router(scraped_reports_router)
 app.include_router(ingest_router)
 app.include_router(portfolio_router)
 app.include_router(admin_router)
-app.include_router(technical_screener_router)
 app.include_router(viop_router)
 app.include_router(alpha_router)
 from routers.conviction import router as conviction_router
@@ -219,6 +229,10 @@ from routers.export import router as export_router
 app.include_router(export_router)
 from routers.baskets import router as baskets_router
 app.include_router(baskets_router)
+from routers.ta import router as ta_router
+app.include_router(ta_router)
+from routers.alerts import router as alerts_router
+app.include_router(alerts_router)
 
 
 # --- Health check (stays in main) ---

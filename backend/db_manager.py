@@ -228,6 +228,9 @@ class ReportDBManager:
                     conn.execute("ALTER TABLE score_history ADD COLUMN revision_momentum REAL")
                 if "price_momentum_percentile" not in existing_cols:
                     conn.execute("ALTER TABLE score_history ADD COLUMN price_momentum_percentile REAL")
+                if "model_version" not in existing_cols:
+                    # Which scoring model wrote conviction_score (the score card tracks one model at a time).
+                    conn.execute("ALTER TABLE score_history ADD COLUMN model_version TEXT")
 
                 # Migration guard: paper vs real money accounts on portfolio transactions
                 cursor.execute("PRAGMA table_info(portfolio_transactions)")
@@ -755,6 +758,7 @@ class ReportDBManager:
                 r.get("consensus_component"),
                 r.get("revision_momentum"),
                 r.get("price_momentum_percentile"),
+                r.get("model_version"),
                 r.get("created_at") or r.get("snapshot_date")
             ))
         if not rows:
@@ -765,8 +769,8 @@ class ReportDBManager:
                     INSERT INTO score_history (
                         ticker, snapshot_date, conviction_score, alpha_score,
                         technical_component, fundamental_component, sentiment_component,
-                        consensus_component, revision_momentum, price_momentum_percentile, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        consensus_component, revision_momentum, price_momentum_percentile, model_version, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(ticker, snapshot_date) DO UPDATE SET
                         conviction_score = COALESCE(excluded.conviction_score, score_history.conviction_score),
                         alpha_score = COALESCE(excluded.alpha_score, score_history.alpha_score),
@@ -776,6 +780,7 @@ class ReportDBManager:
                         consensus_component = COALESCE(excluded.consensus_component, score_history.consensus_component),
                         revision_momentum = COALESCE(excluded.revision_momentum, score_history.revision_momentum),
                         price_momentum_percentile = COALESCE(excluded.price_momentum_percentile, score_history.price_momentum_percentile),
+                        model_version = COALESCE(excluded.model_version, score_history.model_version),
                         created_at = excluded.created_at
                 """, rows)
                 conn.commit()

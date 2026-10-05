@@ -1,214 +1,127 @@
+// HisseRadar score of one stock: decision, what drives it, the evidence behind it, the trade plan and the
+// analyst/valuation context that is deliberately kept out of the score.
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import { Chip, InfoTip } from './ui';
+import { ScoreBar, StageChip, VerdictChip, pts } from './ta/common';
+import { fmtNum, fmtPct } from '../utils/format';
 
-const getPillarColor = (percentage) => {
-  if (percentage >= 75) return 'var(--positive)';
-  if (percentage >= 50) return 'var(--gold)';
-  if (percentage >= 35) return 'var(--warning)';
-  if (percentage >= 20) return '#ff7700';
-  return 'var(--negative)';
-};
+const API = import.meta.env.VITE_API_URL || '/api';
+const DECISION_TONE = { STRONG_BUY: 'up', BUY: 'gold', HOLD: 'default', AVOID: 'down' };
 
-export default function ScoreBreakdownWidget({ 
-  ticker, 
-  initialData, 
-  compact = false, 
-  showCockpitLink = true 
-}) {
-  const [data, setData] = useState(initialData || null);
-  const [loading, setLoading] = useState(!initialData);
+function Groups({ groups }) {
+  const max = Math.max(0.002, ...groups.map(g => Math.abs(g.effect)));
+  return groups.map(g => {
+    const w = (Math.abs(g.effect) / max) * 50;
+    return (
+      <div key={g.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px 78px', gap: 8, alignItems: 'center', padding: '4px 0' }}>
+        <span className="text-secondary" style={{ fontSize: 12 }}>{g.label}</span>
+        <span className="diverge-track">
+          <span className="zero" />
+          <span className="fill" style={{ background: g.effect >= 0 ? 'var(--positive)' : 'var(--negative)', left: g.effect >= 0 ? '50%' : `${50 - w}%`, width: `${w}%` }} />
+        </span>
+        <span className={g.effect >= 0 ? 'text-up' : 'text-down'} style={{ fontSize: 11, textAlign: 'right' }}>{pts(g.effect)}</span>
+      </div>
+    );
+  });
+}
+
+export default function ScoreBreakdownWidget({ ticker, compact = false }) {
+  const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!ticker) return;
-    let isMounted = true;
-    const apiBase = import.meta.env.VITE_API_URL || '/api';
-    
-    fetch(`${apiBase}/stocks/${ticker}/score-breakdown`)
-      .then(res => {
-        if (!res.ok) throw new Error('Skor dökümü alınamadı');
-        return res.json();
-      })
-      .then(json => {
-        if (isMounted) {
-          setData(json);
-          setLoading(false);
-        }
-      })
-      .catch(err => {
-        if (isMounted) {
-          setError(err.message);
-          setLoading(false);
-        }
-      });
-
-    return () => { isMounted = false; };
+    if (!ticker) return undefined;
+    let alive = true;
+    setData(null); setError(null);
+    fetch(`${API}/stocks/${ticker}/score-breakdown`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error('Skor alınamadı'))))
+      .then(d => alive && setData(d))
+      .catch(e => alive && setError(e.message));
+    return () => { alive = false; };
   }, [ticker]);
 
-  if (loading) {
+  if (error) return <div className="text-muted" style={{ fontSize: 11, padding: 8 }}>{error}</div>;
+  if (!data) return <div className="text-muted" style={{ fontSize: 11, padding: 8 }}>Skor yükleniyor…</div>;
+
+  const head = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <ScoreBar score={data.has_model ? data.score : null} width={compact ? 60 : 110} />
+      <Chip tone={DECISION_TONE[data.decision_badge] || 'default'} solid>{data.decision}</Chip>
+      {data.stage && <StageChip stage={data.stage} />}
+      {data.decile && <span className="text-muted" style={{ fontSize: 11 }}>{data.decile}. dilim · tarihsel 20 gün {pts(data.expected_excess_20d)}</span>}
+    </div>
+  );
+
+  if (compact) {
     return (
-      <div style={{ padding: compact ? '6px' : '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
-        <div className="skeleton-bar" style={{ width: '100%', height: '16px', marginBottom: '6px' }} />
-        <div className="skeleton-bar" style={{ width: '80%', height: '12px', margin: '0 auto' }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 4 }}>
+        {head}
+        {data.groups?.length > 0 && <Groups groups={data.groups} />}
+        <Link to={`/hisse/${data.ticker}?tab=skor_dokumu`} className="text-gold" style={{ fontSize: 11 }}>Skor detayı</Link>
       </div>
     );
   }
-
-  if (error || !data) {
-    return (
-      <div style={{ padding: '6px', color: 'var(--color-down)', fontSize: '11px' }}>
-        Bileşen verisi yüklenemedi: {error || 'Bilinmeyen hata'}
-      </div>
-    );
-  }
-
-  const { score, raw_score, decision, decision_color, components, disagreement } = data;
 
   return (
-    <div style={{
-      background: compact ? 'rgba(18, 18, 20, 0.85)' : 'var(--bg-secondary)',
-      border: '1px solid var(--border-color)',
-      borderRadius: '5px',
-      padding: compact ? '8px 10px' : '14px 18px',
-      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '8px',
-      width: '100%',
-      maxWidth: '100%',
-      boxSizing: 'border-box',
-      overflowX: 'hidden'
-    }}>
-      {/* ─── HEADER: Title & Score Badge ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: compact ? '11px' : '13px', fontWeight: 'bold', color: 'var(--text-highlight)', letterSpacing: '0.3px' }}>
-            KARAR SKORU DÖKÜMÜ
-          </span>
-          <span style={{
-            background: decision_color || 'var(--warning)',
-            color: ['var(--negative)', 'var(--negative)', 'var(--negative)', 'var(--negative)'].includes(decision_color) ? 'var(--text-primary)' : '#000',
-            fontSize: '9.5px',
-            fontWeight: '900',
-            padding: '1px 6px',
-            borderRadius: '3px',
-            letterSpacing: '0.2px',
-            whiteSpace: 'nowrap'
-          }}>
-            {decision} ({score}p)
-          </span>
-          {raw_score !== undefined && (
-            <span style={{ fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-              Ham: {raw_score.toFixed(1)}/100
-            </span>
-          )}
-        </div>
-
-        {compact && showCockpitLink && (
-          <Link to={`/hisse/${ticker}`} className="action-button" style={{ padding: '2px 6px', fontSize: '9.5px' }}>
-            Kokpit ↗
-          </Link>
-        )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="card">
+        <div className="card-eyebrow">HisseRadar skoru</div>
+        {head}
+        <p className="text-muted" style={{ fontSize: 11.5, marginTop: 8, lineHeight: 1.55 }}>
+          Skor yalnızca geçmişte işe yaradığı örneklem dışı doğrulanan teknik modelden gelir (likit hisseler arasında yüzdelik sıra).
+          Karar bantları: 90+ GÜÇLÜ AL (4. evrede değilse), 70-90 KADEMELİ AL, 30-70 BEKLE / İZLE, 30 altı RİSKLİ / SAT.
+          {!data.liquid && ' Bu hisse likit değil; karar en fazla KADEMELİ AL olabilir.'} <Link to="/karne" className="text-gold">Skor karnesi</Link>
+        </p>
       </div>
 
-      {/* ─── DISAGREEMENT ALERT BANNER ─── */}
-      {disagreement?.is_disagreeing && (
-        <div style={{
-          background: 'rgba(201, 136, 58, 0.12)',
-          border: '1px solid rgba(201, 136, 58, 0.45)',
-          borderRadius: '4px',
-          padding: '5px 8px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '10px',
-          lineHeight: 1.3
-        }}>
-          <span style={{ fontSize: '12px', flexShrink: 0 }}><AlertTriangle size={12} /></span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-            <span style={{ fontWeight: 'bold', color: 'var(--warning)' }}>
-              İki Motor Farklı Görüşte
-            </span>
-            <span style={{ color: 'var(--text-primary)', fontSize: '9px', wordBreak: 'break-word' }}>
-              {disagreement.reason}
-            </span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
+        <div className="panel" style={{ marginBottom: 0 }}>
+          <div className="panel-header">Skoru ne belirliyor <InfoTip text="Girdi grupları nötr değere çekildiğinde 20 günlük tahminin ne kadar değiştiği (yaklaşık)." size={10} /></div>
+          <div className="panel-content" style={{ flex: 'none' }}>
+            {data.groups?.length ? <Groups groups={data.groups} /> : <span className="text-muted">Model hesaplanamadı.</span>}
+            <ul style={{ margin: '10px 0 0', paddingLeft: 16, fontSize: 12, lineHeight: 1.6 }} className="text-secondary">
+              {(data.drivers || []).map((d, i) => <li key={i}>{d}</li>)}
+            </ul>
           </div>
         </div>
-      )}
-
-      {/* ─── 5 PILLARS HORIZONTAL PROGRESS BARS ─── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr)',
-        gap: compact ? '6px' : '9px',
-        width: '100%'
-      }}>
-        {components.map((comp) => {
-          const color = getPillarColor(comp.percentage);
-          const isNegative = comp.points < 0;
-          return (
-            <div key={comp.key} style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '10px', minWidth: 0 }}>
-                <span style={{ color: 'var(--text-primary)', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={comp.name}>
-                  {comp.name}
-                </span>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline', flexShrink: 0 }}>
-                  <span style={{ color: isNegative ? 'var(--color-down)' : color, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
-                    {comp.points > 0 ? `+${comp.points.toFixed(1)}` : comp.points.toFixed(1)} pt
-                  </span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '8.5px' }}>
-                    /{comp.max_points}
-                  </span>
-                </div>
-              </div>
-
-              {/* Progress Track */}
-              <div style={{
-                width: '100%',
-                height: '5px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                borderRadius: '3px',
-                overflow: 'hidden',
-                position: 'relative'
-              }}>
-                <div style={{
-                  width: `${Math.min(100, Math.max(0, comp.percentage))}%`,
-                  height: '100%',
-                  background: isNegative 
-                    ? 'linear-gradient(90deg, var(--negative), #ff0055)' 
-                    : `linear-gradient(90deg, ${color}88, ${color})`,
-                  borderRadius: '3px',
-                  transition: 'width 0.4s ease'
-                }} />
-              </div>
-
-              {/* Detail label */}
-              <div style={{ fontSize: '9px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', gap: '4px', minWidth: 0 }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={comp.details}>
-                  {comp.details}
-                </span>
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                  %{comp.percentage.toFixed(0)}
+        <div className="panel" style={{ marginBottom: 0 }}>
+          <div className="panel-header">Aktif sinyaller</div>
+          <div className="panel-content" style={{ flex: 'none' }}>
+            {(data.signal_details || []).length === 0 && <span className="text-muted" style={{ fontSize: 12 }}>Aktif sinyal yok.</span>}
+            {(data.signal_details || []).map(s => (
+              <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                <span style={{ fontSize: 12 }}>{s.label}</span>
+                <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span className={s.mean20 > 0 ? 'text-up' : s.mean20 < 0 ? 'text-down' : 'text-muted'} style={{ fontSize: 11 }}>{pts(s.mean20)}</span>
+                  <VerdictChip verdict={s.verdict} />
                 </span>
               </div>
-            </div>
-          );
-        })}
+            ))}
+            <Link to={`/hisse/${data.ticker}?tab=teknik`} className="text-gold" style={{ fontSize: 11, display: 'inline-block', marginTop: 8 }}>Teknik analizin tamamı</Link>
+          </div>
+        </div>
       </div>
 
-      {/* ─── FOOTER BREAKDOWN SUMMATION ─── */}
-      <div style={{
-        borderTop: '1px solid var(--border-color)',
-        paddingTop: '5px',
-        fontSize: '9px',
-        color: 'var(--text-muted)',
-        lineHeight: 1.4,
-        wordBreak: 'break-word'
-      }}>
-        <div>
-          <span style={{ fontWeight: 'bold', color: 'var(--text-highlight)' }}>Formül: </span>
-          +2.0 + {components.map(c => (c.points > 0 ? `+${c.points.toFixed(1)}` : `${c.points.toFixed(1)}`)).join(' ')} = <strong style={{ color: 'var(--text-primary)' }}>{raw_score?.toFixed(1)} pt</strong> → <strong style={{ color: decision_color }}>{score}p</strong>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
+        <div className="panel" style={{ marginBottom: 0 }}>
+          <div className="panel-header">İşlem planı</div>
+          <div className="panel-content" style={{ flex: 'none', fontSize: 12.5, lineHeight: 1.7 }}>
+            <div>Giriş bandı: <b>{fmtNum(data.entry_zone?.low, 2)} – {fmtNum(data.entry_zone?.high, 2)} TL</b></div>
+            <div>Önerilen stop: <b className="text-down">{fmtNum(data.stop_loss, 2)} TL</b> ({fmtPct(-data.stop_loss_pct, 1)})</div>
+            {data.risk_reward > 0 && <div>Risk / ödül (kurum hedefine göre): <b>1 : {fmtNum(data.risk_reward, 1)}</b></div>}
+            <p className="text-muted" style={{ fontSize: 11.5, marginTop: 6 }}>{data.risk_statement}</p>
+          </div>
+        </div>
+        <div className="panel" style={{ marginBottom: 0 }}>
+          <div className="panel-header">Bağlam (skora dahil değil) <InfoTip text="Kurum hedefleri, kapsam ve revizyonlar 2026 raporlarıyla test edildi; teknik modelin ötesinde bilgi taşımadılar ve yüksek potansiyel sonraki getiriyle ters yönlü çıktı. Değerleme için geçmişe dönük veri olmadığından doğrulanamadı. Bu yüzden bilgi olarak gösterilir, skora girmez." size={10} /></div>
+          <div className="panel-content" style={{ flex: 'none', fontSize: 12.5, lineHeight: 1.7 }}>
+            <div>Konsensüs hedef: <b>{data.consensus_target ? `${fmtNum(data.consensus_target, 2)} TL (${fmtPct(data.upside_pct, 1)})` : '—'}</b></div>
+            <div>Kapsayan kurum: <b>{data.broker_count || 0}</b>{data.model_count ? ` · ${data.model_count} model portföyde` : ''}</div>
+            <div>Hedef revizyonları (90 gün): <b>{data.revision_momentum > 0 ? 'yukarı ağırlıklı' : data.revision_momentum < 0 ? 'aşağı ağırlıklı' : 'nötr'}</b></div>
+            <div>Sektöre göre değerleme: <b>{data.valuation_score != null ? `${Math.round(data.valuation_score)}/100` : '—'}</b> <span className="text-muted" style={{ fontSize: 11 }}>(yüksek = ucuz)</span></div>
+            {data.is_falling_knife && <div className="text-down" style={{ fontSize: 11.5, marginTop: 4 }}>Uyarı: yüksek kurum potansiyeli düşüş evresiyle birlikte; hedef güncel olmayabilir.</div>}
+          </div>
         </div>
       </div>
     </div>

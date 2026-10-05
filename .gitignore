@@ -65,3 +65,6 @@ frontend/public/tv_test.html
 scripts/*_results.json
 scripts/*_output.csv
 backend/seed_test.db
+
+# Computed model caches
+backend/cache/

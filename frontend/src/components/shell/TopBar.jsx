@@ -4,6 +4,7 @@ import { Search, HelpCircle } from 'lucide-react';
 import { startTour } from './tours';
 import Brand from './BrandMark';
 import SyncButton from './SyncButton';
+import AlertBell from './AlertBell';
 import ScraperStatus from '../ScraperStatus';
 import { TOP_TABS, isNavActive } from '../../navigation';
 
@@ -42,6 +43,7 @@ export default function TopBar({ onOpenSearch }) {
         <button type="button" className="btn btn-sm btn-ghost" data-tour="help" onClick={startTour} title="Bu sayfanın tanıtımını göster" aria-label="Sayfa tanıtımı">
           <HelpCircle size={15} />
         </button>
+        <AlertBell />
         <SyncButton />
         <ScraperStatus />
       </div>

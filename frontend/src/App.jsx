@@ -30,6 +30,8 @@ import Backtest from "./pages/Backtest";
 import Strategies from "./pages/Strategies";
 import Copilot from "./pages/Copilot";
 import Studio from "./pages/Studio";
+import Scorecard from "./pages/Scorecard";
+import Alerts from "./pages/Alerts";
 import NotFound from "./pages/NotFound";
 
 // Only dynamic parameter pages are lazily loaded
@@ -94,6 +96,8 @@ function Shell() {
                 <Route path="/strategies" element={<Strategies />} />
                 <Route path="/copilot" element={<Copilot />} />
                 <Route path="/studio" element={<Studio />} />
+                <Route path="/karne" element={<Scorecard />} />
+                <Route path="/alarms" element={<Alerts />} />
                 <Route path="/hisse/:ticker" element={<StockDetail />} />
                 <Route path="/kurum/:kurumName" element={<BrokerageDetail />} />
                 <Route path="*" element={<NotFound />} />

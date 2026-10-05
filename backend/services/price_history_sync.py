@@ -68,6 +68,11 @@ def _invalidate_caches() -> None:
         backtest_engine._data_cache["time"] = 0.0
     except Exception:
         pass
+    try:
+        from services import ta_lab
+        ta_lab.ensure_fresh()  # a new session makes the lab stale: rebuild in the background
+    except Exception:
+        pass
     for mod, attr in (("services.house_strategies", "_cache"), ("services.baskets", "_cache")):
         try:
             import importlib

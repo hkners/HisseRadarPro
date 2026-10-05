@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { slugifyBroker } from '../utils/slugify';
 import ImageWithFallback from '../components/ImageWithFallback';
 import { sortReportsByDateDesc } from '../utils/dateUtils';
@@ -18,11 +18,13 @@ import ValuationTab from '../components/valuation/ValuationTab';
 import { brokerTargets, buildValuationRows } from '../components/valuation/valuationModel';
 import { PillTabs } from '../components/ui';
 import { classifyRating } from '../utils/rating';
+import TechnicalPanel from '../components/ta/TechnicalPanel';
 
 const DETAIL_TABS = [
   { id: 'ozet', label: 'Özet & Kokpit' },
+  { id: 'teknik', label: 'Teknik Analiz' },
   { id: 'degerleme', label: 'Değerleme' },
-  { id: 'skor_dokumu', label: 'Karar Skoru Dökümü' },
+  { id: 'skor_dokumu', label: 'HisseRadar Skoru' },
   { id: 'ai_analiz', label: 'Yapay Zeka Analizi' },
   { id: 'finansallar', label: 'Finansal Tablolar' },
   { id: 'carpanlar', label: 'Çarpanlar & Rasyolar' },
@@ -31,7 +33,8 @@ const DETAIL_TABS = [
 
 export default function StockDetail() {
   const { ticker } = useParams();
-  const [activeTab, setActiveTab] = useState('ozet');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => (DETAIL_TABS.some(t => t.id === searchParams.get('tab')) ? searchParams.get('tab') : 'ozet'));
   const [leftPanelTab, setLeftPanelTab] = useState('fundamentals'); // 'fundamentals' | 'technicals'
   const [layoutMode, setLayoutMode] = useState(() => {
     try { return localStorage.getItem('cockpit_layout_mode') || 'terminal'; } catch { return 'terminal'; }
@@ -691,6 +694,12 @@ export default function StockDetail() {
           <div className="panel-content">
             <TabDividends fundamentals={fundamentals} />
           </div>
+        </div>
+      )}
+
+      {activeTab === 'teknik' && (
+        <div className="panel flex-1" style={{ overflowY: 'auto', minHeight: 0, padding: '12px' }}>
+          <TechnicalPanel ticker={ticker} />
         </div>
       )}
 
