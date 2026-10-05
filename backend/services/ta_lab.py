@@ -41,7 +41,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-LAB_VERSION = 9                 # bump when definitions change: a cache with another version is rebuilt
+LAB_VERSION = 10                 # bump when definitions change: a cache with another version is rebuilt
 DATA_START = "2012-06-01"       # one year of warm-up before the study window
 STUDY_START = "2015-01-01"
 WF_FIRST_YEAR = 2019            # first out-of-sample year of the walk-forward
@@ -711,7 +711,20 @@ def _walk_forward(f: Dict[str, Any], masks: Dict[str, pd.DataFrame], fwd20: pd.D
     def cagr(v):
         return v ** (1 / span) - 1 if span > 0 and v > 0 else None
 
+    # Real (TÜFE) and USD versions of the same curves.
+    real_usd: Dict[str, Any] = {}
+    try:
+        from services.macro_data import deflate_curve, cagr as _cagr
+        cdf = pd.DataFrame(curve).set_index(pd.to_datetime(pd.DataFrame(curve)["date"]))
+        for col in ("top", "bottom", "universe"):
+            conv = deflate_curve(cdf[col])
+            real_usd[f"cagr_{col}_real"] = _cagr(conv["real"]) if conv["real"] is not None else None
+            real_usd[f"cagr_{col}_usd"] = _cagr(conv["usd"]) if conv["usd"] is not None else None
+    except Exception as e:
+        logger.warning(f"TA lab: real/USD conversion failed: {e}")
+
     return {
+        **real_usd,
         "method": "gbm", "final_model": final, "importance": importance,
         "signal_directions": getattr(final, "signal_directions_", {}),
         "oos_start": oos.index[0].date().isoformat(), "oos_end": oos.index[-1].date().isoformat(),

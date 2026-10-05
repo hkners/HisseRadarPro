@@ -4,6 +4,7 @@ import PageContainer from '../components/common/PageContainer';
 import { Chip, TickerCell, EmptyState, Button } from '../components/ui';
 import { fmtNum, fmtPct, signClass } from '../utils/format';
 import { trSector } from '../utils/sectors';
+import MacroRatesPanel from '../components/MacroRatesPanel';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -190,6 +191,8 @@ export default function Macro() {
               </table>
             </div>
           </div>
+
+          <MacroRatesPanel />
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 12, alignItems: 'start' }}>
             <SectorMoves sectors={data.sectors} />

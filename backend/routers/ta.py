@@ -46,7 +46,8 @@ def get_overview():
         "as_of": lab["as_of"], "study": lab["study"], "overview": lab["overview"], "sectors": lab["sectors"],
         "model": {k: model.get(k) for k in (
             "method", "oos_start", "oos_end", "train_rows", "deciles", "ic_mean", "ic_t", "ic_positive_months",
-            "yearly", "curve", "cagr_top", "cagr_bottom", "cagr_universe", "cost", "importance", "signal_directions")},
+            "yearly", "curve", "cagr_top", "cagr_bottom", "cagr_universe", "cost", "importance", "signal_directions",
+            "cagr_top_real", "cagr_universe_real", "cagr_bottom_real", "cagr_top_usd", "cagr_universe_usd", "cagr_bottom_usd")},
     }
 
 

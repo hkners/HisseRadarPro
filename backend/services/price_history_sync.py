@@ -138,6 +138,11 @@ def sync_missing_days(tickers: Optional[List[str]] = None) -> Dict[str, Any]:
                 logger.warning(f"Full refetch failed for {t}: {e}")
         if records or rebased:
             _invalidate_caches()
+        try:
+            from services import macro_data
+            macro_data.sync()  # TCMB inflation/policy tables, USD/TRY, gold: refreshed with each new session
+        except Exception as e:
+            logger.warning(f"Macro sync failed: {e}")
         result = {"status": "ok", "session": cutoff.isoformat(), "tickers_checked": len(stale),
                   "rows_added": len(records), "rebased": rebased, "seconds": round(time.time() - t0, 1)}
         logger.info(f"Price history sync: {result}")

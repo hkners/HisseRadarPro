@@ -365,6 +365,15 @@ def run_backtest(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     s_metrics["ytd"] = _ytd(strat)
     b_metrics["ytd"] = _ytd(bench)
+    # The same results in real TL (deflated by TÜFE) and in USD: nominal TL overstates long-run gains.
+    try:
+        from services.macro_data import deflate_curve, cagr as _cagr
+        for metrics, cv in ((s_metrics, curve), (b_metrics, bench_curve)):
+            conv = deflate_curve(cv)
+            metrics["cagr_real"] = _cagr(conv["real"]) if conv["real"] is not None else None
+            metrics["cagr_usd"] = _cagr(conv["usd"]) if conv["usd"] is not None else None
+    except Exception as e:
+        logger.warning(f"Real/USD returns unavailable: {e}")
     result = {
         "spec": spec,
         "start": index[0].date().isoformat(),

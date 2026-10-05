@@ -20,6 +20,12 @@ export function ModelStats({ m }) {
       <StatTile label="En kötü %10 (20 gün)" value={pts(bottom)} tone={bottom < 0 ? 'down' : 'up'} sub={`${yearly.filter(y => y.bottom < 0).length}/${yearly.length} yılda negatif`} />
       <StatTile label="Sıralama korelasyonu (IC)" tip="Skor sırası ile sonraki 20 günlük getiri sırası arasındaki ortalama korelasyon. Hisse seçiminde 0,05 üzeri güçlü kabul edilir." value={fmtNum(m.ic_mean, 3)} sub={`t = ${fmtNum(m.ic_t, 1)} · ayların %${Math.round((m.ic_positive_months || 0) * 100)}'inde pozitif`} />
       <StatTile label="Yıllık getiri (maliyet sonrası)" tip="Her ay başı en iyi %10 alınıp ay boyunca tutulduğunda; işlem başına %0,20 maliyet düşülür. Nominal TL." value={pct(m.cagr_top, 0)} sub={`Evren ${pct(m.cagr_universe, 0)} · en kötü %10 ${pct(m.cagr_bottom, 0)}`} tone={m.cagr_top > m.cagr_universe ? 'up' : 'down'} />
+      {m.cagr_top_real != null && (
+        <StatTile label="Reel yıllık getiri" tip="TÜFE ile enflasyondan arındırılmış: satın alma gücündeki yıllık değişim." value={pct(m.cagr_top_real, 0)} tone={m.cagr_top_real >= 0 ? 'up' : 'down'} sub={`Evren ${pct(m.cagr_universe_real, 0)} · en kötü %10 ${pct(m.cagr_bottom_real, 0)}`} />
+      )}
+      {m.cagr_top_usd != null && (
+        <StatTile label="Dolar bazında yıllık getiri" value={pct(m.cagr_top_usd, 0)} tone={m.cagr_top_usd >= 0 ? 'up' : 'down'} sub={`Evren ${pct(m.cagr_universe_usd, 0)} · en kötü %10 ${pct(m.cagr_bottom_usd, 0)}`} />
+      )}
     </div>
   );
 }

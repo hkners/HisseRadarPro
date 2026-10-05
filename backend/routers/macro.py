@@ -17,3 +17,14 @@ def get_macro_snapshot():
 def get_macro_brief(refresh: bool = False):
     from services.macro_service import build_snapshot, get_brief
     return get_brief(build_snapshot(), force=refresh)
+
+
+@router.get("/macro/rates")
+def get_macro_rates():
+    """TCMB inflation and policy rate, real rate, USD/TRY and gram gold (stored daily by macro_data.sync)."""
+    from services import macro_data
+    data = macro_data.summary()
+    if not data.get("history"):
+        macro_data.sync()  # first call on a fresh database
+        data = macro_data.summary()
+    return data

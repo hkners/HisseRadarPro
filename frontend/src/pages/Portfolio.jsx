@@ -195,6 +195,9 @@ export default function Portfolio() {
           serverPrice: item.live_price,
           priceSource: item.price_source,
           realizedPnl: item.realized_pnl || 0,
+          costReal: item.cost_real_today,
+          costUsd: item.cost_usd,
+          usdtry: item.usdtry,
         }));
         setHoldings(mapped);
       })
@@ -284,6 +287,10 @@ export default function Portfolio() {
   const portfolioData = useMemo(() => {
     let totalCostBasis = 0;
     let totalMarketValue = 0;
+    let totalRealCost = 0;
+    let totalUsdCost = 0;
+    let usdtry = null;
+    let altComplete = true;
     const rows = holdings.map(h => {
       const live = livePrices[h.ticker];
       // Live quote first, then the server's price (live or last stored close). A position with no
@@ -298,6 +305,13 @@ export default function Portfolio() {
       if (hasPrice) {
         totalCostBasis += costBasis;
         totalMarketValue += marketValue;
+        if (h.costReal != null && h.costUsd != null && h.usdtry) {
+          totalRealCost += h.quantity * h.costReal;
+          totalUsdCost += h.quantity * h.costUsd;
+          usdtry = h.usdtry;
+        } else {
+          altComplete = false;
+        }
       }
       return {
         ...h,
@@ -322,7 +336,15 @@ export default function Portfolio() {
     const totalPnl = totalMarketValue - totalCostBasis;
     const totalPnlPct = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : 0;
 
-    return { rows, totalCostBasis, totalMarketValue, totalPnl, totalPnlPct };
+    // Against inflation (cost in today's prices) and in dollars (cost at each purchase day's USD/TRY).
+    const realPnl = altComplete && totalRealCost > 0 ? totalMarketValue - totalRealCost : null;
+    const usdValue = altComplete && usdtry ? totalMarketValue / usdtry : null;
+    const usdPnl = usdValue != null && totalUsdCost > 0 ? usdValue - totalUsdCost : null;
+    return {
+      rows, totalCostBasis, totalMarketValue, totalPnl, totalPnlPct,
+      realPnl, realPnlPct: realPnl != null ? (realPnl / totalRealCost) * 100 : null,
+      usdPnl, usdPnlPct: usdPnl != null ? (usdPnl / totalUsdCost) * 100 : null, usdValue,
+    };
   }, [holdings, livePrices]);
 
   // Pie chart data for weight distribution
@@ -750,6 +772,20 @@ export default function Portfolio() {
             <span style={{ fontSize: '13px', marginLeft: '8px' }}>
               ({fmtPct(portfolioData.totalPnlPct, 2)})
             </span>
+          </div>
+        </div>
+        <div className="panel">
+          <div className="panel-header text-muted">ENFLASYONA GÖRE (REEL)</div>
+          <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: portfolioData.realPnl == null ? 'var(--text-muted)' : portfolioData.realPnl >= 0 ? 'var(--color-up)' : 'var(--color-red)' }}>
+            {portfolioData.realPnl == null ? '—' : <>{portfolioData.realPnl >= 0 ? '+' : ''}{formatCurrency(portfolioData.realPnl)} ₺ <span style={{ fontSize: 13 }}>({fmtPct(portfolioData.realPnlPct, 2)})</span></>}
+            <div className="text-muted" style={{ fontSize: 11, fontWeight: 400 }}>Her alımın maliyeti TÜFE ile bugüne taşınır</div>
+          </div>
+        </div>
+        <div className="panel">
+          <div className="panel-header text-muted">DOLAR BAZINDA</div>
+          <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: portfolioData.usdPnl == null ? 'var(--text-muted)' : portfolioData.usdPnl >= 0 ? 'var(--color-up)' : 'var(--color-red)' }}>
+            {portfolioData.usdPnl == null ? '—' : <>{portfolioData.usdPnl >= 0 ? '+' : ''}${formatCurrency(portfolioData.usdPnl)} <span style={{ fontSize: 13 }}>({fmtPct(portfolioData.usdPnlPct, 2)})</span></>}
+            <div className="text-muted" style={{ fontSize: 11, fontWeight: 400 }}>{portfolioData.usdValue != null ? `Portföy değeri $${formatCurrency(portfolioData.usdValue)}` : 'Kur verisi yok'}</div>
           </div>
         </div>
         <div className="panel">

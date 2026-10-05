@@ -203,10 +203,15 @@ def get_brief(snapshot: Dict[str, Any], force: bool = False) -> Dict[str, Any]:
         facts["sectors"] = [{**x, "sector": SECTOR_TR.get(x["sector"], x["sector"])} for x in snapshot["sectors"]]
         facts["gainers"] = [g["ticker"] for g in snapshot["gainers"]]
         facts["losers"] = [g["ticker"] for g in snapshot["losers"]]
+        try:
+            from services.macro_data import summary as _rates
+            facts["tcmb_ve_kur"] = {k: v for k, v in _rates().items() if k != "history"}
+        except Exception:
+            pass
         prompt = f"""Sen Borsa İstanbul'u izleyen kıdemli bir piyasa stratejistisin.
 Aşağıdaki verilere DAYANARAK, yalnızca bu sayıları kullanarak Türkçe kısa bir günlük brif yaz.
-Kurallar: 3 kısa paragraf, toplam en fazla 110 kelime. 1) Rejim ve endeks trendi. 2) Piyasa genişliği ve sektörler.
-3) Bu tabloda nelere dikkat edilmeli. Verilerde olmayan rakam, haber veya makro gelişme uydurma.
+Kurallar: 3 kısa paragraf, toplam en fazla 120 kelime. 1) Rejim ve endeks trendi. 2) Piyasa genişliği ve sektörler.
+3) Enflasyon, reel faiz ve kur tablosuyla birlikte nelere dikkat edilmeli. Verilerde olmayan rakam, haber veya makro gelişme uydurma.
 Yatırım tavsiyesi verme, "al/sat" deme. Sektör adlarını Türkçe yaz.
 
 Veriler (JSON): {facts}"""

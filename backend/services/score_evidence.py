@@ -173,6 +173,7 @@ def build() -> Dict[str, Any]:
         "ready": True, "as_of": lab["as_of"],
         "model": {k: m.get(k) for k in ("oos_start", "oos_end", "deciles", "yearly", "ic_mean", "ic_t",
                                          "ic_positive_months", "curve", "cagr_top", "cagr_bottom", "cagr_universe", "cost",
+                                         "cagr_top_real", "cagr_universe_real", "cagr_bottom_real", "cagr_top_usd", "cagr_universe_usd", "cagr_bottom_usd",
                                          "importance", "train_rows")},
         "analyst": _analyst_test(lab),
     }

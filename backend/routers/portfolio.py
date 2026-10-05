@@ -167,7 +167,14 @@ def get_portfolio_factors(demo: bool = False, account: Optional[str] = Query(Non
 @router.get("")
 def get_portfolio(account: Optional[str] = Query(None)):
     report_repo, price_service = _get_deps()
-    items = report_repo.get_user_portfolio(_account(account))
+    acc = _account(account)
+    items = report_repo.get_user_portfolio(acc)
+    # Cost basis in today's prices (TÜFE) and in USD, so a gain can be judged against inflation and the dollar.
+    try:
+        from services.macro_data import position_costs
+        alt_costs = position_costs(report_repo.get_portfolio_transactions(acc))
+    except Exception:
+        alt_costs = {}
 
     # Enrich with live prices
     enriched = []
@@ -188,6 +195,11 @@ def get_portfolio(account: Optional[str] = Query(None)):
         item["live_price"] = live_price
         item["live_change_pct"] = change_pct
         item["price_source"] = price_source
+        alt = alt_costs.get((ticker, item.get("account") or "real"))
+        if alt and alt["qty"] > 1e-9:
+            item["cost_real_today"] = alt["cost_real"] / alt["qty"] if alt["cost_real"] == alt["cost_real"] else None
+            item["cost_usd"] = alt["cost_usd"] / alt["qty"] if alt["cost_usd"] == alt["cost_usd"] else None
+            item["usdtry"] = alt.get("usdtry_today")
         enriched.append(item)
 
     return enriched

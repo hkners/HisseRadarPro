@@ -400,6 +400,8 @@ export default function Backtest() {
                 <div className="stat-grid">
                   <StatTile label="Yıllık getiri" value={pct(m.cagr)} tone={m.cagr >= 0 ? 'up' : 'down'} sub={`${result.benchmark_name}: ${pct(b.cagr)}`} />
                   <StatTile label="Toplam getiri" value={pct(m.total_return, 0)} sub={`${result.start} – ${result.end}`} />
+                  <StatTile label="Reel yıllık getiri" tip="TÜFE ile enflasyondan arındırılmış yıllık getiri: paranın satın alma gücü ne kadar arttı." value={pct(m.cagr_real)} tone={m.cagr_real >= 0 ? 'up' : 'down'} sub={`${result.benchmark_name}: ${pct(b.cagr_real)}`} />
+                  <StatTile label="Dolar bazında yıllık getiri" tip="USD/TRY ile dolara çevrilmiş yıllık getiri." value={pct(m.cagr_usd)} tone={m.cagr_usd >= 0 ? 'up' : 'down'} sub={`${result.benchmark_name}: ${pct(b.cagr_usd)}`} />
                   <StatTile label="Maksimum düşüş" value={pct(m.max_drawdown)} tone="down" sub={`${result.benchmark_name}: ${pct(b.max_drawdown)}`} />
                   <StatTile label="Yıllık volatilite" value={pct(m.volatility, 1, false)} sub={`Sharpe ${fmtNum(m.sharpe, 2)}`} />
                   <StatTile label="Pozitif ay oranı" value={pct(m.positive_months, 0, false)} sub={`En iyi ${pct(m.best_month)} · en kötü ${pct(m.worst_month)}`} />

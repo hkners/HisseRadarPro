@@ -298,6 +298,13 @@ BIST piyasa genişliği (hisselerin kendi 50 günlük ortalamasının üzerindek
 * Bölünme veya bedelsiz sonrası yfinance geçmişi yeniden ölçeklerse ilgili hissenin tüm geçmişi yeniden indirilir.
 * Durum: `GET /api/admin/price-history`, elle tetikleme: `POST /api/admin/price-history/sync` ("Senkronize et" düğmesi de tetikler).
 
+## 18. Makro veri ve reel getiri (`macro_data.py`)
+* Kaynaklar (anahtar gerektirmez): TCMB TÜFE tablosu (2005'ten aylık ve yıllık değişim), TCMB bir hafta repo tablosu (2010'dan), yfinance USD/TRY, EUR/TRY ve ons altın (gram altın TL = ons × kur / 31,1035). `macro_series` tablosunda saklanır, fiyat geçmişi her güncellendiğinde yenilenir.
+* Geçmişe dönük kullanımda bir ayın enflasyonu ancak ertesi ayın 5'inden itibaren "bilinir" kabul edilir.
+* Reel ve dolar bazlı getiriler: backtest sonuçları, teknik modelin karnesi (en iyi/en kötü %10 ve evren) ve portföy (her alımın maliyeti TÜFE ile bugüne taşınır; dolar maliyeti alım günündeki kurla).
+* Model testi: kur değişimi, reel faiz ve enflasyon eğilimi girdileri modeli iyileştirmedi (IC 8 yılın 4'ünde, fark 3'ünde daha iyi; ortalama IC düştü); modele eklenmedi. Piyasa genişliği ve XU100 trendi bu bilgiyi zaten taşıyor.
+* Makro sayfası: enflasyon, politika faizi, reel faiz, USD/TRY ve gram altın; yapay zekâ brifi bu verileri de görür. Uç nokta: `GET /api/macro/rates`.
+
 ---
 > **Dokümantasyonun Sonu.** Bu belge, HisseRadarPro v3.0 sisteminin sahip olduğu istisnasız tüm modülleri, sınıfları, değişken atamalarını ve iş mantıklarını (business logic) milimetrik olarak barındırmaktadır.
 
