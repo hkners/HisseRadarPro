@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import TopBar from "./components/shell/TopBar";
 import Sidebar from "./components/shell/Sidebar";
 import StatusBar from "./components/shell/StatusBar";
@@ -17,7 +17,6 @@ import Models from "./pages/Models";
 import UnifiedScreener from "./pages/UnifiedScreener";
 import TechnicalScreener from "./pages/TechnicalScreener";
 import Portfolio from "./pages/Portfolio";
-import AlphaInsights from "./pages/AlphaInsights";
 import Brokerages from "./pages/Brokerages";
 import ResearchReports from "./pages/ResearchReports";
 import ViopScreener from "./pages/ViopScreener";
@@ -82,7 +81,8 @@ function Shell() {
                 <Route path="/screener" element={<UnifiedScreener />} />
                 <Route path="/technical-screener" element={<TechnicalScreener />} />
                 <Route path="/teknik-radar" element={<TechnicalScreener />} />
-                <Route path="/alpha" element={<AlphaInsights />} />
+                {/* The Alpha score was retired in favour of the single HisseRadar score. */}
+                <Route path="/alpha" element={<Navigate to="/technical-screener?sekme=tarama" replace />} />
                 <Route path="/viop" element={<ViopScreener />} />
                 <Route path="/reports" element={<ResearchReports />} />
                 <Route path="/brokerages" element={<Brokerages />} />

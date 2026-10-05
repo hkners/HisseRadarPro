@@ -141,3 +141,12 @@ def get_scorecard():
     if not data.get("ready"):
         raise HTTPException(status_code=503, detail={"message": "Teknik analiz modeli hazırlanıyor.", **(data.get("status") or {})})
     return data
+
+
+@router.get("/point-in-time")
+def get_point_in_time(days: int = 30, metric: str = "SCORE", condition: str = "GREATER", threshold: float = 70.0, tickers: Optional[str] = None):
+    """Stocks that met a rule on a past date, held to the last close, against XU100."""
+    from services.score_evidence import point_in_time_test
+    if metric.upper() not in ("SCORE", "RSI", "SMA", "POTENTIAL") or condition.upper() not in ("GREATER", "LESS"):
+        raise HTTPException(status_code=400, detail="Geçersiz ölçüt.")
+    return point_in_time_test(max(5, min(days, 3650)), metric.upper(), condition.upper(), threshold, tickers)

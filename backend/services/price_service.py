@@ -23,6 +23,7 @@ class PriceService:
         self._prices: dict = {}
         self._last_updated: Optional[str] = None
         self._status: str = "INITIALIZING"
+        self._fast_info_time: dict = {}
         
         if report_repo:
             # Last two closes per ticker in one query (reading every ticker's full history took ~8s).
@@ -74,7 +75,7 @@ class PriceService:
 
     def get_price(self, ticker: str) -> dict:
         with self._lock:
-            return self._prices.get(ticker, {})
+            return dict(self._prices.get(ticker, {}))  # a copy: callers must not mutate the shared cache
 
     def get_priority_tickers(self) -> list:
         """Returns high-priority tickers (BIST 30 + stocks with research reports)."""
@@ -103,6 +104,13 @@ class PriceService:
         Updates self._prices[clean_ticker] and returns the updated price dict.
         """
         clean_ticker = ticker.replace(".IS", "").upper()
+        # One network call per ticker per minute: every stock page opened this (~1-3 s) synchronously.
+        now = time.time()
+        with self._lock:
+            last = self._fast_info_time.get(clean_ticker, 0.0)
+            if now - last < 60 and clean_ticker in self._prices:
+                return dict(self._prices[clean_ticker])
+            self._fast_info_time[clean_ticker] = now
         try:
             fi = yf.Ticker(f"{clean_ticker}.IS").fast_info
             last_price = getattr(fi, 'last_price', None)

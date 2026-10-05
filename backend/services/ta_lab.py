@@ -12,8 +12,9 @@ Evidence-based technical analysis for BIST, computed from our own daily OHLCV hi
    universe 5/20/60 sessions after the signal (entry at the next close), hit rate, a month-clustered
    t-statistic, the share of positive years and the split by market regime (XU100 above/below its
    200-day average). A signal's verdict comes from this evidence, not from textbook lore.
-4. Technical score: gradient-boosted trees on 15 cross-sectional feature ranks and the 31 signal
-   flags, predicting the next 20-session excess return (winsorised). Walk-forward: every year from
+4. Technical score: gradient-boosted trees on 30 cross-sectional feature ranks (trend, 52-week
+   position, relative strength, sector momentum, volatility/risk, volume/liquidity, oscillators),
+   5 market-regime inputs and the 31 signal flags, predicting the next 20-session excess return (winsorised). Walk-forward: every year from
    2019 is predicted by a model trained only on data ending 90 days before that year, so the
    reported deciles, yearly results and top/bottom-decile curves are out of sample. A linear
    IC-weighted blend was tried first; it ranked well but its top decile did not beat the market,
@@ -40,7 +41,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-LAB_VERSION = 8                 # bump when definitions change: a cache with another version is rebuilt
+LAB_VERSION = 9                 # bump when definitions change: a cache with another version is rebuilt
 DATA_START = "2012-06-01"       # one year of warm-up before the study window
 STUDY_START = "2015-01-01"
 WF_FIRST_YEAR = 2019            # first out-of-sample year of the walk-forward
@@ -101,7 +102,6 @@ def _load_ohlcv() -> Dict[str, pd.DataFrame]:
     high = wide("high").reindex(idx).where(traded).fillna(close)
     low = wide("low").reindex(idx).where(traded).fillna(close)
     volume = wide("volume").reindex(idx).where(traded).fillna(0.0)
-    del wide_all
 
     raw_ret = close.pct_change(fill_method=None)
     ret = raw_ret.mask(raw_ret.abs() > JUMP, 0.0)
@@ -125,6 +125,32 @@ class _F32Dict(dict):
         if isinstance(value, pd.DataFrame) and len(value.columns) and value.dtypes.iloc[0] == np.float64:
             value = value.astype(np.float32)
         super().__setitem__(key, value)
+
+
+def _sector_map() -> Dict[str, str]:
+    try:
+        from globals import report_repo
+        return {t: (v.get("sector") or "") for t, v in (report_repo.get_all_company_info() or {}).items()}
+    except Exception:
+        return {}
+
+
+def _regime_frame(f: Dict[str, Any], c: pd.DataFrame) -> pd.DataFrame:
+    """Market conditions on each date (same for every stock), standardised over the whole history so
+    that 0 means an average market. Trees are insensitive to this scaling; it only sets the neutral
+    point used by the local attributions."""
+    liquid = f["liquid"]
+    bench = f["bench"]
+    bench_ret = bench.pct_change(fill_method=None)
+    ew = (1 + c.pct_change(fill_method=None).where(liquid.shift(1, fill_value=False)).mean(axis=1).fillna(0.0)).cumprod()
+    reg = pd.DataFrame({
+        "mkt_breadth200": (c > f["sma200"]).where(liquid).mean(axis=1),
+        "mkt_dist200": bench / bench.rolling(200, min_periods=150).mean() - 1,
+        "mkt_ret1m": bench / bench.shift(21) - 1,
+        "mkt_vol": bench_ret.rolling(20, min_periods=15).std() * math.sqrt(252),
+        "mkt_smallcap": (ew / ew.shift(63)) / (bench / bench.shift(63)) - 1,
+    })
+    return (reg - reg.mean()) / reg.std()
 
 
 def _wilder(x: pd.DataFrame, n: int) -> pd.DataFrame:
@@ -216,6 +242,33 @@ def _indicators(d: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     f["vol60"] = day_ret.rolling(60, min_periods=40).std() * math.sqrt(252)
     f["ext50"] = c / f["sma50"] - 1
     f["price_sma200"] = c / f["sma200"] - 1
+
+    # Return-distribution, risk and liquidity features (added after a walk-forward comparison, see _walk_forward).
+    bench_ret = bench.pct_change(fill_method=None)
+    f["max_ret_1m"] = day_ret.rolling(21, min_periods=15).max()           # lottery-like spikes
+    f["skew_60"] = day_ret.rolling(60, min_periods=40).skew()
+    bvar = bench_ret.rolling(60, min_periods=40).var()
+    beta = day_ret.apply(lambda col: col.rolling(60, min_periods=40).cov(bench_ret)).div(bvar, axis=0)
+    f["beta_60"] = beta
+    f["ivol_60"] = day_ret.sub(beta.mul(bench_ret, axis=0)).rolling(60, min_periods=40).std()
+    f["amihud_20"] = (day_ret.abs() / (close_raw * v).replace(0, np.nan)).rolling(20, min_periods=10).mean() * 1e6
+    f["gap_20"] = (o / c.shift(1) - 1).rolling(20, min_periods=10).sum()       # overnight part of the move
+    f["intraday_20"] = (c / o - 1).rolling(20, min_periods=10).sum()           # session part of the move
+    sectors = _sector_map()
+    sec_series = pd.Series({t: sectors.get(t, "") for t in c.columns})
+    sec3 = pd.DataFrame(np.nan, index=c.index, columns=c.columns, dtype=np.float32)
+    sec6 = sec3.copy()
+    for name, members in sec_series.groupby(sec_series).groups.items():
+        members = list(members)
+        if not name or len(members) < 4:
+            continue
+        m3 = f["ret_3m"][members].where(liquid[members]).mean(axis=1)
+        m6 = f["ret_6m"][members].where(liquid[members]).mean(axis=1)
+        for t in members:
+            sec3[t] = m3
+            sec6[t] = m6
+    f["sector_mom_3m"], f["sector_mom_6m"] = sec3, sec6
+    f["rel_sector_3m"] = f["ret_3m"] - sec3
 
     # Minervini trend template: 8 criteria (RS uses our rating).
     tt = [
@@ -447,6 +500,28 @@ FEATURES: List[Dict[str, Any]] = [
     {"key": "vol60", "label": "Volatilite (60 gün)"},
     {"key": "template", "label": "Trend şablonu puanı"},
     {"key": "bb_width", "label": "Bollinger genişliği"},
+    {"key": "max_ret_1m", "label": "Son 1 ayın en büyük günlük artışı"},
+    {"key": "skew_60", "label": "Getiri çarpıklığı (60 gün)"},
+    {"key": "beta_60", "label": "Beta (XU100'e göre, 60 gün)"},
+    {"key": "ivol_60", "label": "Hisseye özgü oynaklık"},
+    {"key": "amihud_20", "label": "Fiyat etkisi (likiditesizlik)"},
+    {"key": "turnover20", "label": "İşlem hacmi düzeyi"},
+    {"key": "gap_20", "label": "Gece açılış boşlukları (20 gün)"},
+    {"key": "intraday_20", "label": "Seans içi getiri (20 gün)"},
+    {"key": "above_lo52", "label": "52 hafta dibinden uzaklık"},
+    {"key": "sector_mom_3m", "label": "Sektör momentumu (3 ay)"},
+    {"key": "sector_mom_6m", "label": "Sektör momentumu (6 ay)"},
+    {"key": "rel_sector_3m", "label": "Sektörüne göre güç (3 ay)"},
+    {"key": "ret_3m", "label": "3 aylık getiri"},
+    {"key": "ret_6m", "label": "6 aylık getiri"},
+    {"key": "ret_12m", "label": "12 aylık getiri"},
+]
+REGIME = [
+    {"key": "mkt_breadth200", "label": "Piyasa genişliği (SMA200 üstü pay)"},
+    {"key": "mkt_dist200", "label": "XU100'ün SMA200'e uzaklığı"},
+    {"key": "mkt_ret1m", "label": "XU100 son 1 ay"},
+    {"key": "mkt_vol", "label": "Piyasa oynaklığı"},
+    {"key": "mkt_smallcap", "label": "Küçük hisselerin XU100'e göre gücü (3 ay)"},
 ]
 
 
@@ -456,34 +531,50 @@ def _rank_stack(f: Dict[str, Any], dates: pd.DatetimeIndex) -> Dict[str, pd.Data
 
 
 FEAT_KEYS = [x["key"] for x in FEATURES]
+REG_KEYS = [x["key"] for x in REGIME]
 SIG_KEYS = [s["key"] for s in SIGNALS]
-X_COLS = FEAT_KEYS + SIG_KEYS
-LABELS = {**{x["key"]: x["label"] for x in FEATURES}, **{s["key"]: s["label"] for s in SIGNALS}}
+X_COLS = FEAT_KEYS + REG_KEYS + SIG_KEYS   # signals last: the monotonic constraints follow this order
+LABELS = {**{x["key"]: x["label"] for x in FEATURES}, **{x["key"]: x["label"] for x in REGIME},
+          **{s["key"]: s["label"] for s in SIGNALS}}
 # Input groups for the score breakdown (contributions are approximate: the model is not additive).
 GROUPS = [
     ("trend", "Trend", ["price_sma200", "sma200_slope", "adx_dir", "template", "stage2_entry", "stage2", "stage4",
                         "template_full", "golden_cross", "death_cross", "above_sma200", "adx_up", "adx_down"]),
-    ("position", "52 hafta konumu ve kırılımlar", ["dist_hi52", "hi52_breakout", "near_hi52", "donchian55",
+    ("position", "52 hafta konumu ve kırılımlar", ["dist_hi52", "above_lo52", "hi52_breakout", "near_hi52", "donchian55",
                                                    "breakout_volume", "squeeze_breakout", "far_below_hi52"]),
-    ("strength", "Göreli güç", ["rs_raw", "ret_1m", "ret_5d", "rs_top", "rs_line_high", "rs_lead", "mom_1m_top", "mom_1m_bottom"]),
-    ("volatility", "Volatilite", ["vol60", "atr_ratio", "bb_width"]),
-    ("volume", "Hacim", ["updown_vol", "vol_ratio", "pocket_pivot", "accumulation", "distribution", "gap_up_volume"]),
+    ("strength", "Göreli güç", ["rs_raw", "ret_1m", "ret_5d", "ret_3m", "ret_6m", "ret_12m", "gap_20", "intraday_20",
+                                "rs_top", "rs_line_high", "rs_lead", "mom_1m_top", "mom_1m_bottom"]),
+    ("sector", "Sektör", ["sector_mom_3m", "sector_mom_6m", "rel_sector_3m"]),
+    ("volatility", "Volatilite ve risk", ["vol60", "atr_ratio", "bb_width", "max_ret_1m", "skew_60", "beta_60", "ivol_60"]),
+    ("volume", "Hacim ve likidite", ["updown_vol", "vol_ratio", "amihud_20", "turnover20", "pocket_pivot", "accumulation",
+                                     "distribution", "gap_up_volume"]),
     ("oscillator", "Osilatör ve uzama", ["rsi14", "ext50", "macd_up", "macd_down", "rsi_oversold", "rsi_overbought",
                                          "rsi2_dip_uptrend", "pullback_sma50", "overextended"]),
+    ("regime", "Piyasa koşulları", ["mkt_breadth200", "mkt_dist200", "mkt_ret1m", "mkt_vol", "mkt_smallcap"]),
 ]
 GBM_PARAMS = dict(max_iter=200, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=400,
                   l2_regularization=1.0, early_stopping=False, random_state=0)
 
 
-def _panel(f: Dict[str, Any], masks: Dict[str, pd.DataFrame], fwd20: pd.DataFrame, sampled: pd.DatetimeIndex) -> pd.DataFrame:
-    """Long table (date, ticker) of feature ranks, signal flags and the winsorised forward excess."""
+def _stack(frame: pd.DataFrame) -> pd.Series:
+    frame = frame.copy()
+    frame.index.name, frame.columns.name = "date", "ticker"  # uniform level names, or joins go cartesian
+    return frame.stack()
+
+
+def _panel(f: Dict[str, Any], masks: Dict[str, pd.DataFrame], fwd20: pd.DataFrame, sampled: pd.DatetimeIndex,
+           regime: pd.DataFrame) -> pd.DataFrame:
+    """Long table (date, ticker) of feature ranks, market regime, signal flags and the winsorised forward excess."""
     ranks = _rank_stack(f, sampled)
-    feat = pd.concat({k: ranks[k].stack() for k in FEAT_KEYS}, axis=1)
+    feat = pd.concat({k: _stack(ranks[k]) for k in FEAT_KEYS}, axis=1)
     liq = f["liquid"].reindex(sampled)
-    sig = pd.concat({k: (masks[k].reindex(sampled) & liq).stack() for k in SIG_KEYS}, axis=1).astype(float)
+    sig = pd.concat({k: _stack(masks[k].reindex(sampled) & liq) for k in SIG_KEYS}, axis=1).astype(float)
     df = feat.join(sig, how="left")
     df = df[df[FEAT_KEYS].notna().sum(axis=1) >= 10]
-    df = df.join(fwd20.reindex(sampled).stack().rename("y"), how="left")
+    day = df.index.get_level_values(0)
+    for k in REG_KEYS:
+        df[k] = regime[k].reindex(day).values
+    df = df.join(_stack(fwd20.reindex(sampled)).rename("y"), how="left")
     g = df["y"].groupby(level=0)
     df["yw"] = df["y"].clip(g.transform(lambda x: x.quantile(0.02)), g.transform(lambda x: x.quantile(0.98)))
     return df
@@ -514,9 +605,9 @@ def _fit_gbm(train: pd.DataFrame):
     from sklearn.ensemble import HistGradientBoostingRegressor
     train = train.dropna(subset=["yw"])
     directions = _signal_directions(train)
-    cst = [0] * len(FEAT_KEYS) + [directions[k] for k in SIG_KEYS]
+    cst = [0] * (len(FEAT_KEYS) + len(REG_KEYS)) + [directions[k] for k in SIG_KEYS]
     model = HistGradientBoostingRegressor(monotonic_cst=cst, **GBM_PARAMS)
-    model.fit(train[X_COLS].fillna(0.0).values, train["yw"].values)
+    model.fit(train[X_COLS].fillna(0.0).to_numpy(dtype=float), train["yw"].to_numpy(dtype=float))
     model.signal_directions_ = directions
     return model
 
@@ -534,11 +625,11 @@ def _contributions(model, X: np.ndarray) -> np.ndarray:
 
 
 def _walk_forward(f: Dict[str, Any], masks: Dict[str, pd.DataFrame], fwd20: pd.DataFrame,
-                  dates: pd.DatetimeIndex) -> Dict[str, Any]:
+                  dates: pd.DatetimeIndex, regime: pd.DataFrame) -> Dict[str, Any]:
     """Gradient-boosted trees on feature ranks and signal flags, predicting the 20-session excess
     return. Each test year is predicted by a model trained only on data ending 90 days before it."""
     sampled = dates[::SAMPLE_EVERY]
-    df = _panel(f, masks, fwd20, sampled)
+    df = _panel(f, masks, fwd20, sampled, regime)
     day = df.index.get_level_values(0)
     years = sorted({d.year for d in sampled if d.year >= WF_FIRST_YEAR})
     pred = pd.Series(np.nan, index=df.index)
@@ -547,20 +638,20 @@ def _walk_forward(f: Dict[str, Any], masks: Dict[str, pd.DataFrame], fwd20: pd.D
         model = _fit_gbm(df[day < cutoff])
         te = df[day.year == y]
         if len(te):
-            pred.loc[te.index] = model.predict(te[X_COLS].fillna(0.0).values)
+            pred.loc[te.index] = model.predict(te[X_COLS].fillna(0.0).to_numpy(dtype=float))
     final = _fit_gbm(df)
 
     # Global importance: average absolute local contribution over a sample of recent rows.
     recent = df[day >= day.max() - pd.Timedelta(days=730)]
     sample = recent.sample(min(8000, len(recent)), random_state=0) if len(recent) else recent
-    contrib = _contributions(final, sample[X_COLS].fillna(0.0).values) if len(sample) else np.zeros((0, len(X_COLS)))
+    contrib = _contributions(final, sample[X_COLS].fillna(0.0).to_numpy(dtype=float)) if len(sample) else np.zeros((0, len(X_COLS)))
     importance = []
     for i, k in enumerate(X_COLS):
-        col = sample[k].fillna(0.0).values if len(sample) else np.array([])
+        col = np.asarray(sample[k].fillna(0.0).values, dtype=float) if len(sample) else np.array([])
         direction = None
         if len(contrib) and col.std() > 0 and contrib[:, i].std() > 0:
             direction = float(np.corrcoef(col, contrib[:, i])[0, 1])
-        importance.append({"key": k, "label": LABELS[k], "kind": "feature" if k in FEAT_KEYS else "signal",
+        importance.append({"key": k, "label": LABELS[k], "kind": "feature" if k in FEAT_KEYS else "regime" if k in REG_KEYS else "signal",
                            "importance": float(np.abs(contrib[:, i]).mean()) if len(contrib) else 0.0,
                            "direction": direction})
     importance.sort(key=lambda x: -x["importance"])
@@ -684,7 +775,8 @@ def _build() -> Dict[str, Any]:
     logger.info(f"TA lab: evidence done in {time.time() - t0:.0f}s")
     fwd20 = fwd[MAIN_H]
     del fwd  # the 5- and 60-session frames are only needed for the evidence tables
-    model = _walk_forward(f, masks, fwd20, dates)
+    regime = _regime_frame(f, c)
+    model = _walk_forward(f, masks, fwd20, dates, regime)
     logger.info(f"TA lab: model done in {time.time() - t0:.0f}s")
 
     # ---- live snapshot (last session)
@@ -698,9 +790,11 @@ def _build() -> Dict[str, Any]:
         r_liq = v.where(lq_last).rank(pct=True) - 0.5
         r_all = v.rank(pct=True) - 0.5
         X_live[k] = r_liq.fillna(r_all)
+    for k in REG_KEYS:
+        X_live[k] = float(regime[k].loc[last]) if pd.notna(regime[k].loc[last]) else 0.0
     for k in SIG_KEYS:
         X_live[k] = masks[k].loc[last].astype(float)
-    Xv = X_live[X_COLS].fillna(0.0).values
+    Xv = X_live[X_COLS].fillna(0.0).to_numpy(dtype=float)
     pred_live = pd.Series(final.predict(Xv), index=stocks)
     contrib_live = pd.DataFrame(_contributions(final, Xv), index=stocks, columns=X_COLS)
     liquid_sorted = np.sort(pred_live[lq_last.reindex(stocks).fillna(False).values].values)

@@ -46,35 +46,7 @@ def trigger_conviction_recompute():
 
 
 def _enrich_setup_with_alpha(setup: Dict[str, Any], ticker: str) -> Dict[str, Any]:
-    try:
-        from services.alpha_engine import alpha_engine
-        screener = alpha_engine.get_alpha_screener()
-        clean_t = ticker.replace(".IS", "").upper().strip()
-        a_row = next((x for x in screener if x["ticker"] == clean_t), None)
-        if a_row:
-            a_score = a_row.get("alpha_score", 50.0)
-            a_sig = a_row.get("signal", "NÖTR")
-            c_dec = setup.get("decision", "NÖTR")
-            c_score = setup.get("score", 50.0)
-
-            is_al_c = any(k in c_dec.upper() for k in ["AL", "GÜÇLÜ AL", "BUY"])
-            is_sat_c = any(k in c_dec.upper() for k in ["SAT", "SELL"])
-            is_al_a = any(k in a_sig.upper() for k in ["AL", "GÜÇLÜ AL", "BUY"])
-            is_sat_a = any(k in a_sig.upper() for k in ["SAT", "SELL"])
-
-            is_disagreeing = False
-            reason = ""
-            if (is_al_c and (is_sat_a or "NÖTR" in a_sig.upper())) or (is_al_a and (is_sat_c or "NÖTR" in c_dec.upper() or "BEKLE" in c_dec.upper())):
-                is_disagreeing = True
-                reason = f"Alpha Motoru ({a_score:.0f}p, {a_sig}) ile Karar Skoru ({c_score:.0f}p, {c_dec}) zıt yönlü sinyal üretiyor."
-
-            setup["alpha_score"] = round(a_score, 1)
-            setup["alpha_signal"] = a_sig
-            setup["is_disagreeing"] = is_disagreeing
-            setup["disagreement_badge"] = "Ayrışma" if is_disagreeing else None
-            setup["disagreement_reason"] = reason
-    except Exception:
-        pass
+    """Kept for callers: there is a single score now, so nothing to compare against."""
     return setup
 
 
@@ -139,46 +111,8 @@ def get_conviction_stock_setup(ticker: str):
 
 @router.get("/conviction/all")
 def get_all_conviction_stocks():
-    """Returns all scored stocks with decision badges, scores, and Alpha Engine disagreement indicators."""
-    stocks = conviction_engine.get_all_scored_stocks()
-    try:
-        from services.alpha_engine import alpha_engine
-        screener = alpha_engine.get_alpha_screener()
-        a_map = {s["ticker"]: s for s in screener}
-        enriched = []
-        for s in stocks:
-            item = dict(s)
-            t = item.get("ticker")
-            a_item = a_map.get(t)
-            if a_item:
-                a_score = round(float(a_item.get("alpha_score", 0.0)), 1)
-                a_signal = a_item.get("signal", "NÖTR")
-                item["alpha_score"] = a_score
-                item["alpha_signal"] = a_signal
-
-                c_dec = (item.get("decision") or "").upper()
-                c_cat = "AL" if ("AL" in c_dec and "SAT" not in c_dec) else ("SAT" if ("SAT" in c_dec or "RİSKLİ" in c_dec or "RISKLI" in c_dec) else "NOTR")
-                a_sig = (a_signal or "").upper()
-                a_cat = "AL" if ("AL" in a_sig and "SAT" not in a_sig) else ("SAT" if "SAT" in a_sig else "NOTR")
-
-                if (c_cat == "AL" and a_cat in ("NOTR", "SAT")) or (a_cat == "AL" and c_cat in ("NOTR", "SAT")):
-                    item["is_disagreeing"] = True
-                    item["disagreement_badge"] = "İki motor farklı görüşte"
-                    item["disagreement_reason"] = f"Karar Motoru: {item.get('score')}p ({item.get('decision')}) vs Alpha Motoru: {a_score}p ({a_signal})"
-                else:
-                    item["is_disagreeing"] = False
-                    item["disagreement_badge"] = None
-                    item["disagreement_reason"] = None
-            else:
-                item["alpha_score"] = None
-                item["alpha_signal"] = None
-                item["is_disagreeing"] = False
-                item["disagreement_badge"] = None
-                item["disagreement_reason"] = None
-            enriched.append(item)
-        return enriched
-    except Exception:
-        return stocks
+    """All stocks with the HisseRadar score and decision."""
+    return conviction_engine.get_all_scored_stocks()
 
 
 @router.get("/conviction/ai-thesis/{ticker}")

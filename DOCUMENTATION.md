@@ -114,9 +114,9 @@ Skora yalnızca örneklem dışında işe yaradığı gösterilen bilgi girer. E
 * Hüküm: t ≥ 3 ve yılların %60'ı pozitif ise güçlü olumlu; t ≥ 2 olumlu; simetrik olarak olumsuz; arası "kanıt yok". Klasik yorumu tersine çıkan sinyaller işaretlenir (ör. RSI 30 altı BIST'te olumsuz, RSI 70 üstü olumlu).
 
 ### 6.3 Model
-* Gradyan artırmalı karar ağaçları (scikit-learn HistGradientBoosting): 15 göstergenin günlük kesitsel sırası + 31 sinyal bayrağı → sonraki 20 seansın fazla getirisi (her gün %2-%98 aralığına kırpılmış).
+* Gradyan artırmalı karar ağaçları (scikit-learn HistGradientBoosting): 30 göstergenin günlük kesitsel sırası (trend, 52 hafta konumu, göreli güç, sektör momentumu, volatilite/risk: en büyük günlük artış, çarpıklık, beta, hisseye özgü oynaklık; hacim/likidite: Amihud, işlem hacmi; gece/seans içi getiri) + 5 piyasa koşulu (genişlik, XU100-SMA200, XU100 1 ay, piyasa oynaklığı, küçük hisselerin göreli gücü) + 31 sinyal bayrağı → sonraki 20 seansın fazla getirisi (her gün %2-%98 aralığına kırpılmış).
 * Sinyallere monoton kısıt: her eğitimde yalnızca o eğitim verisine bakılarak, anlamlı (|t| ≥ 2) sinyallerin skoru etkileyebileceği yön sabitlenir.
-* Yürüyen pencere: 2019'dan itibaren her yıl, yıl başından 90 gün öncesine kadarki veriyle eğitilen modelle tahmin edilir. Örneklem dışı sonuçlar (2019-2026): en iyi %10 her yıl evrenin üzerinde, en kötü %10 her yıl altında; dilimler sıralı; aylık dengelemeli en iyi %10 maliyet sonrası yıllık ~%62 (evren ~%55, en kötü %10 ~%5).
+* Yürüyen pencere: 2019'dan itibaren her yıl, yıl başından 90 gün öncesine kadarki veriyle eğitilen modelle tahmin edilir. Örneklem dışı sonuçlar (2019-2026): IC 0,068 (t 9,4); en iyi %10 her yıl evrenin üzerinde (+1,49 puan/20 gün), en kötü %10 her yıl altında; dilimler sıralı; aylık dengelemeli en iyi %10 maliyet sonrası yıllık ~%75 (evren ~%55, en kötü %10 ~%4). Beş sürüm karşılaştırıldı; seçilen sürüm IC'yi 8 yılın 7'sinde, en iyi-en kötü farkını 8 yılın 6'sında iyileştirdi.
 * Doğrusal (IC ağırlıklı) birleşim denendi ve bırakıldı: sıralamayı iyi yapsa da en iyi dilimi evrenin üzerine taşıyamadı.
 * Yerel açıklama: her girdi nötr değere çekildiğinde tahminin değişimi; Trend, 52 hafta konumu, Göreli güç, Volatilite, Hacim, Osilatör gruplarında toplanır.
 * Seviyeler: son ~250 seansın 5 çubuklu tepe/diplerinden, en fazla 1 ATR genişliğinde kümeler. Stop: en yakın desteğin 0,5 ATR altı (1-3 ATR aralığındaysa), değilse 2,5 ATR.
@@ -136,14 +136,10 @@ Skora yalnızca örneklem dışında işe yaradığı gösterilen bilgi girer. E
 * Fiyat/skor/karar alarmları dakikada bir, sinyal alarmları her model güncellemesinde kontrol edilir. Tek seferlik alarmlar tetiklenince kapanır; tekrarlı ve çoklu hisse alarmları her hisse için günde en fazla bir kez tetiklenir.
 * Bildirimler `alert_events` tablosunda tutulur; üst bardaki zil ve (izin verilirse) tarayıcı bildirimi gösterir.
 
-## 7. Alpha Engine (Yapay Zeka Destekli Momentum & Değer Skorları)
-
-`alpha_engine.py`, Conviction Engine'den farklı olarak piyasayı daha matematiksel ağlarla 0-100 arasında endeksler. Ağırlıkları şöyledir:
-*   `Teknik (%30):` SMA (Basit Hareketli Ortalama) ve RSI formülleri kendi içinde sıfırdan hesaplanır. TradingView verisi bulunamazsa kendi hesaplamasına döner.
-*   `Temel (%30):` ROE, P/E (F/K) ve P/B (PD/DD). 
-*   `Sentiment (%40):` Aracı kurum raporlarının ortalaması ve konsensüs beklentisi.
-
----
+## 7. Tek skor kararı (Alpha skoru kaldırıldı)
+* Alpha skoru (%30 TradingView tavsiyesi, %30 F/K-PD/DD-ROE eşikleri, %40 kurum potansiyeli/AL oranı) HisseRadar skoruyla aynı yöntemle karşılaştırıldı.
+* TradingView tavsiyesi fiyat geçmişinden yeniden üretildi: 2019-2026 IC ≈ 0. Alpha'nın tam formülü 2026'da (temel veriler bugünkü değerlerle, yani alpha lehine) en iyi dilimi en kötüsünden kötü çıkardı; temel analiz parçası ters çalıştı.
+* HisseRadar modeli aynı tarihlerde IC 0,087 (t 6,8). Bu yüzden tek skor HisseRadar skorudur; Alpha Insights sayfası, `alpha_engine.py` ve `/api/alpha/*` kaldırıldı. Alpha sayfasındaki geçmiş tarih testi Skor Karnesi'ne taşındı (`/api/ta/point-in-time`).
 
 ## 8. AI Service (Yapay Zeka) - Gemini Prompt Mühendisliği
 
@@ -214,12 +210,10 @@ Projede Python'un `schedule` kütüphanesi kullanılarak bir zamanlayıcı (`scr
 
 ---
 
-## 12. VİOP Service (Vadeli İşlem ve Opsiyon Piyasası) - Simülasyon Katmanı
-
-Projede BIST30 hisseleri (Örn: AKBNK, THYAO, EREGL) için `viop_service.py` modülü bulunur.
-*   **Çalışma Mantığı:** VİOP piyasasındaki kontratların gerçek zamanlı derinlik (Level 2) verisi ücretli ve gecikmeli olduğundan, sistem şu anlık **Simülasyon (Mock)** üzerinden VİOP arbitraj taraması yapar.
-*   **Formüller:** `random.uniform(-3.5, 5.5)` aralığında rastgele spread (makas) oranları türetilir. Arbitraj Puanı (Arbitrage Score) ise `(Spot Fiyat - Vadeli Fiyat) / Açık Pozisyon` gibi sanal ağırlıklandırmalarla 0-100 arasına indekslenir. 
-*   Bu modülün amacı, VİOP tarafı lisanslı bir veri sağlayıcıyla (Matriks veya Foreks API) bağlandığında arayüzün (Frontend) tamamen hazır olmasıdır.
+## 12. VİOP Teorik Fiyat Hesaplayıcı (`viop_service.py`)
+* Kaynaklarımızda VİOP piyasa verisi (kontrat fiyatı, açık pozisyon) yoktur. Önceki sürüm bu alanları rastgele sayılarla dolduruyordu; kaldırıldı.
+* Sayfa yalnızca BIST 30 pay vadelileri için teorik fiyatı hesaplar: F = S × (1 + (r − q) × gün/365). r kullanıcının girdiği yıllık faiz, q son 12 ayın temettü verimi; vade ayın son iş günü (3 günden az kaldıysa sonraki ay).
+* Uç nokta: `GET /api/viop/fair-value?rate=0.40`.
 
 ## 13. React Error Boundary ve Hata Yakalama (Frontend)
 React tarafında uygulamanın çökmesini (White Screen of Death) engellemek için özel bir `ErrorBoundary.jsx` sınıf bileşeni (Class Component) mevcuttur.

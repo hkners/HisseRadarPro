@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FavoriteStar from './common/FavoriteStar';
 import { getCachedData } from '../utils/apiCache';
-import { AlertTriangle } from 'lucide-react';
+import {  } from 'lucide-react';
 
 const BIST30 = new Set(['AKBNK', 'ALARK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'CCOMP', 'CWENE', 'ENKAI', 'EREGL', 'FROTO', 'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KRDMD', 'MIATK', 'ODAS', 'PGSUS', 'PETKM', 'SAHOL', 'SASA', 'SISE', 'TCELL', 'THYAO', 'TOASO', 'TRALT', 'TRMET', 'TUPRS', 'YKBNK']);
 
@@ -180,27 +180,6 @@ export default function StockCommandHeader({
               {decisionText} {Math.round(score)}
             </span>
 
-            {/* Engine Disagreement Alert Badge */}
-            {setup?.is_disagreeing && (
-              <span 
-                title={setup.disagreement_reason || `Karar Skoru: ${Math.round(score)}p (${decisionText}) vs Alpha Motoru: ${setup.alpha_score}p (${setup.alpha_signal}) zıt görüşte`}
-                style={{
-                  background: 'rgba(201, 136, 58, 0.15)',
-                  border: '1px solid rgba(201, 136, 58, 0.4)',
-                  color: 'var(--warning)',
-                  fontSize: '9px',
-                  fontWeight: 'bold',
-                  padding: '2px 6px',
-                  borderRadius: '3px',
-                  cursor: 'help',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '2px'
-                }}
-              >
-                <AlertTriangle size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />İki motor farklı görüşte
-              </span>
-            )}
 
             {/* Entry Range */}
             {setup.entry_zone?.low && (
@@ -218,7 +197,7 @@ export default function StockCommandHeader({
                 <span style={{ color: 'var(--text-muted)' }}>Hedef:</span>
                 <span style={{ color: 'var(--color-up)', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
                   {setup.consensus_target.toFixed(2)}
-                  {setup.upside_pct ? ` (+${setup.upside_pct.toFixed(0)}%)` : ''}
+                  {setup.upside_pct ? ` (${setup.upside_pct > 0 ? '+' : ''}${setup.upside_pct.toFixed(0)}%)` : ''}
                 </span>
               </div>
             )}
@@ -234,7 +213,7 @@ export default function StockCommandHeader({
             )}
 
             {/* R:R */}
-            {setup.risk_reward && (
+            {setup.risk_reward > 0 && (
               <div style={{ display: 'flex', gap: '3px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>R:R:</span>
                 <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>

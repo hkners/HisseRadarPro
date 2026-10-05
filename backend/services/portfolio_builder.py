@@ -10,13 +10,10 @@ Otomatik portföy inşası, ağırlıklandırma, korelasyon ve likidite optimiza
 6. generate_portfolio: Bütçeye göre tam sayı lot hesabı (Math.floor) ve kalan nakit ile nihai portföyü üretir.
 """
 
-import datetime
-import json
 import logging
 import math
 import statistics
-import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +77,7 @@ class PortfolioBuilder:
 
         # 1. Fetch scores: Query score_history first for instant candidate loading
         scored_candidates = []
-        score_col = "alpha_score" if score_metric == "alpha_score" else "conviction_score"
+        score_col = "conviction_score"  # the HisseRadar score (the alpha score was retired)
         try:
             with r._get_connection() as conn:
                 cursor = conn.cursor()
@@ -126,51 +123,28 @@ class PortfolioBuilder:
         except Exception as e:
             logger.warning(f"Error querying score_history for candidates: {e}")
 
-        # Fallback to in-memory ConvictionEngine or AlphaEngine if score_history was empty
+        # Fallback to the in-memory decision engine if score_history was empty
         if not scored_candidates:
-            if score_metric == "alpha_score":
-                try:
-                    # The running singleton: AlphaEngine() would start another endless refresh thread.
-                    from services.alpha_engine import alpha_engine
-                    alpha_data = alpha_engine.get_alpha_screener() or []
-                    for item in alpha_data:
-                        t = item.get("ticker", "").upper().strip()
-                        if allowed_set and t not in allowed_set:
-                            continue
-                        price = item.get("price") or 0.0
-                        score = item.get("alpha_score") or item.get("score") or 0.0
-                        if price > 0 and score > 0:
-                            c_info = company_info_map.get(t, {})
-                            scored_candidates.append({
-                                "ticker": t,
-                                "score": float(score),
-                                "price": float(price),
-                                "sector": c_info.get("sector") or "Genel",
-                                "company_name": item.get("company_name") or t
-                            })
-                except Exception as e:
-                    logger.warning(f"Error fetching alpha candidates: {e}")
-            else:
-                try:
-                    # The running singleton: a fresh ConvictionEngine has an empty cache.
-                    from services.conviction_engine import conviction_engine
-                    cached = {s["ticker"]: s for s in conviction_engine.get_all_scored_stocks()}
-                    for t, setup in cached.items():
-                        if allowed_set and t not in allowed_set:
-                            continue
-                        price = setup.get("price") or 0.0
-                        score = setup.get("score") or 0.0
-                        if price > 0 and score > 0:
-                            c_info = company_info_map.get(t, {})
-                            scored_candidates.append({
-                                "ticker": t,
-                                "score": float(score),
-                                "price": float(price),
-                                "sector": c_info.get("sector") or "Genel",
-                                "company_name": setup.get("company_name") or t
-                            })
-                except Exception as e:
-                    logger.warning(f"Error fetching conviction candidates: {e}")
+            try:
+                # The running singleton: a fresh ConvictionEngine has an empty cache.
+                from services.conviction_engine import conviction_engine
+                cached = {s["ticker"]: s for s in conviction_engine.get_all_scored_stocks()}
+                for t, setup in cached.items():
+                    if allowed_set and t not in allowed_set:
+                        continue
+                    price = setup.get("price") or 0.0
+                    score = setup.get("score") or 0.0
+                    if price > 0 and score > 0:
+                        c_info = company_info_map.get(t, {})
+                        scored_candidates.append({
+                            "ticker": t,
+                            "score": float(score),
+                            "price": float(price),
+                            "sector": c_info.get("sector") or "Genel",
+                            "company_name": setup.get("company_name") or t
+                        })
+            except Exception as e:
+                logger.warning(f"Error fetching conviction candidates: {e}")
 
         # If still empty (e.g. isolated test environment), fallback to company_info with mock prices
         if not scored_candidates:

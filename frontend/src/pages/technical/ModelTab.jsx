@@ -31,7 +31,9 @@ export default function ModelTab({ ov }) {
         <div className="card-eyebrow">Yöntem</div>
         <div className="card-body" style={{ fontSize: 12.5, lineHeight: 1.65 }}>
           <p>
-            Model, 15 teknik göstergenin hisseler arasındaki sırasını ve 31 sinyalin varlığını girdi alan bir gradyan artırmalı karar ağacı topluluğudur.
+            Model, 30 göstergenin hisseler arasındaki sırasını (trend, 52 hafta konumu, göreli güç, sektör momentumu, volatilite ve risk, hacim ve likidite, osilatörler),
+            5 piyasa koşulu girdisini ve 31 sinyalin varlığını kullanan bir gradyan artırmalı karar ağacı topluluğudur. Piyasa koşulları sayesinde model,
+            örneğin momentumun yükselen ve düşen piyasada farklı çalışmasını öğrenebilir.
             Hedef, sonraki 20 işlem gününde likit evrene göre fazla getiridir; uç değerler her gün %2–%98 aralığına kırpılır.
           </p>
           <p style={{ marginTop: 8 }}>
@@ -42,6 +44,9 @@ export default function ModelTab({ ov }) {
           <p style={{ marginTop: 8 }}>
             Önce göstergeleri doğrusal ağırlıklarla birleştiren daha basit bir model denendi; sıralamayı iyi yapsa da en iyi dilimi piyasanın üzerine taşıyamadı.
             Teknik etkiler çoğunlukla eşikli: derin aşırı satım, 4. evre, dağıtım hacmi gibi durumlar doğrusal bir puanla yakalanamıyor.
+            Ardından aynı protokolle beş sürüm karşılaştırıldı; yeni hisse değişkenleri ve piyasa koşulları eklenen sürüm IC'yi 8 yılın 7'sinde,
+            en iyi - en kötü dilim farkını 8 yılın 6'sında iyileştirdiği için seçildi. Eski Alpha skoru (TradingView tavsiyesi, F/K-PD/DD-ROE eşikleri ve kurum potansiyeli)
+            aynı testte sıralama gücü göstermedi ve kaldırıldı.
           </p>
           <p style={{ marginTop: 8 }} className="text-muted">
             Sınırlar: getiriler nominal TL'dir; borsadan çıkmış hisseler veri setinde yoksa sonuçlar olduğundan iyi görünebilir; geçmiş performans gelecek için garanti değildir.

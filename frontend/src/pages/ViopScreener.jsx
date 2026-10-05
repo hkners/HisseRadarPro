@@ -1,171 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import ImageWithFallback from '../components/ImageWithFallback';
 import PageContainer from '../components/common/PageContainer';
-import { usePolling } from '../hooks/usePolling';
+import { InfoTip } from '../components/ui';
+import { fmtNum, fmtPct, signClass } from '../utils/format';
 
+const API = import.meta.env.VITE_API_URL || '/api';
+
+// Theoretical single-stock futures prices (cost of carry). Contract prices and open interest are not
+// shown: our data sources do not include VİOP market data, and the page used to fill them with
+// random numbers.
 export default function ViopScreener() {
-  const { data: fetchedData, loading } = usePolling(`${import.meta.env.VITE_API_URL}/viop/screener`, 0);
-  const data = fetchedData || [];
+  const [ratePct, setRatePct] = useState('40');
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const filteredData = data.filter(item => 
-      item.contract.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      item.ticker.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const formatCurrency = (val) => {
-    if (val === null || val === undefined || isNaN(val)) return '-';
-    return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
-  };
-
-  const formatPct = (val) => {
-    if (val === null || val === undefined || isNaN(val)) return '-';
-    return val.toFixed(2) + '%';
-  };
+  useEffect(() => {
+    const r = Number(String(ratePct).replace(',', '.'));
+    if (!Number.isFinite(r) || r < 0 || r > 200) return undefined;
+    const id = setTimeout(() => {
+      fetch(`${API}/viop/fair-value?rate=${r / 100}`)
+        .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+        .then(d => { setData(d); setError(''); })
+        .catch(e => setError(e.message));
+    }, 300);
+    return () => clearTimeout(id);
+  }, [ratePct]);
 
   return (
-    <PageContainer 
+    <PageContainer
       title="VİOP"
-      badge={{ label: `${filteredData.length} SÖZLEŞME` }}
-      subtitle="Vadeli kontratlarda arbitraj getirisi ve açık pozisyon analizi."
+      subtitle="BIST 30 pay vadeli sözleşmeleri için teorik (taşıma maliyeti) fiyat hesaplayıcı."
+      badge={data ? `Vade ${data.expiry}` : undefined}
+      scrollable
     >
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', marginBottom: '0', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
-        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', gap: '10px', flexWrap: 'wrap' }}>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
-              Vadeli İşlem ve Opsiyon Piyasası'ndaki (VİOP) pay vadeli sözleşmelerinin spot fiyata göre arbitraj getirisini ve açık pozisyon sayısı (APS) değişimini analiz edin.
-            </p>
-            <div style={{ minWidth: '220px' }}>
-              <input 
-                type="text" 
-                placeholder="Sözleşme Ara (Örn: THYAO)..." 
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                style={{ 
-                  width: '100%', 
-                  padding: '5px 10px', 
-                  borderRadius: '4px', 
-                  border: '1px solid var(--border-color)', 
-                  background: 'rgba(0,0,0,0.3)', 
-                  color: 'var(--text-primary)', 
-                  outline: 'none',
-                  fontSize: '11px'
-                }}
-              />
-            </div>
-          </div>
-
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-              Veriler yükleniyor...
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-              <div className="table-responsive" style={{ flex: 1, overflowY: 'auto', borderBottom: '1px solid var(--border-color)' }}>
-                <table className="data-table">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 16 }}>
+        <div className="notice">
+          Kontrat piyasa fiyatı ve açık pozisyon (APS) verisi kaynaklarımızda yok; bu sayfa yalnızca teorik fiyatı hesaplar.
+          Önceki sürümdeki kontrat fiyatı, APS ve trend sütunları rastgele üretiliyordu ve kaldırıldı.
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label className="filter-field" style={{ width: 220 }}>
+            <span className="eyebrow">Yıllık faiz varsayımı (%) <InfoTip text="Genellikle TCMB politika faizi ya da kısa vadeli TL borçlanma faizi. Teorik fiyat bu orana doğrudan bağlıdır." size={10} /></span>
+            <input className="input" value={ratePct} onChange={e => setRatePct(e.target.value)} inputMode="decimal" />
+          </label>
+          {data && <span className="text-muted" style={{ fontSize: 12 }}>Vadeye {data.days_to_expiry} gün · F = S × (1 + (faiz − temettü verimi) × gün/365)</span>}
+        </div>
+        {error && <div className="text-down">Hesaplanamadı: {error}</div>}
+        {data && (
+          <div className="panel" style={{ marginBottom: 0 }}>
+            <div className="panel-content" style={{ padding: 0, flex: 'none' }}>
+              <table className="data-table compact">
                 <thead>
                   <tr>
-                    <th></th>
-                    <th style={{ textAlign: 'left' }}>SÖZLEŞME</th>
-                    <th>SPOT FİYAT</th>
-                    <th>VADELİ FİYAT</th>
-                    <th>TEORİK FİYAT</th>
-                    <th style={{ color: 'var(--color-warning)' }}>YILLIK GETİRİ</th>
-                    <th>APS</th>
-                    <th>APS DEĞİŞİM</th>
-                    <th style={{ textAlign: 'center' }}>SİNYAL / TREND</th>
+                    <th style={{ textAlign: 'left' }}>Sözleşme</th><th>Spot</th><th>Günlük</th>
+                    <th>Temettü verimi</th><th>Teorik vadeli fiyat</th>
+                    <th>Baz <InfoTip text="Teorik vadeli fiyatın spot fiyata göre farkı. Piyasa fiyatı bundan belirgin saparsa (kaynağınızdan bakarak) arbitraj fırsatı olabilir." size={9} /></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => (
-                    <tr key={item.contract} className="row-hoverable" style={{ background: idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
-                      <td style={{ textAlign: 'center', width: '30px' }}>
-                        <ImageWithFallback
-                          src={`${import.meta.env.VITE_API_URL.replace(/\/api$/, '')}/logos/${item.ticker}.png`}
-                          alt={item.ticker}
-                          fallbackName={item.ticker}
-                          size={24}
-                          style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#fff', objectFit: 'contain' }}
-                        />
-                      </td>
-                      <td style={{ fontWeight: 'bold' }}>
-                        <div style={{ color: 'var(--color-cyan)' }}>{item.contract}</div>
-                        <div style={{ fontSize: '0.7rem' }}>
-                          <Link to={`/hisse/${item.ticker}`} className="ticker-link">{item.ticker} Vade: {item.days_to_expiry} Gün</Link>
-                        </div>
-                      </td>
-                      <td style={{ fontWeight: 'bold' }}>
-                        {formatCurrency(item.spot_price)}
-                        <span style={{ fontSize: '10px', marginLeft: '6px', color: item.spot_change > 0 ? 'var(--color-up)' : item.spot_change < 0 ? 'var(--color-red)' : 'var(--text-muted)'}}>
-                          {item.spot_change > 0 ? '▲' : item.spot_change < 0 ? '▼' : ''} {Math.abs(item.spot_change).toFixed(2)}%
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 'bold' }}>{formatCurrency(item.market_price)}</td>
-                      <td style={{ color: 'var(--text-muted)' }}>{formatCurrency(item.theo_price)}</td>
-                      <td style={{ fontWeight: 'bold', color: item.arbitrage_yield > 40 ? 'var(--color-warning)' : 'var(--text-highlight)' }}>
-                        {formatPct(item.arbitrage_yield)}
-                      </td>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>{item.aps.toLocaleString('tr-TR')}</td>
-                      <td style={{ fontWeight: 'bold', color: item.aps_change_pct > 0 ? 'var(--color-up)' : item.aps_change_pct < 0 ? 'var(--color-red)' : 'var(--text-muted)'}}>
-                        {item.aps_change_pct > 0 ? '+' : ''}{formatPct(item.aps_change_pct)}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <span style={{
-                          background: 'rgba(0,0,0,0.3)',
-                          border: `1px solid ${item.trend_color}`,
-                          color: item.trend_color,
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '10px',
-                          fontWeight: 'bold'
-                        }}>
-                          {item.trend}
-                        </span>
-                      </td>
+                  {data.rows.map(r => (
+                    <tr key={r.ticker}>
+                      <td style={{ textAlign: 'left' }}><Link to={`/hisse/${r.ticker}`} className="ticker-link">{r.contract}</Link></td>
+                      <td>{fmtNum(r.spot_price, 2)}</td>
+                      <td className={signClass(r.spot_change)}>{fmtPct(r.spot_change, 2)}</td>
+                      <td>{fmtPct((r.dividend_yield || 0) * 100, 1, { sign: false })}</td>
+                      <td style={{ color: 'var(--text-primary)' }}>{fmtNum(r.fair_price, 2)}</td>
+                      <td>{fmtPct(r.basis_pct, 2)}</td>
                     </tr>
                   ))}
-                  {filteredData.length === 0 && (
-                      <tr>
-                          <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                              Eşleşen sözleşme bulunamadı. Lütfen arama kriterinizi değiştirin.
-                          </td>
-                      </tr>
-                  )}
                 </tbody>
               </table>
             </div>
-
-            {filteredData.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
-                    <button 
-                        className="btn-read" 
-                        disabled={currentPage === 1}
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-                    >
-                        &larr; Önceki Sayfa
-                    </button>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Sayfa {currentPage} / {Math.ceil(filteredData.length / itemsPerPage)} <br/>
-                        <span style={{ fontSize: '10px' }}>(Toplam {filteredData.length} Sözleşme)</span>
-                    </span>
-                    <button 
-                        className="btn-read" 
-                        disabled={currentPage >= Math.ceil(filteredData.length / itemsPerPage)}
-                        onClick={() => setCurrentPage(p => p + 1)}
-                        style={{ opacity: currentPage >= Math.ceil(filteredData.length / itemsPerPage) ? 0.5 : 1, cursor: currentPage >= Math.ceil(filteredData.length / itemsPerPage) ? 'not-allowed' : 'pointer' }}
-                    >
-                        Sonraki Sayfa &rarr;
-                    </button>
-                </div>
-            )}
           </div>
-          )}
-        </div>
+        )}
+        <p className="text-muted" style={{ fontSize: 11 }}>Temettü verimi son 12 ayın verimidir ve vade içinde temettü olup olmadığını dikkate almaz. Yatırım tavsiyesi değildir.</p>
       </div>
     </PageContainer>
   );

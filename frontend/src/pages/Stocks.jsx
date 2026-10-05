@@ -128,9 +128,7 @@ export default function Stocks() {
         model_count: conv.model_count || 0,
         is_disagreeing: conv.is_disagreeing || false,
         disagreement_badge: conv.disagreement_badge || null,
-        disagreement_reason: conv.disagreement_reason || null,
-        alpha_score: conv.alpha_score !== undefined ? conv.alpha_score : null,
-        alpha_signal: conv.alpha_signal || null
+        disagreement_reason: conv.disagreement_reason || null
       };
     });
 

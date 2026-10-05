@@ -1,6 +1,6 @@
 // Single source of truth for navigation: sidebar, top tabs, command palette and document titles.
 import {
-  Briefcase, ShieldAlert, Layers, Sparkles, History, Filter, Compass, Gauge, Radar,
+  Briefcase, ShieldAlert, Layers, Sparkles, History, Filter, Compass, Radar,
   CandlestickChart, Factory, ArrowLeftRight, FileText, Landmark, Activity,
   LayoutDashboard, MessageSquare, Globe, TrendingUp, ClipboardCheck, Bell,
 } from 'lucide-react';
@@ -36,7 +36,6 @@ export const NAV_GROUPS = [
     items: [
       { to: '/screener', label: 'Tarayıcı', icon: Filter },
       { to: '/discovery', label: 'Hisse Keşif', icon: Compass },
-      { to: '/alpha', label: 'Alpha Insights', icon: Gauge },
       { to: '/technical-screener', label: 'Teknik Radar', icon: Radar, matchAlso: ['/teknik-radar'] },
       { to: '/karne', label: 'Skor Karnesi', icon: ClipboardCheck },
       { to: '/stocks', label: 'Hisseler', icon: CandlestickChart, matchAlso: ['/hisse/'] },

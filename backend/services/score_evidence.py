@@ -11,6 +11,8 @@ Answers "does the score work?" with three pieces of evidence:
 3. Analyst information test: whether consensus upside, coverage, target revisions or fresh reports
    explain the next 20 sessions beyond the technical model (rank IC with the model's residual, per
    date, month-clustered t). A feature that clears |t| >= 2 is flagged as a candidate for the score.
+4. Point-in-time test (point_in_time_test): the liquid stocks that met a rule (score, RSI, SMA distance,
+   consensus upside) on a past date, held to today, against XU100 and the equal-weight universe.
 """
 
 import logging
@@ -177,3 +179,113 @@ def build() -> Dict[str, Any]:
     with _lock:
         _cache["key"], _cache["data"] = key, data
     return {**data, "live": _live_record()}
+
+
+def point_in_time_test(days_ago: int = 30, metric: str = "SCORE", condition: str = "GREATER", threshold: float = 70.0, tickers: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Point-in-time check of a simple rule: the liquid stocks that met the condition at the close
+    `days_ago` calendar days back, held to the last close.
+    - Prices are split/bonus-adjusted (backtest_engine frames).
+    - SCORE: the HisseRadar score known on that date (walk-forward technical model, no look-ahead;
+      available from 2019).
+    - RSI / SMA: computed from prices up to that date. POTENTIAL: each broker's latest target in the
+      180 days before that date against that day's close.
+    - A trade "wins" when it beats XU100 over the same window; the liquid equal-weight universe is shown too.
+      (Counting positive nominal returns would make almost everything a winner under high inflation.)
+    """
+    import datetime
+    from globals import report_repo
+    from services.backtest_engine import _load_frames
+
+    d = _load_frames()
+    adj, closes, fac = d["adj"], d["closes"], d["factors"]
+    idx = adj.index
+    target = pd.Timestamp(datetime.date.today() - datetime.timedelta(days=max(1, int(days_ago))))
+    pos = idx.searchsorted(target, side="right") - 1
+    empty = {"period_days": days_ago, "total_trades": 0, "win_rate_pct": 0, "avg_return_pct": 0, "trades": []}
+    if pos < 0 or pos >= len(idx) - 1:
+        return {**empty, "note": "Seçilen tarih için fiyat verisi yok."}
+    t0, t1 = idx[pos], idx[-1]
+    names = [c for c in adj.columns if not c.startswith("XU")]
+    if tickers:
+        wanted = {t.strip().upper() for t in tickers.split(",") if t.strip()}
+        names = [c for c in names if c in wanted]
+    liquid = (fac["turnover20"].loc[t0].reindex(names).fillna(0) >= 5_000_000)
+    ret = (adj.loc[t1, names] / adj.loc[t0, names] - 1)
+    uni_ret = float(ret[liquid & ret.notna()].mean()) if (liquid & ret.notna()).any() else None
+    bench_ret = float(adj.loc[t1, "XU100"] / adj.loc[t0, "XU100"] - 1) if "XU100" in adj and pd.notna(adj.loc[t0, "XU100"]) else None
+
+    reports_by_ticker: Dict[str, List[Dict[str, Any]]] = {}
+    note = None
+    metric = (metric or "SCORE").upper()
+    if metric == "RSI":
+        values = fac["rsi14"].loc[t0, names]
+    elif metric == "SMA":
+        sma20 = adj.iloc[max(0, pos - 19): pos + 1][names].mean()
+        values = (adj.loc[t0, names] / sma20 - 1) * 100
+    elif metric == "POTENTIAL":
+        cutoff = (t0 - pd.Timedelta(days=180)).date().isoformat()
+        for r in report_repo.get_reports(limit=20000) or []:
+            rd = str(r.get("report_date") or "")[:10]
+            if cutoff < rd <= t0.date().isoformat() and r.get("target_price") and r.get("broker"):
+                reports_by_ticker.setdefault(str(r.get("ticker") or "").upper(), []).append(r)
+        vals = {}
+        for t, reps in reports_by_ticker.items():
+            if t not in names or pd.isna(closes.at[t0, t]):
+                continue
+            latest = {}
+            for r in sorted(reps, key=lambda x: str(x.get("report_date"))):
+                latest[r["broker"]] = float(r["target_price"])
+            vals[t] = (np.mean(list(latest.values())) / closes.at[t0, t] - 1) * 100
+        values = pd.Series(vals, dtype=float).reindex(names)
+    else:
+        values = pd.Series(np.nan, index=names)
+        try:
+            from services import ta_lab
+            lab = ta_lab.get_lab()
+            oos = lab["model"].get("oos_pred") if lab else None
+            if oos is not None and len(oos.index):
+                sd = oos.index[oos.index <= t0]
+                if len(sd):
+                    row = oos.loc[sd[-1]]
+                    values = (row.rank(pct=True) * 100).reindex(names)
+                    note = f"Skor, {sd[-1].date().isoformat()} tarihinde o güne kadarki veriyle eğitilmiş modelden."
+            if note is None:
+                note = "Bu tarih için geçmiş skor yok (model 2019'dan itibaren test edildi)."
+        except Exception as e:
+            note = f"Skor geçmişi okunamadı: {e}"
+
+    hit = values > threshold if condition == "GREATER" else values < threshold
+    sel = [t for t in names if bool(hit.get(t)) and bool(liquid.get(t)) and pd.notna(ret.get(t))]
+    trades = []
+    for t in sel:
+        r = float(ret[t])
+        reps = reports_by_ticker.get(t, [])
+        trades.append({
+            "ticker": t,
+            "sector": (report_repo.get_all_company_info().get(t) or {}).get("sector", "Bilinmiyor"),
+            "buy_date": t0.date().isoformat(),
+            "buy_price": float(closes.at[t0, t]),
+            "sell_price": float(closes.at[t1, t]),
+            "return_pct": round(r * 100, 2),
+            "excess_vs_xu100_pct": round((r - bench_ret) * 100, 2) if bench_ret is not None else None,
+            "hist_alpha": round(float(values[t]), 1),
+            "broker_count": len({x.get("broker") for x in reps}),
+            "avg_potential": round(float(values[t]), 1) if metric == "POTENTIAL" else 0,
+            "latest_report_date": max((str(x.get("report_date"))[:10] for x in reps), default="Yok"),
+        })
+    n = len(trades)
+    wins = sum(1 for x in trades if x["excess_vs_xu100_pct"] is not None and x["excess_vs_xu100_pct"] > 0)
+    avg = sum(x["return_pct"] for x in trades) / n if n else 0.0
+    return {
+        "period_days": days_ago,
+        "start_date": t0.date().isoformat(), "end_date": t1.date().isoformat(),
+        "total_trades": n,
+        "win_rate_pct": round(wins / n * 100, 2) if n else 0,
+        "avg_return_pct": round(avg, 2),
+        "benchmark_return_pct": round(bench_ret * 100, 2) if bench_ret is not None else None,
+        "universe_return_pct": round(uni_ret * 100, 2) if uni_ret is not None else None,
+        "avg_excess_pct": round(avg - bench_ret * 100, 2) if n and bench_ret is not None else None,
+        "note": note,
+        "trades": sorted(trades, key=lambda x: x["return_pct"], reverse=True),
+    }

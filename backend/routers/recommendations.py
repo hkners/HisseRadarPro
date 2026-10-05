@@ -12,6 +12,16 @@ from services.ticker_resolver import parse_rating
 router = APIRouter(prefix="/api", tags=["recommendations"])
 
 
+def _stage_map() -> dict:
+    """Weinstein stage per ticker from the technical lab (empty while it is building)."""
+    try:
+        from services import ta_lab
+        lab = ta_lab.get_lab()
+        return {r["ticker"]: r.get("stage") for r in lab["rows"]} if lab else {}
+    except Exception:
+        return {}
+
+
 def _get_deps():
     """Lazy import to avoid circular dependencies."""
     from main import get_cached_recommendations, get_cached_models
@@ -86,11 +96,10 @@ def get_model_portfolios():
 @router.get("/kurum-stats")
 def get_kurum_stats():
     get_cached_recommendations, _, price_service, BIST_TICKERS, match_ticker = _get_deps()
-    from globals import report_repo
     stats = {}
     data = get_cached_recommendations()
     all_prices = price_service.prices  # Single snapshot — one lock acquire
-    all_company_info = report_repo.get_all_company_info()
+    stages = _stage_map()
 
     latest_reports = {}
     for r in data:
@@ -102,9 +111,8 @@ def get_kurum_stats():
         date_str = str(r.get("tarih", ""))
         key = (ticker, broker)
         if key not in latest_reports or date_str > str(latest_reports[key].get("tarih", "")):
-            # Ensure the normalized broker name is stored
-            r["kurum_normalized"] = broker
-            latest_reports[key] = r
+            # A copy: the recommendation list is a shared cache and must not be written to.
+            latest_reports[key] = {**r, "kurum_normalized": broker}
 
     unique_reports = list(latest_reports.values())
 
@@ -112,28 +120,19 @@ def get_kurum_stats():
         k = r.get("kurum_normalized", "Bilinmiyor")
         ticker = match_ticker(r.get("hisse", ""), BIST_TICKERS)
         
-        # Determine if falling knife
+        # Falling knife: a 40%+ stated upside on a stock in a stage-4 decline (target likely not yet cut).
         is_falling_knife = False
         if ticker:
-            info = all_company_info.get(ticker, {})
-            ta = info.get("technical_analysis", {})
-            ta_summary = ta.get("summary", {}) if ta else {}
-            ta_rec = ta_summary.get("RECOMMENDATION", "NEUTRAL")
-            
             p_data = all_prices.get(ticker, {})
             live_price = p_data.get("price") if isinstance(p_data, dict) else 0.0
-            
-            target = r.get("hedefFiyat")
             upside = 0.0
             try:
-                target_val = float(str(target).replace(",", "."))
+                target_val = float(str(r.get("hedefFiyat")).replace(",", "."))
                 if target_val > 0 and live_price and live_price > 0:
                     upside = ((target_val - live_price) / live_price) * 100
             except (ValueError, TypeError):
                 pass
-                
-            if ta_rec in ("SELL", "STRONG_SELL") and upside >= 40:
-                is_falling_knife = True
+            is_falling_knife = stages.get(ticker) == 4 and upside >= 40
 
         # Note: is_stale_due_to_split is already filtered by get_reports query (is_stale_due_to_split = 0)
         
@@ -191,11 +190,10 @@ def _normalize_broker_slug(s: str) -> str:
 @router.get("/kurum/{kurumName}")
 def get_kurum_detail(kurumName: str):
     get_cached_recommendations, _, price_service, BIST_TICKERS, match_ticker = _get_deps()
-    from globals import report_repo
     matched = []
     data = get_cached_recommendations()
     all_prices = price_service.prices  # Single snapshot
-    all_company_info = report_repo.get_all_company_info()
+    stages = _stage_map()
     target_slug = _normalize_broker_slug(kurumName)
 
     for r in data:
@@ -204,6 +202,7 @@ def get_kurum_detail(kurumName: str):
         k_slug = _normalize_broker_slug(k)
         
         if k_normalized == kurumName.lower() or k_slug == target_slug or k.strip().lower() == kurumName.strip().lower():
+            r = dict(r)  # never write into the shared recommendation cache
             ticker = match_ticker(r.get("hisse", ""), BIST_TICKERS)
             r["ticker"] = ticker
             if ticker:
@@ -214,10 +213,6 @@ def get_kurum_detail(kurumName: str):
                 
                 # Exclude falling knife from potential calculation implicitly if client calculates it,
                 # but let's pass a flag so the frontend knows it's a falling knife
-                info = all_company_info.get(ticker, {})
-                ta = info.get("technical_analysis", {})
-                ta_summary = ta.get("summary", {}) if ta else {}
-                ta_rec = ta_summary.get("RECOMMENDATION", "NEUTRAL")
                 
                 target = r.get("hedefFiyat")
                 upside = 0.0
@@ -228,7 +223,7 @@ def get_kurum_detail(kurumName: str):
                 except (ValueError, TypeError):
                     pass
                     
-                is_falling_knife = ta_rec in ("SELL", "STRONG_SELL") and upside >= 40
+                is_falling_knife = stages.get(ticker) == 4 and upside >= 40
                 r["is_falling_knife"] = is_falling_knife
                 
                 if is_falling_knife or r.get("is_stale_due_to_split"):
@@ -310,10 +305,7 @@ def get_screener_data(days: Optional[int] = None):
             upside = None
         else:
             avg_target = sum(data["targets"]) / len(data["targets"])
-            if live_price and live_price > 0:
-                upside = ((avg_target - live_price) / live_price) * 100
-            else:
-                upside = 0.0
+            upside = ((avg_target - live_price) / live_price) * 100 if live_price and live_price > 0 else None
 
         if upside is not None and upside > 500:
             continue

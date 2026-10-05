@@ -477,8 +477,7 @@ export default function Portfolio() {
                   onChange={e => setBuilderMetric(e.target.value)}
                   style={{ width: '150px', padding: '6px 8px' }}
                 >
-                  <option value="conviction_score">Conviction Skoru</option>
-                  <option value="alpha_score">Alpha Skoru</option>
+                  <option value="conviction_score">HisseRadar skoru</option>
                 </select>
               </div>
 

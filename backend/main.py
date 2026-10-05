@@ -33,12 +33,10 @@ if scrapers_dir not in sys.path:
 if base_dir not in sys.path:
     sys.path.insert(0, base_dir)
 
-from db_manager import ReportRepository
-from services.ticker_resolver import load_bist_tickers, match_ticker, parse_rating
-from services.price_service import PriceService
+from services.ticker_resolver import match_ticker, parse_rating
 
 from globals import (
-    base_dir, ALL_BIST_FILE, report_repo, BIST_TICKERS, price_service,
+    base_dir, report_repo, BIST_TICKERS, price_service,
     _static_json_cache, _static_json_lock
 )
 
@@ -199,7 +197,6 @@ from routers.ingest import router as ingest_router
 from routers.portfolio import router as portfolio_router
 from routers.admin import router as admin_router
 from routers.viop import router as viop_router
-from routers.alpha import router as alpha_router
 
 app.include_router(stocks_router)
 app.include_router(recommendations_router)
@@ -208,7 +205,6 @@ app.include_router(ingest_router)
 app.include_router(portfolio_router)
 app.include_router(admin_router)
 app.include_router(viop_router)
-app.include_router(alpha_router)
 from routers.conviction import router as conviction_router
 app.include_router(conviction_router)
 from routers.backtest import router as backtest_router
@@ -440,7 +436,7 @@ def get_dashboard():
     try:
         from services.market_regime_service import market_regime_service
         market_regime_data = market_regime_service.get_current_regime(all_prices=all_prices)
-    except Exception as e:
+    except Exception:
         market_regime_data = {"regime": "NEUTRAL", "exposure_multiplier": 1.0, "color": "#C9883A"}
 
     result = {
