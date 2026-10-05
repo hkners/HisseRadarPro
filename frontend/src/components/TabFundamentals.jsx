@@ -2,12 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { getFinancialItemMeta } from '../utils/financialDictionary';
 import { Search } from 'lucide-react';
 
+// The empty-data guard lives in the wrapper so the hooks below always run in the same order.
 export default function TabFundamentals({ fundamentals }) {
-  const [activeSubTab, setActiveSubTab] = useState('income_statement'); // 'income_statement' | 'balance_sheet' | 'cash_flow'
-  const [viewMode, setViewMode] = useState('summary'); // 'summary' | 'all'
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTooltip, setActiveTooltip] = useState(null);
-
   if (!fundamentals) {
     return (
       <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -15,6 +11,14 @@ export default function TabFundamentals({ fundamentals }) {
       </div>
     );
   }
+  return <FundamentalsBody fundamentals={fundamentals} />;
+}
+
+function FundamentalsBody({ fundamentals }) {
+  const [activeSubTab, setActiveSubTab] = useState('income_statement'); // 'income_statement' | 'balance_sheet' | 'cash_flow'
+  const [viewMode, setViewMode] = useState('summary'); // 'summary' | 'all'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTooltip, setActiveTooltip] = useState(null);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // 1. KPI ÖZET VERİLERİNİ HESAPLA (SON ÇEYREK & BÜYÜME)

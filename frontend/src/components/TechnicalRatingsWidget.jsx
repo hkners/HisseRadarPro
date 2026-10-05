@@ -1,7 +1,12 @@
 import React, { useMemo } from 'react';
 
+// The empty-data guard lives in the wrapper so the hooks below always run in the same order.
 const TechnicalRatingsWidget = ({ taData, currentPrice }) => {
     if (!taData || !taData.indicators) return null;
+    return <TechnicalRatingsBody taData={taData} currentPrice={currentPrice} />;
+};
+
+const TechnicalRatingsBody = ({ taData, currentPrice }) => {
 
     const { summary, indicators, oscillators, moving_averages } = taData;
 
