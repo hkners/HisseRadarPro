@@ -31,6 +31,7 @@ KINDS = {
     "change_above": "Günlük artış", "change_below": "Günlük düşüş",
     "score_above": "Skor üstüne çıkarsa", "score_below": "Skor altına inerse",
     "decision": "Karar değişirse", "signal": "Teknik sinyal oluşursa", "portfolio_stop": "Portföy stop seviyesi",
+    "kap": "KAP bildirimi gelirse",
 }
 SCOPES_ALLOWED = {
     "price_above": {"ticker"}, "price_below": {"ticker"},
@@ -38,6 +39,7 @@ SCOPES_ALLOWED = {
     "score_above": {"ticker", "PORTFOY"}, "score_below": {"ticker", "PORTFOY"},
     "decision": {"ticker", "PORTFOY", "*"}, "signal": {"ticker", "PORTFOY", "*"},
     "portfolio_stop": {"PORTFOY"},
+    "kap": {"ticker", "PORTFOY", "*"},
 }
 _lock = threading.Lock()
 
@@ -162,7 +164,7 @@ def _fire(alert: Dict[str, Any], hits: List[Tuple[str, str, Optional[float]]]) -
 def evaluate_live() -> int:
     """Price, change, score, decision and portfolio-stop alerts against live data."""
     from globals import price_service
-    alerts = [a for a in list_alerts() if a["active"] and a["kind"] != "signal"]
+    alerts = [a for a in list_alerts() if a["active"] and a["kind"] not in ("signal", "kap")]
     if not alerts:
         return 0
     prices = price_service.prices
@@ -222,6 +224,40 @@ def evaluate_signal_alerts(lab: Optional[Dict[str, Any]] = None) -> int:
                 hits.append((t, f"{t}: {label} ({lab['as_of']}). BIST kanıtı: {verdict}.", r.get("score")))
         # A one-shot signal alert on many stocks still fires once, with every match in the event list.
         total += _fire(a, hits[:40])
+    return total
+
+
+def evaluate_kap_alerts() -> int:
+    """New KAP disclosures (since the alert was created) of the chosen category; each disclosure fires once."""
+    from services.kap import disclosures, CATEGORY_BY_KEY
+    total = 0
+    for a in [a for a in list_alerts() if a["active"] and a["kind"] == "kap"]:
+        cat = a["params"].get("category") or "any"
+        tickers = None if a["ticker"] == "*" else _targets(a, [])
+        if tickers is not None and not tickers:
+            continue
+        items = disclosures(tickers, None if cat == "any" else [cat], a["created_at"], 100)
+        if a["ticker"] == "*" and cat == "any":
+            items = [d for d in items if d.get("category")]  # never "every disclosure on the exchange"
+        with _conn() as conn:
+            seen = {int(r[0]) for r in conn.execute("SELECT value FROM alert_events WHERE alert_id = ? AND value IS NOT NULL", (a["id"],)).fetchall()}
+        hits = []
+        for d in items:
+            if d["idx"] in seen:
+                continue
+            code = (d.get("stock_codes") or d.get("related_stocks") or "").split(",")[0].strip() or "KAP"
+            label = CATEGORY_BY_KEY.get(d.get("category"), {}).get("label") or d.get("subject") or "Bildirim"
+            hits.append((code, f"{code} KAP: {label}. {d.get('summary') or ''}".strip(), d["idx"]))
+        # Repeating alerts would skip a second disclosure of the same stock on the same day; KAP alerts
+        # must report every disclosure, so record them directly.
+        if hits:
+            now = datetime.datetime.now().isoformat(timespec="seconds")
+            with _lock, _conn() as conn:
+                conn.executemany("INSERT INTO alert_events (alert_id, ticker, kind, message, value, triggered_at) VALUES (?,?,?,?,?,?)",
+                                 [(a["id"], t, "kap", m, idx, now) for t, m, idx in hits[:50]])
+                conn.execute("UPDATE alerts SET last_triggered = ? WHERE id = ?", (now, a["id"]))
+                conn.commit()
+            total += len(hits[:50])
     return total
 
 

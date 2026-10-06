@@ -144,6 +144,12 @@ async def lifespan(app):
         start_alerts()
     except Exception as e:
         logger.warning(f"Could not start alert worker: {e}")
+    # KAP disclosures: today's and yesterday's lists every 30 minutes (low volume), then KAP alerts
+    try:
+        from services.kap import start_worker as start_kap
+        start_kap()
+    except Exception as e:
+        logger.warning(f"Could not start KAP worker: {e}")
     # Pre-warm the recommendations cache
     get_cached_recommendations()
     # Pre-warm company info cache
@@ -229,6 +235,8 @@ from routers.ta import router as ta_router
 app.include_router(ta_router)
 from routers.alerts import router as alerts_router
 app.include_router(alerts_router)
+from routers.kap import router as kap_router
+app.include_router(kap_router)
 
 
 # --- Health check (stays in main) ---

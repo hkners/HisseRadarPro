@@ -15,6 +15,7 @@ const KIND_SCOPES = {
   change_above: ['ticker', 'PORTFOY'], change_below: ['ticker', 'PORTFOY'],
   score_above: ['ticker', 'PORTFOY'], score_below: ['ticker', 'PORTFOY'],
   decision: ['ticker', 'PORTFOY', '*'], signal: ['ticker', 'PORTFOY', '*'], portfolio_stop: ['PORTFOY'],
+  kap: ['ticker', 'PORTFOY', '*'],
 };
 const PARAM = {
   price_above: { key: 'level', label: 'Fiyat (TL)' }, price_below: { key: 'level', label: 'Fiyat (TL)' },
@@ -31,6 +32,7 @@ const describe = (a, kinds, signals) => {
   if (p.pct != null) what += ` %${p.pct.toLocaleString('tr-TR')}`;
   if (p.decision) what += `: ${p.decision}`;
   if (p.signal) what += `: ${signals[p.signal]?.label || p.signal}`;
+  if (p.category) what += `: ${p.category === 'any' ? 'her tür' : p.category}`;
   return `${scope} · ${what}`;
 };
 
@@ -51,6 +53,8 @@ export default function Alerts() {
   const [value, setValue] = useState('');
   const [decision, setDecision] = useState('GÜÇLÜ AL');
   const [signal, setSignal] = useState('hi52_breakout');
+  const [kapCat, setKapCat] = useState('any');
+  const [kapCats, setKapCats] = useState([]);
   const [repeat, setRepeat] = useState(false);
   const [note, setNote] = useState('');
   const [msg, setMsg] = useState('');
@@ -63,6 +67,7 @@ export default function Alerts() {
   useEffect(() => {
     load();
     fetch(`${API}/ta/screener`).then(r => (r.ok ? r.json() : null)).then(d => d && setSignals(d.signals)).catch(() => {});
+    fetch(`${API}/kap/categories`).then(r => r.json()).then(setKapCats).catch(() => {});
     fetch(`${API}/alerts/events/seen`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
   }, []);
 
@@ -74,7 +79,7 @@ export default function Alerts() {
   const submit = async (e) => {
     e.preventDefault();
     setMsg('');
-    const p = PARAM[kind] ? { [PARAM[kind].key]: Number(String(value).replace(',', '.')) } : kind === 'decision' ? { decision } : kind === 'signal' ? { signal } : {};
+    const p = PARAM[kind] ? { [PARAM[kind].key]: Number(String(value).replace(',', '.')) } : kind === 'decision' ? { decision } : kind === 'signal' ? { signal } : kind === 'kap' ? { category: kapCat } : {};
     const r = await fetch(`${API}/alerts`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticker: scope === 'ticker' ? ticker : scope, kind, params: p, note, repeat }),
@@ -126,6 +131,14 @@ export default function Alerts() {
             <label className="filter-field"><span className="eyebrow">Sinyal</span>
               <select className="input" value={signal} onChange={e => setSignal(e.target.value)}>
                 {signalOptions.map(([k, s]) => <option key={k} value={k}>{s.label} · {VERDICT[s.verdict]?.label}</option>)}
+              </select>
+            </label>
+          )}
+          {kind === 'kap' && (
+            <label className="filter-field"><span className="eyebrow">Bildirim türü</span>
+              <select className="input" value={kapCat} onChange={e => setKapCat(e.target.value)}>
+                <option value="any">{scope === '*' ? 'Sınıflandırılmış tüm türler' : 'Her bildirim'}</option>
+                {kapCats.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </label>
           )}

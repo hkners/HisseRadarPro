@@ -305,6 +305,14 @@ BIST piyasa genişliği (hisselerin kendi 50 günlük ortalamasının üzerindek
 * Model testi: kur değişimi, reel faiz ve enflasyon eğilimi girdileri modeli iyileştirmedi (IC 8 yılın 4'ünde, fark 3'ünde daha iyi; ortalama IC düştü); modele eklenmedi. Piyasa genişliği ve XU100 trendi bu bilgiyi zaten taşıyor.
 * Makro sayfası: enflasyon, politika faizi, reel faiz, USD/TRY ve gram altın; yapay zekâ brifi bu verileri de görür. Uç nokta: `GET /api/macro/rates`.
 
+## 19. KAP bildirimleri ve olay çalışmaları (`kap.py`, `kap_events.py`)
+* KAP'ın kullanım koşulları yoğun erişimin resmi API (Borsa İstanbul sözleşmesi veya ücretsiz MKK API Portal) üzerinden yapılmasını ister. Bu modül sitenin herkese açık JSON uç noktalarını bir kullanıcı yoğunluğunda kullanır: bir günün tüm bildirim listesi tek istek, istekler arasında en az 3 sn, hatada bekleme; bildirim metni yalnızca kullanıcı açtığında çekilir. Toplu metin/ek dosya gerekirse MKK API Portal anahtarı kullanılmalıdır.
+* Akış: bugün ve dün yarım saatte bir. Geçmiş: kullanıcının başlattığı, kaldığı yerden devam eden, günde bir istekli indirme (`POST /api/kap/backfill?days=730`).
+* Tablolar: `kap_disclosures`, `kap_disclosure_tickers` (filer = bildirimi yapan şirket, related = borsa/SPK duyurusunda adı geçen hisse), `kap_days`.
+* Kategoriler: geri alım, pay alım satım, yeni iş ilişkisi, kâr payı, sermaye artırımı/azaltımı (bedelsiz/bedelli ayrımı özetten), varlık alımı/satımı, birleşme, pay alım teklifi, kredi derecelendirmesi, finansal rapor, özel durum, devre kesici (gün yönüne göre), SPK işlem yasağı, borsa tedbirleri, endeks değişikliği.
+* Olay çalışması: 17:45'ten önce yayımlanan bildirimde giriş o günün kapanışı, sonra ertesi seans; ilk gün tepkisi ayrı; 1/5/20/60 seans likit eşit ağırlıklı evrene göre fazla getiri; aynı hisse ve türde 20 seans içinde tekrarlar tek olay; aylara göre kümelenmiş t.
+* Uç noktalar: `/api/kap/feed`, `/api/kap/stock/{t}`, `/api/kap/disclosure/{idx}?summarize=true` (yapay zekâ özeti), `/api/kap/events`, `/api/kap/categories`, `/api/kap/backfill`. Alarm türü `kap` (hisse, portföy veya tüm hisseler; kategori seçilebilir; her bildirim bir kez).
+
 ---
 > **Dokümantasyonun Sonu.** Bu belge, HisseRadarPro v3.0 sisteminin sahip olduğu istisnasız tüm modülleri, sınıfları, değişken atamalarını ve iş mantıklarını (business logic) milimetrik olarak barındırmaktadır.
 

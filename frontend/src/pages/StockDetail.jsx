@@ -19,10 +19,12 @@ import { brokerTargets, buildValuationRows } from '../components/valuation/valua
 import { PillTabs } from '../components/ui';
 import { classifyRating } from '../utils/rating';
 import TechnicalPanel from '../components/ta/TechnicalPanel';
+import StockKap from '../components/kap/StockKap';
 
 const DETAIL_TABS = [
   { id: 'ozet', label: 'Özet & Kokpit' },
   { id: 'teknik', label: 'Teknik Analiz' },
+  { id: 'kap', label: 'KAP' },
   { id: 'degerleme', label: 'Değerleme' },
   { id: 'skor_dokumu', label: 'HisseRadar Skoru' },
   { id: 'ai_analiz', label: 'Yapay Zeka Analizi' },
@@ -694,6 +696,12 @@ export default function StockDetail() {
           <div className="panel-content">
             <TabDividends fundamentals={fundamentals} />
           </div>
+        </div>
+      )}
+
+      {activeTab === 'kap' && (
+        <div className="panel flex-1" style={{ overflowY: 'auto', minHeight: 0, padding: '12px' }}>
+          <StockKap ticker={ticker} />
         </div>
       )}
 

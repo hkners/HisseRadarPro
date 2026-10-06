@@ -57,6 +57,12 @@ def add_alert(a: AlertIn):
             if p.get("decision") not in ("GÜÇLÜ AL", "KADEMELİ AL", "BEKLE / İZLE", "RİSKLİ / SAT"):
                 raise ValueError
             p = {"decision": p["decision"]}
+        elif kind == "kap":
+            from services.kap import CATEGORY_BY_KEY
+            cat = p.get("category") or "any"
+            if cat != "any" and cat not in CATEGORY_BY_KEY:
+                raise ValueError
+            p = {"category": cat}
         elif kind == "signal":
             from services.ta_lab import SIGNAL_BY_KEY
             if p.get("signal") not in SIGNAL_BY_KEY:
@@ -69,7 +75,13 @@ def add_alert(a: AlertIn):
     res = create_alert(scope, kind, p, a.note.strip(), a.repeat or scope in ("PORTFOY", "*"))
     # Check right away so a condition that already holds shows up without waiting a minute.
     try:
-        evaluate_signal_alerts() if kind == "signal" else evaluate_live()
+        if kind == "signal":
+            evaluate_signal_alerts()
+        elif kind == "kap":
+            from services.alerts import evaluate_kap_alerts
+            evaluate_kap_alerts()
+        else:
+            evaluate_live()
     except Exception:
         pass
     return res

@@ -2,7 +2,7 @@
 import {
   Briefcase, ShieldAlert, Layers, Sparkles, History, Filter, Compass, Radar,
   CandlestickChart, Factory, ArrowLeftRight, FileText, Landmark, Activity,
-  LayoutDashboard, MessageSquare, Globe, TrendingUp, ClipboardCheck, Bell,
+  LayoutDashboard, MessageSquare, Globe, TrendingUp, ClipboardCheck, Bell, Megaphone,
 } from 'lucide-react';
 
 export const APP_NAME = 'HisseRadar Pro';
@@ -41,6 +41,7 @@ export const NAV_GROUPS = [
       { to: '/stocks', label: 'Hisseler', icon: CandlestickChart, matchAlso: ['/hisse/'] },
       { to: '/industries', label: 'Sektörler', icon: Factory },
       { to: '/compare', label: 'Karşılaştır', icon: ArrowLeftRight },
+      { to: '/kap', label: 'KAP Akışı', icon: Megaphone },
       { to: '/reports', label: 'Raporlar', icon: FileText },
       { to: '/brokerages', label: 'Kurumlar', icon: Landmark, matchAlso: ['/kurum/'] },
       { to: '/viop', label: 'VİOP', icon: Activity },
