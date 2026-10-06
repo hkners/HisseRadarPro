@@ -1038,6 +1038,16 @@ def ensure_fresh(block: bool = False) -> None:
         threading.Thread(target=_run_build, name="ta-lab-build", daemon=True).start()
 
 
+def force_rebuild() -> bool:
+    """Rebuilds even when the latest session is unchanged (e.g. after price history was corrected)."""
+    with _lock:
+        if _state["building"]:
+            return False
+        _state["building"], _state["started"] = True, time.time()
+    threading.Thread(target=_run_build, name="ta-lab-build", daemon=True).start()
+    return True
+
+
 def get_lab() -> Optional[Dict[str, Any]]:
     ensure_fresh()
     with _lock:

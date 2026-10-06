@@ -48,6 +48,7 @@ export default function Portfolio() {
   const [txType, setTxType] = useState('BUY');
   const [equityCurve, setEquityCurve] = useState([]);
   const [realized, setRealized] = useState(0);
+  const [dividends, setDividends] = useState(null);
   const [formError, setFormError] = useState('');
   const [auditResult, setAuditResult] = useState(null);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -207,6 +208,11 @@ export default function Portfolio() {
       .then(res => res.json())
       .then(d => setRealized(typeof d?.total === 'number' ? d.total : 0))
       .catch(() => setRealized(0));
+
+    fetch(`${import.meta.env.VITE_API_URL}/portfolio/dividends${q}`)
+      .then(res => res.json())
+      .then(d => setDividends(d && Array.isArray(d.events) ? d : null))
+      .catch(() => setDividends(null));
       
     fetch(`${import.meta.env.VITE_API_URL}/portfolio/equity-curve?days=30${account === 'all' ? '' : `&account=${account}`}`)
       .then(res => res.json())
@@ -796,6 +802,15 @@ export default function Portfolio() {
           </div>
         </div>
         <div className="panel">
+          <div className="panel-header text-muted">ALINAN TEMETTÜ</div>
+          <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: dividends?.total_net > 0 ? 'var(--color-up)' : 'var(--text-primary)' }}>
+            {dividends ? `${formatCurrency(dividends.total_net)} ₺` : '—'}
+            <div className="text-muted" style={{ fontSize: 11, fontWeight: 400 }}>
+              {dividends ? `Stopaj (%${Math.round(dividends.withholding * 100)}) sonrası · brüt ${formatCurrency(dividends.total_gross)} ₺` : 'Temettü verisi yok'}
+            </div>
+          </div>
+        </div>
+        <div className="panel">
           <div className="panel-header text-muted">POZİSYON SAYISI</div>
           <div className="panel-content" style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--color-warning)' }}>
             {holdings.length}
@@ -990,8 +1005,24 @@ export default function Portfolio() {
                   </ResponsiveContainer>
                 </div>
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px' }}>
-                  * Portföy değeriniz geçmiş işlemlere göre hesaplanmıştır.
+                  * Geçmiş işlemlere göre hesaplanır; alınan temettüler (net) değere dahildir.
                 </div>
+              </div>
+            </div>
+          )}
+
+          {dividends?.events?.length > 0 && (
+            <div className="panel">
+              <div className="panel-header">Temettüler · hak kesim günü eldeki adede göre</div>
+              <div className="panel-content" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {dividends.events.slice(0, 12).map(e => (
+                  <div key={`${e.ticker}-${e.account}-${e.ex_date}`} style={{ display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 8, fontSize: 12, alignItems: 'baseline' }}>
+                    <span style={{ fontWeight: 600 }}>{e.ticker}</span>
+                    <span className="text-muted">{e.ex_date.split('-').reverse().join('.')} · {formatCurrency(e.shares)} adet × {e.per_share.toLocaleString('tr-TR', { maximumFractionDigits: 4 })} ₺</span>
+                    <span className="num" style={{ textAlign: 'right' }}>{formatCurrency(e.net)} ₺</span>
+                  </div>
+                ))}
+                <div className="text-muted" style={{ fontSize: 10.5 }}>Net tutarlar. Hisse başı temettüler bugünkü pay sayısına göre (bedelsiz sonrası) ifade edilir. Portföy değeri grafiğine hak kesim gününden itibaren eklenir.</div>
               </div>
             </div>
           )}

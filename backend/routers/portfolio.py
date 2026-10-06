@@ -170,11 +170,17 @@ def get_portfolio(account: Optional[str] = Query(None)):
     acc = _account(account)
     items = report_repo.get_user_portfolio(acc)
     # Cost basis in today's prices (TÜFE) and in USD, so a gain can be judged against inflation and the dollar.
+    txs = report_repo.get_portfolio_transactions(acc)
     try:
         from services.macro_data import position_costs
-        alt_costs = position_costs(report_repo.get_portfolio_transactions(acc))
+        alt_costs = position_costs(txs)
     except Exception:
         alt_costs = {}
+    try:
+        from services.corporate_actions import dividends_received
+        divs = dividends_received(txs)["by_position"]
+    except Exception:
+        divs = {}
 
     # Enrich with live prices
     enriched = []
@@ -195,6 +201,8 @@ def get_portfolio(account: Optional[str] = Query(None)):
         item["live_price"] = live_price
         item["live_change_pct"] = change_pct
         item["price_source"] = price_source
+        d = divs.get(f"{ticker}|{item.get('account') or 'real'}") or {}
+        item["dividends_gross"], item["dividends_net"] = d.get("gross", 0.0), d.get("net", 0.0)
         alt = alt_costs.get((ticker, item.get("account") or "real"))
         if alt and alt["qty"] > 1e-9:
             item["cost_real_today"] = alt["cost_real"] / alt["qty"] if alt["cost_real"] == alt["cost_real"] else None
@@ -215,7 +223,7 @@ def add_portfolio_item(item: PortfolioItem):
 @router.get("/transactions")
 def get_transactions(account: Optional[str] = Query(None)):
     report_repo, _ = _get_deps()
-    return report_repo.get_portfolio_transactions(_account(account))
+    return report_repo.get_portfolio_transactions(_account(account), adjusted=False)  # as entered
 
 class TransactionItem(BaseModel):
     ticker: str
@@ -232,6 +240,14 @@ def add_transaction(item: TransactionItem):
     tx = _validate_transactions([item.model_dump()], account)[0]
     report_repo.add_portfolio_transaction(tx["ticker"], tx["tx_type"], tx["quantity"], tx["price"], tx["tx_date"], account)
     return {"status": "success"}
+
+
+@router.get("/dividends")
+def get_dividends(account: Optional[str] = Query(None)):
+    """Cash dividends earned on held shares (ex-date holdings), before and after withholding."""
+    report_repo, _ = _get_deps()
+    from services.corporate_actions import dividends_received
+    return dividends_received(report_repo.get_portfolio_transactions(_account(account)))
 
 
 @router.get("/realized")
@@ -266,6 +282,11 @@ def get_equity_curve(days: int = 30, account: Optional[str] = Query(None)):
         rows = report_repo.get_historical_prices(ticker)
         dates = [str(p['date']).split(' ')[0] for p in rows]
         closes = [float(p['close']) for p in rows]
+        try:
+            from services.corporate_actions import undo_dividend_adjustment
+            closes = undo_dividend_adjustment(ticker, dates, closes)  # dividends are added separately below
+        except Exception:
+            pass
         live = price_service.get_price(ticker)
         if isinstance(live, dict) and live.get("price"):
             if dates and dates[-1] == end_date.isoformat():
@@ -279,6 +300,13 @@ def get_equity_curve(days: int = 30, account: Optional[str] = Query(None)):
         dates, closes = histories.get(ticker, ([], []))
         i = bisect.bisect_right(dates, date_str) - 1
         return closes[i] if i >= 0 else fallback
+
+    # Cash dividends received count as part of the portfolio's value from their ex-date.
+    try:
+        from services.corporate_actions import dividends_received
+        div_events = dividends_received(transactions)["events"]
+    except Exception:
+        div_events = []
 
     curve = []
     for current_date in date_list:
@@ -303,10 +331,12 @@ def get_equity_curve(days: int = 30, account: Optional[str] = Query(None)):
 
         # Before a ticker's first stored bar, value it at its own trade price.
         market_value = sum(qty * price_on(t, date_str, last_trade_price[t]) for t, qty in holdings.items() if qty > 0)
+        dividends = sum(e["net"] for e in div_events if e["ex_date"] <= date_str)
         curve.append({
             "day": "Bugün" if current_date == end_date else current_date.strftime("%d.%m"),
             "date": date_str,
-            "value": market_value,
+            "value": market_value + dividends,
+            "dividends": dividends,
             "invested": cash_invested,
         })
 

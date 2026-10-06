@@ -897,6 +897,13 @@ class ReportDBManager:
         """Replays the account's transactions plus `extra` in date order and returns an error message
         if any sale exceeds the quantity held at that moment, otherwise None."""
         txs = [dict(t, _order=(str(t['tx_date'])[:10], 0, t['id'])) for t in self.get_portfolio_transactions(account)]
+        if extra:
+            # New entries are on the share basis of their own date; bring them to today's basis too.
+            try:
+                from services.corporate_actions import adjust_transactions
+                extra = adjust_transactions([dict(t) for t in extra])
+            except Exception:
+                pass
         for i, t in enumerate(extra or []):
             txs.append(dict(t, _order=(str(t.get('tx_date') or '')[:10], 1, i)))
         held: Dict[str, float] = {}
@@ -913,14 +920,24 @@ class ReportDBManager:
                 held[tk] = have - qty
         return None
 
-    def get_portfolio_transactions(self, account: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_portfolio_transactions(self, account: Optional[str] = None, adjusted: bool = True) -> List[Dict[str, Any]]:
+        """Transactions in date order. adjusted=True converts them to the current share basis
+        (later splits / bonus issues applied), which is what positions, P/L and dividends use;
+        adjusted=False returns them exactly as entered."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if account:
                 cursor.execute("SELECT * FROM portfolio_transactions WHERE account = ? ORDER BY tx_date ASC, id ASC", (account,))
             else:
                 cursor.execute("SELECT * FROM portfolio_transactions ORDER BY tx_date ASC, id ASC")
-            return [dict(r) for r in cursor.fetchall()]
+            rows = [dict(r) for r in cursor.fetchall()]
+        if adjusted and rows:
+            try:
+                from services.corporate_actions import adjust_transactions
+                rows = adjust_transactions(rows)
+            except Exception as e:
+                logger.warning(f"Split adjustment unavailable: {e}")
+        return rows
 
     def add_portfolio_transaction(self, ticker: str, tx_type: str, quantity: float, price: float, tx_date: str, account: str = "real") -> None:
         with self._lock:

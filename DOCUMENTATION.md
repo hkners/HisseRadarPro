@@ -316,3 +316,9 @@ BIST piyasa genişliği (hisselerin kendi 50 günlük ortalamasının üzerindek
 ---
 > **Dokümantasyonun Sonu.** Bu belge, HisseRadarPro v3.0 sisteminin sahip olduğu istisnasız tüm modülleri, sınıfları, değişken atamalarını ve iş mantıklarını (business logic) milimetrik olarak barındırmaktadır.
 
+
+## 20. Temettü, bedelsiz ve toplam getiri
+
+- **Fiyat geçmişi toplam getiridir:** `historical_prices` yfinance'in temettü ve bölünmeye göre düzeltilmiş fiyatlarını tutar; backtest, teknik model ve skor karnesi bu yüzden temettüyü içerir. Günlük güncelleme son üç ayı indirip saklanan kapanışlarla karşılaştırır; medyan oran %0,3'ten fazla saparsa (yeni temettü veya bölünme) hissenin geçmişi baştan indirilir. Bir defalık tam tarama: `price_history_sync.repair_adjustments()` (ilk çalıştırmada 32 hisse düzeltildi).
+- **Portföy (services/corporate_actions.py):** portföydeki hisselerin temettü ve bölünme kayıtları yfinance'ten günde bir alınır (`corporate_actions` tablosu). İşlemler bugünkü pay bazına çevrilir: bedelsizden önce 50 TL'den 100 adet, %100 bedelsizden sonra 25 TL'den 200 adet sayılır. Kullanıcının girdiği değerler işlem listesinde aynen kalır; pozisyon, maliyet, kâr/zarar ve satış kontrolü düzeltilmiş değerlerle yapılır. Bedelli artırımla alınan yeni paylar alış işlemi olarak girilmelidir.
+- **Temettü geliri:** her hak kesim günü için hisse başı temettü x bir önceki gün eldeki adet; %15 stopaj varsayımıyla brüt ve net gösterilir (`GET /api/portfolio/dividends`, portföy satırlarında `dividends_gross` / `dividends_net`). Portföy değeri grafiği geçmiş günleri ham fiyatla değerler (düzeltme geri alınır, `undo_dividend_adjustment`) ve net temettüyü hak kesim gününden itibaren ekler; böylece temettü iki kez sayılmaz.

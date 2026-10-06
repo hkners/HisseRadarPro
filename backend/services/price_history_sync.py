@@ -48,6 +48,58 @@ def _latest_rows(repo) -> Dict[str, tuple]:
     return {r[0]: (str(r[1])[:10], float(r[2] or 0)) for r in rows}
 
 
+REBASE_TOLERANCE = 0.003   # a typical dividend is 1-10% of the price; float noise is far below 0.3%
+
+
+def _stored_closes(repo, tickers: List[str], since: str) -> Dict[str, Dict[str, float]]:
+    out: Dict[str, Dict[str, float]] = {}
+    if not tickers:
+        return out
+    marks = ",".join("?" * len(tickers))
+    with repo._get_connection() as conn:
+        for t, d, c in conn.execute(f"SELECT ticker, date, close FROM historical_prices WHERE date >= ? AND ticker IN ({marks})",
+                                    [since, *tickers]).fetchall():
+            out.setdefault(t, {})[str(d)[:10]] = float(c)
+    return out
+
+
+def _needs_rebase(adjusted_close, stored: Dict[str, float]) -> bool:
+    """True when the stored closes and yfinance's adjusted closes disagree on the overlapping days."""
+    import numpy as np
+    ratios = [float(v) / stored[i.date().isoformat()] for i, v in adjusted_close.items()
+              if i.date().isoformat() in stored and stored[i.date().isoformat()] > 0 and v == v]
+    if len(ratios) < 5:
+        return False
+    return abs(float(np.median(ratios[:20])) - 1) > REBASE_TOLERANCE
+
+
+def repair_adjustments(tickers: Optional[List[str]] = None, period: str = "2y") -> Dict[str, Any]:
+    """One-off check of the whole universe: refetch every ticker whose stored history misses a
+    dividend or split adjustment that yfinance has applied since it was downloaded."""
+    import yfinance as yf
+    from globals import BIST_TICKERS, report_repo
+    names = sorted(set(tickers or BIST_TICKERS) | {"XU100"})
+    data = yf.download([f"{t}.IS" for t in names], period=period, group_by="ticker", auto_adjust=True,
+                       progress=False, threads=True)
+    since = (datetime.date.today() - datetime.timedelta(days=800)).isoformat()
+    stored = _stored_closes(report_repo, names, since)
+    fixed = []
+    for t in names:
+        key = f"{t}.IS"
+        if data is None or data.empty or key not in data.columns.get_level_values(0):
+            continue
+        close = data[key]["Close"].dropna()
+        if _needs_rebase(close, stored.get(t, {})):
+            try:
+                _refetch_full(t, report_repo)
+                fixed.append(t)
+            except Exception as e:
+                logger.warning(f"Repair refetch failed for {t}: {e}")
+    if fixed:
+        _invalidate_caches(rebuild_lab=True)
+    return {"checked": len(names), "fixed": fixed}
+
+
 def _refetch_full(ticker: str, repo) -> int:
     """Replaces a ticker's whole history with yfinance's split-adjusted series."""
     import yfinance as yf
@@ -62,7 +114,7 @@ def _refetch_full(ticker: str, repo) -> int:
     return len(records)
 
 
-def _invalidate_caches() -> None:
+def _invalidate_caches(rebuild_lab: bool = False) -> None:
     try:
         from services import backtest_engine
         backtest_engine._data_cache["time"] = 0.0
@@ -70,7 +122,10 @@ def _invalidate_caches() -> None:
         pass
     try:
         from services import ta_lab
-        ta_lab.ensure_fresh()  # a new session makes the lab stale: rebuild in the background
+        if rebuild_lab:
+            ta_lab.force_rebuild()  # same session, corrected history
+        else:
+            ta_lab.ensure_fresh()   # a new session makes the lab stale: rebuild in the background
     except Exception:
         pass
     for mod, attr in (("services.house_strategies", "_cache"), ("services.baskets", "_cache")):
@@ -105,9 +160,12 @@ def sync_missing_days(tickers: Optional[List[str]] = None) -> Dict[str, Any]:
 
         oldest = min(datetime.date.fromisoformat(latest[t]) for t in stale)
         gap = (datetime.date.today() - oldest).days
-        period = "5d" if gap <= 5 else "1mo" if gap <= 28 else "3mo" if gap <= 85 else "6mo"
+        # At least three months: the overlap with stored prices is how dividends and splits that
+        # yfinance has applied to the past since our last download are detected.
+        period = "3mo" if gap <= 85 else "6mo"
         data = yf.download([f"{t}.IS" for t in stale], period=period, group_by="ticker",
                            auto_adjust=True, progress=False, threads=True)
+        stored = _stored_closes(report_repo, stale, (datetime.date.today() - datetime.timedelta(days=200)).isoformat())
         records = []
         rebased: List[str] = []
         for t in stale:
@@ -115,11 +173,9 @@ def sync_missing_days(tickers: Optional[List[str]] = None) -> Dict[str, Any]:
             if data is None or data.empty or key not in data.columns.get_level_values(0):
                 continue
             df = data[key].dropna(subset=["Open", "High", "Low", "Close"])
-            # A split or bonus issue makes yfinance rescale the past. If its close for our last stored
-            # day no longer matches what we stored, the stored history is on the old basis: refetch it.
-            stored_close = last_rows[t][1]
-            same_day = [r["Close"] for i, r in df.iterrows() if i.date().isoformat() == latest[t]]
-            if same_day and stored_close > 0 and abs(float(same_day[0]) / stored_close - 1) > 0.02:
+            # Dividends, splits and bonus issues make yfinance rescale the past. If its adjusted closes
+            # no longer match what we stored, our history misses an adjustment: refetch it whole.
+            if _needs_rebase(df["Close"], stored.get(t, {})):
                 rebased.append(t)
                 continue
             for idx, row in df.iterrows():
@@ -137,12 +193,18 @@ def sync_missing_days(tickers: Optional[List[str]] = None) -> Dict[str, Any]:
             except Exception as e:
                 logger.warning(f"Full refetch failed for {t}: {e}")
         if records or rebased:
-            _invalidate_caches()
+            _invalidate_caches(rebuild_lab=bool(rebased) and not records)
         try:
             from services import macro_data
             macro_data.sync()  # TCMB inflation/policy tables, USD/TRY, gold: refreshed with each new session
         except Exception as e:
             logger.warning(f"Macro sync failed: {e}")
+        try:
+            from services import corporate_actions
+            held = sorted({tx["ticker"] for tx in report_repo.get_portfolio_transactions(adjusted=False)})
+            corporate_actions.refresh(held)  # new dividends and bonus issues of portfolio stocks (daily)
+        except Exception as e:
+            logger.warning(f"Corporate actions refresh failed: {e}")
         result = {"status": "ok", "session": cutoff.isoformat(), "tickers_checked": len(stale),
                   "rows_added": len(records), "rebased": rebased, "seconds": round(time.time() - t0, 1)}
         logger.info(f"Price history sync: {result}")
